@@ -8,22 +8,42 @@
 </head>
 <body>
     <div class="container">
-        <h1>🚌 九龍巴士 到站查詢</h1>
-        <p class="subtitle">GitHub Learning Project 1</p>
-        
+        <!-- Header -->
+        <header class="header">
+            <h1>🚌 九龍巴士 到站查詢</h1>
+            <p class="subtitle">GitHub Learning Project 1</p>
+        </header>
+
+        <!-- 搜尋區域 -->
         <div class="search-box">
-            <input type="text" id="routeInput" placeholder="輸入路線號，例如 1A" value="1A">
-            <select id="serviceType">
-                <option value="1">服務類型 1（正常）</option>
-                <option value="2">服務類型 2</option>
-            </select>
-            <button onclick="searchETA()">🔍 查詢</button>
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="routeInput" 
+                    placeholder="輸入路線號，例如 1A、2、104" 
+                    value="1A"
+                    onkeyup="if(event.key === 'Enter') searchETA()">
+                <select id="serviceType">
+                    <option value="1">服務類型 1（正常）</option>
+                    <option value="2">服務類型 2</option>
+                </select>
+            </div>
+            <button onclick="searchETA()" id="searchBtn">🔍 查詢</button>
         </div>
 
+        <!-- 狀態資訊 -->
+        <div id="status" class="status"></div>
+
+        <!-- 結果區域 -->
         <div id="result" class="result">
             <!-- 查詢結果會顯示在這裡 -->
         </div>
     </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>這是我的第一個 GitHub 學習專案 • 使用香港政府開放資料 API</p>
+    </footer>
 
     <script src="script.js"></script>
 </body>

@@ -1,25 +1,42 @@
-// GitHub Learning Project 1 - KMB Bus ETA
-console.log("github_learning_project_1 已載入");
+// GitHub Learning Project 1 - KMB Bus ETA Stage 2
+console.log("🚀 github_learning_project_1 階段 2 已載入");
 
-// 目前只是顯示訊息，之後會加入真正的 API 功能
+// 主查詢函數
 function searchETA() {
     const route = document.getElementById('routeInput').value.trim().toUpperCase();
+    const serviceType = document.getElementById('serviceType').value;
     const resultDiv = document.getElementById('result');
-    
+    const statusDiv = document.getElementById('status');
+    const searchBtn = document.getElementById('searchBtn');
+
     if (!route) {
-        resultDiv.innerHTML = `<p style="color:red">請輸入路線號！</p>`;
+        statusDiv.innerHTML = `<span style="color:red">⚠️ 請輸入路線號！</span>`;
         return;
     }
 
-    resultDiv.innerHTML = `<p class="loading">正在查詢路線 ${route} 的到站時間...</p>`;
-    
-    // 暫時顯示提示，之後會替換成真實 API 呼叫
+    // 顯示載入狀態
+    searchBtn.disabled = true;
+    searchBtn.textContent = "查詢中...";
+    statusDiv.innerHTML = `🔍 正在查詢路線 <strong>${route}</strong> ...`;
+    resultDiv.innerHTML = `<div class="loading">正在獲取巴士到站資料，請稍候...</div>`;
+
+    // 目前階段先顯示美化後的提示（真實 API 將在階段 3 加入）
     setTimeout(() => {
         resultDiv.innerHTML = `
-            <h2>路線 ${route} 查詢結果</h2>
-            <p>✅ 專案骨架已成功建立！</p>
-            <p>現在我們進入階段 2，將會加入真正的巴士到站資料。</p>
-            <p style="color:#666">目前 script.js 還在準備階段，API 功能將在下一階段加入。</p>
+            <h2 style="text-align:center; color:#c8102e;">路線 ${route} 查詢結果</h2>
+            <p style="text-align:center; color:#666;">✅ 階段 2 介面已成功美化完成！</p>
+            <p style="text-align:center;">現在網站已經有專業的外觀了。</p>
+            <p style="text-align:center; color:#888;">下一步（階段 3）將會連接真正的九龍巴士官方 API，讓它顯示實際到站時間。</p>
         `;
-    }, 1500);
+        statusDiv.innerHTML = `✅ 介面載入完成（階段 2）`;
+        searchBtn.disabled = false;
+        searchBtn.textContent = "🔍 查詢";
+    }, 1800);
 }
+
+// 讓輸入框按 Enter 也可以查詢
+document.getElementById('routeInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        searchETA();
+    }
+});
