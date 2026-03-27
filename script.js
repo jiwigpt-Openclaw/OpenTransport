@@ -1,6 +1,6 @@
-const APP_VERSION = "2026-03-27 17:15";
+const APP_VERSION = "2026-03-28 00:10";
 const API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
-const COUNTDOWN_REFRESH_MS = 30000;
+const COUNTDOWN_REFRESH_MS = 1000;
 const DATA_REFRESH_MS = 60000;
 const routeStopCache = new Map();
 const stopEtaCache = new Map();
@@ -507,12 +507,18 @@ function formatEtaMinutes(etaValue) {
     }
 
     const diffMilliseconds = etaTimestamp - Date.now();
-    if (diffMilliseconds <= 60000) {
+    if (diffMilliseconds <= 0) {
         return "即將到站";
     }
 
-    const diffMinutes = Math.ceil(diffMilliseconds / 60000);
-    return `${diffMinutes} 分鐘`;
+    const totalSeconds = Math.ceil(diffMilliseconds / 1000);
+    if (totalSeconds < 60) {
+        return `${totalSeconds} 秒`;
+    }
+
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return seconds === 0 ? `${minutes} 分鐘` : `${minutes} 分 ${seconds} 秒`;
 }
 
 function formatEtaClock(etaValue) {
@@ -591,7 +597,7 @@ function renderResult(route, serviceType, variants, routeStopsByDirection, stopM
 
     return `
         <div>
-            <p style="text-align:center; color:#666;">資料更新：${updatedTimeText} • 倒數每 30 秒自動更新</p>
+            <p style="text-align:center; color:#666;">資料更新：${updatedTimeText} • 倒數每秒更新，資料每 60 秒重抓</p>
             ${sections}
         </div>
     `;
