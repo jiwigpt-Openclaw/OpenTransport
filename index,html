@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KMB 巴士到站查詢 - GitHub Learning Project 1</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🚌 九龍巴士 到站查詢</h1>
+        <p class="subtitle">GitHub Learning Project 1</p>
+        
+        <div class="search-box">
+            <input type="text" id="routeInput" placeholder="輸入路線號，例如 1A" value="1A">
+            <select id="serviceType">
+                <option value="1">服務類型 1（正常）</option>
+                <option value="2">服務類型 2</option>
+            </select>
+            <button onclick="searchETA()">🔍 查詢</button>
+        </div>
+
+        <div id="result" class="result">
+            <!-- 查詢結果會顯示在這裡 -->
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

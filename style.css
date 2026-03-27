@@ -1,0 +1,87 @@
+body {
+    font-family: "Microsoft JhengHei", "Segoe UI", sans-serif;
+    background: #f0f4f8;
+    margin: 0;
+    padding: 20px;
+    color: #333;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+h1 {
+    color: #c8102e;
+    margin-bottom: 5px;
+}
+
+.subtitle {
+    color: #666;
+    font-size: 16px;
+    margin-bottom: 30px;
+}
+
+.search-box {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 40px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+input, select, button {
+    padding: 14px 18px;
+    font-size: 18px;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+}
+
+input {
+    width: 220px;
+}
+
+button {
+    background: #c8102e;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover {
+    background: #a00c24;
+}
+
+.result {
+    text-align: left;
+    margin-top: 20px;
+}
+
+.stop {
+    background: #f8f9fa;
+    padding: 18px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    border-left: 6px solid #c8102e;
+}
+
+.stop h3 {
+    margin: 0 0 10px 0;
+    color: #222;
+}
+
+.eta {
+    font-size: 24px;
+    font-weight: bold;
+    color: #c8102e;
+}
+
+.loading {
+    color: #666;
+    font-style: italic;
+}
