@@ -1,116 +1,93 @@
-// GitHub Learning Project 1 - KMB Bus ETA Stage 3 修復版
-console.log("🚀 github_learning_project_1 階段 3 修復版已載入");
+// GitHub Learning Project 1 - KMB Bus ETA Stage 3 最終修復版
+console.log("🚀 github_learning_project_1 階段 3 最終修復版已載入");
 
 // 主查詢函數
 async function searchETA() {
-    const routeInput = document.getElementById('routeInput');
-    const route = routeInput.value.trim().toUpperCase();
+    const route = document.getElementById('routeInput').value.trim().toUpperCase();
     const serviceType = document.getElementById('serviceType').value;
     const resultDiv = document.getElementById('result');
     const statusDiv = document.getElementById('status');
     const searchBtn = document.getElementById('searchBtn');
-
-    // 清空之前的狀態
-    statusDiv.innerHTML = '';
-    resultDiv.innerHTML = '';
 
     if (!route) {
         statusDiv.innerHTML = `<span style="color:red">⚠️ 請輸入路線號！</span>`;
         return;
     }
 
-    // 顯示載入狀態
+    // 清空並顯示載入狀態
+    statusDiv.innerHTML = `🔍 正在查詢路線 <strong>${route}</strong> ...`;
+    resultDiv.innerHTML = `<div class="loading">正在從官方 API 獲取最新到站資料...</div>`;
     searchBtn.disabled = true;
     searchBtn.textContent = "查詢中...";
-    statusDiv.innerHTML = `🔍 正在查詢路線 <strong>${route}</strong> 的到站時間...`;
 
     try {
-        // 使用正確的官方 API 網址
         const url = `https://data.etabus.gov.hk/v1/transport/kmb/route-eta/${route}/${serviceType}`;
-        console.log("正在呼叫 API:", url);
+        console.log("呼叫 API:", url);
 
         const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP 錯誤: ${response.status}`);
 
-        if (!response.ok) {
-            throw new Error(`HTTP 錯誤！狀態碼：${response.status}`);
-        }
+        const apiResponse = await response.json();
+        console.log("API 完整回傳:", apiResponse);
 
-        const data = await response.json();
-        console.log("API 回傳資料:", data);
+        const stops = apiResponse.data || [];
 
-        if (!data.data || data.data.length === 0) {
+        if (!stops || stops.length === 0) {
             resultDiv.innerHTML = `
                 <h2 style="text-align:center; color:#c8102e;">路線 ${route}</h2>
-                <p style="text-align:center; color:#d32f2f; font-size:1.1em;">
-                    ⚠️ 目前沒有找到這條路線的到站資料
-                </p>
-                <p style="text-align:center; color:#666;">
-                    可能原因：<br>
-                    • 路線號輸入錯誤<br>
-                    • 該路線目前沒有巴士行駛<br>
-                    • 請稍後再試
-                </p>
+                <p style="text-align:center; color:#d32f2f;">⚠️ 目前沒有這條路線的到站資料</p>
+                <p style="text-align:center; color:#666;">請確認路線號正確，或稍後再試</p>
             `;
-            statusDiv.innerHTML = `⚠️ 沒有找到資料`;
+            statusDiv.innerHTML = `⚠️ 沒有資料`;
             return;
         }
 
-        // 成功取得資料，開始顯示
+        // 正確處理 API 資料結構
         let html = `
             <h2 style="text-align:center; color:#c8102e;">路線 ${route} 到站時間</h2>
-            <p style="text-align:center; color:#666; font-size:0.95em;">
-                資料來源：香港運輸署 • 最後更新：${new Date().toLocaleTimeString('zh-HK')}
-            </p>
+            <p style="text-align:center; color:#666;">最後更新：${new Date().toLocaleTimeString('zh-HK')}</p>
         `;
 
-        data.data.forEach(stop => {
-            let etaHtml = '';
+        stops.forEach(stop => {
+            let etaHtml = '<span style="color:#888;">暫無預報</span>';
 
-            if (stop.eta && stop.eta.length > 0) {
-                etaHtml = stop.eta.map(etaItem => {
+            // 處理 eta 資料（可能是陣列或單一物件）
+            if (stop.eta) {
+                const etaList = Array.isArray(stop.eta) ? stop.eta : [stop.eta];
+                
+                etaHtml = etaList.map(etaItem => {
+                    if (!etaItem || !etaItem.eta) return '';
+
                     const etaTime = new Date(etaItem.eta);
-                    const now = new Date();
-                    let minutesLeft = Math.round((etaTime - now) / 60000);
-                    
-                    if (minutesLeft < 1) minutesLeft = 1;   // 最少顯示 1 分鐘
-                    if (minutesLeft > 120) minutesLeft = 120; // 上限避免異常
+                    const minutesLeft = Math.max(1, Math.round((etaTime - new Date()) / 60000));
+                    const dest = etaItem.dest_tc || etaItem.destination_tc || '未知目的地';
 
-                    const dest = etaItem.dest_tc || '未知目的地';
-                    
                     return `
-                        <div style="margin:10px 0; padding:8px 0; border-bottom:1px dashed #ddd;">
+                        <div style="margin:8px 0;">
                             <span class="eta">${minutesLeft} 分鐘</span>
                             <span style="margin-left:12px; color:#555;">→ ${dest}</span>
                         </div>`;
-                }).join('');
-            } else {
-                etaHtml = `<span style="color:#888;">暫無預報資料</span>`;
+                }).filter(item => item !== '').join('');
             }
 
             html += `
                 <div class="stop">
-                    <h3>第 ${stop.seq} 站 • ${stop.stop_tc}</h3>
+                    <h3>第 ${stop.seq || '?'} 站 • ${stop.stop_tc || stop.stop_name_tc || '未知站名'}</h3>
                     <div>${etaHtml}</div>
                 </div>`;
         });
 
         resultDiv.innerHTML = html;
-        statusDiv.innerHTML = `✅ 成功顯示 ${data.data.length} 個車站 • ${new Date().toLocaleTimeString('zh-HK')}`;
+        statusDiv.innerHTML = `✅ 成功顯示 ${stops.length} 個車站 • ${new Date().toLocaleTimeString('zh-HK')}`;
 
     } catch (error) {
-        console.error("API 錯誤詳細資訊:", error);
+        console.error("錯誤詳細資訊:", error);
         
         resultDiv.innerHTML = `
-            <div style="text-align:center; padding:40px 20px;">
-                <p style="color:#d32f2f; font-size:1.2em;">❌ 無法取得資料</p>
-                <p style="color:#666;">可能原因：</p>
-                <ul style="text-align:left; max-width:400px; margin:20px auto; color:#555;">
-                    <li>路線號輸入錯誤（請確認如 1A、2、104）</li>
-                    <li>目前該路線沒有巴士行駛</li>
-                    <li>網路連線問題</li>
-                    <li>API 暫時無法使用（請稍後再試）</li>
-                </ul>
-                <button onclick="searchETA()" style="margin-top:20px; padding:12px 24px;">🔄 再試一次</button>
+            <div style="text-align:center; padding:40px 20px; color:#d32f2f;">
+                <p style="font-size:1.2em;">❌ 無法取得資料</p>
+                <p>請稍後再試，或檢查網路連線</p>
+                <button onclick="searchETA()" style="margin-top:20px; padding:12px 28px; background:#c8102e; color:white; border:none; border-radius:8px; cursor:pointer;">🔄 再試一次</button>
             </div>
         `;
         statusDiv.innerHTML = `❌ 查詢失敗`;
@@ -121,13 +98,10 @@ async function searchETA() {
 }
 
 // Enter 鍵支援
-document.getElementById('routeInput').addEventListener('keypress', function(e) {
+document.getElementById('routeInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') searchETA();
 });
 
-// 頁面載入時的提示
-window.onload = function() {
-    console.log("✅ 頁面載入完成，階段 3 修復版已就緒");
-    // 可選：自動查詢預設路線 1A
-    // setTimeout(() => searchETA(), 800);
+window.onload = () => {
+    console.log("✅ 頁面載入完成，階段 3 最終修復版已就緒");
 };
