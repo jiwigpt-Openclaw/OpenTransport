@@ -1,4 +1,4 @@
-// GitHub Learning Project 1 - KMB Bus ETA Stage 3 最終完美版
+// GitHub Learning Project 1 - KMB Bus ETA Stage 3 最終完美版（正確顯示站名）
 console.log("🚀 github_learning_project_1 階段 3 最終完美版已載入");
 
 // 主查詢函數
@@ -29,7 +29,6 @@ async function searchETA() {
         const apiResponse = await response.json();
         console.log("API 完整回傳:", apiResponse);
 
-        // KMB route-eta API 的資料實際結構：data 是一個陣列
         const rawStops = apiResponse.data || [];
 
         if (rawStops.length === 0) {
@@ -43,14 +42,19 @@ async function searchETA() {
             <p style="text-align:center; color:#666;">最後更新：${new Date().toLocaleTimeString('zh-HK')}</p>
         `;
 
-        // 正確處理每個站點
         rawStops.forEach((stop, index) => {
+            // 正確取得站序與站名
             const seq = stop.seq || (index + 1);
-            const stopName = stop.stop_tc || stop.stop_name_tc || `第 ${seq} 站`;
+            let stopName = "未知站名";
+
+            // 嘗試多種可能的站名欄位
+            if (stop.stop_tc) stopName = stop.stop_tc;
+            else if (stop.stop_name_tc) stopName = stop.stop_name_tc;
+            else if (stop.name_tc) stopName = stop.name_tc;
 
             let etaHtml = '<span style="color:#888;">暫無預報</span>';
 
-            // 處理 eta 資料（可能是陣列或單一物件）
+            // 處理 eta 資料
             if (stop.eta) {
                 const etaItems = Array.isArray(stop.eta) ? stop.eta : [stop.eta];
                 
