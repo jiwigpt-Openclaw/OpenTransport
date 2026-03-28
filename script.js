@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-03-29 01:05";
+const APP_VERSION = "2026-03-29 02:45";
 const KMB_API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const CTB_API_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
 const NLB_API_BASE = "https://rt.data.gov.hk/v2/transport/nlb";
@@ -12,6 +12,8 @@ const GEOLOCATION_OPTIONS = {
 };
 const LOCAL_FILE_GMB_RESTRICTION_MESSAGE = "綠色小巴資料在本機檔案模式下會被限制，請改用 VS Code Live Server 或部署到 GitHub Pages 才能完整使用。";
 const GMB_REGIONS = ["HKI", "KLN", "NT"];
+const FAVORITE_ROUTES_STORAGE_KEY = "favoriteRoutes";
+const FAVORITE_ROUTE_NOTICE_MS = 1800;
 const COMPANY_ORDER = {
     KMB: 0,
     CTB: 1,
@@ -119,6 +121,8 @@ let activeLocationRequestId = 0;
 let liveCountdownTimerId = null;
 let dataRefreshTimerId = null;
 let pendingScrollTimerId = null;
+let favoriteRouteNoticeTimerId = null;
+let activeStopInfoModalRequestId = 0;
 
 // 這個物件會保存目前畫面所需的所有狀態，方便重繪與自動更新。
 let currentRenderState = null;
@@ -139,6 +143,104 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+}
+
+// 常用路線只存「路線號」本身，所以先統一做 trim + 大寫，避免 1a / 1A 被當成不同收藏。
+function normalizeRouteCode(route) {
+    return String(route ?? "").trim().toUpperCase();
+}
+
+// 這裡集中讀取 localStorage，畫面需要星星狀態或常用路線列表時都走同一套邏輯。
+function getFavoriteRoutes() {
+    try {
+        const rawValue = window.localStorage.getItem(FAVORITE_ROUTES_STORAGE_KEY);
+        const parsedValue = rawValue ? JSON.parse(rawValue) : [];
+        if (!Array.isArray(parsedValue)) {
+            return [];
+        }
+
+        const uniqueRoutes = new Set();
+        return parsedValue
+            .map((route) => normalizeRouteCode(route))
+            .filter((route) => {
+                if (!route || uniqueRoutes.has(route)) {
+                    return false;
+                }
+
+                uniqueRoutes.add(route);
+                return true;
+            });
+    } catch (error) {
+        console.warn("讀取常用路線失敗，先改用空白收藏列表", error);
+        return [];
+    }
+}
+
+// 存檔時也做一次去重與正規化，確保 localStorage 內只保留乾淨的路線號陣列。
+function saveFavoriteRoutes(routes) {
+    const normalizedRoutes = [...new Set(
+        (Array.isArray(routes) ? routes : [])
+            .map((route) => normalizeRouteCode(route))
+            .filter(Boolean)
+    )];
+
+    try {
+        window.localStorage.setItem(FAVORITE_ROUTES_STORAGE_KEY, JSON.stringify(normalizedRoutes));
+    } catch (error) {
+        console.warn("儲存常用路線失敗", error);
+    }
+
+    return normalizedRoutes;
+}
+
+function isFavoriteRoute(route) {
+    const normalizedRoute = normalizeRouteCode(route);
+    return normalizedRoute ? getFavoriteRoutes().includes(normalizedRoute) : false;
+}
+
+// 收藏後給一個短提示，讓使用者知道星星點擊已經成功。
+function showFavoriteRoutesNotice(message = "") {
+    const noticeElement = document.getElementById("favoriteRoutesNotice");
+    if (!noticeElement) {
+        return;
+    }
+
+    if (favoriteRouteNoticeTimerId) {
+        window.clearTimeout(favoriteRouteNoticeTimerId);
+        favoriteRouteNoticeTimerId = null;
+    }
+
+    noticeElement.textContent = String(message || "").trim();
+    noticeElement.classList.toggle("is-visible", Boolean(message));
+
+    if (!message) {
+        return;
+    }
+
+    favoriteRouteNoticeTimerId = window.setTimeout(() => {
+        noticeElement.textContent = "";
+        noticeElement.classList.remove("is-visible");
+        favoriteRouteNoticeTimerId = null;
+    }, FAVORITE_ROUTE_NOTICE_MS);
+}
+
+// 常用路線區完全由 localStorage 驅動：有收藏就顯示膠囊，沒有就顯示教學提示。
+function renderFavoriteRoutes() {
+    const favoriteRoutesList = document.getElementById("favoriteRoutesList");
+    if (!favoriteRoutesList) {
+        return;
+    }
+
+    const favoriteRoutes = getFavoriteRoutes();
+    if (favoriteRoutes.length === 0) {
+        favoriteRoutesList.innerHTML = '<p class="quick-routes-empty">點擊方向卡片右上角的星星即可加入常用路線</p>';
+        return;
+    }
+
+    favoriteRoutesList.innerHTML = favoriteRoutes.map((route) => {
+        const encodedRoute = encodeURIComponent(route);
+        return `<button type="button" class="quick-route-btn" onclick="selectQuickRoute('${encodedRoute}')">${escapeHtml(route)}</button>`;
+    }).join("");
 }
 
 function getCompanyConfig(company) {
@@ -303,9 +405,99 @@ function findVariantByKey(variantKey) {
     return currentRenderState.variants.find((variant) => getVariantKey(variant) === variantKey) || null;
 }
 
+function getSelectedVariantStopByKey(stopKey) {
+    if (!currentRenderState?.selectedVariantKey || !stopKey) {
+        return null;
+    }
+
+    const variantData = ensureVariantDataBucket(currentRenderState.selectedVariantKey);
+    if (!variantData?.routeStopsWithEta.length) {
+        return null;
+    }
+
+    return variantData.routeStopsWithEta.find((stop) => {
+        return getStopPanelKey(currentRenderState.selectedVariantKey, stop) === stopKey;
+    }) || null;
+}
+
+function getSelectedVariantContext() {
+    if (!currentRenderState?.selectedVariantKey) {
+        return null;
+    }
+
+    const variant = findVariantByKey(currentRenderState.selectedVariantKey);
+    const variantData = ensureVariantDataBucket(currentRenderState.selectedVariantKey);
+    if (!variant || !variantData) {
+        return null;
+    }
+
+    return {
+        variant,
+        variantData,
+        variantKey: currentRenderState.selectedVariantKey
+    };
+}
+
+function getStopDisplayName(stop, company) {
+    const stopMap = getStopMapForCompany(company);
+    const stopInfo = stopMap.get(normalizeStopId(stop?.stopId));
+    return stopInfo?.name_tc || stopInfo?.name_en || `站點 ${normalizeStopId(stop?.stopId)}`;
+}
+
+function getStopInfoModalElements() {
+    return {
+        modal: document.getElementById("stopInfoModal"),
+        title: document.getElementById("stopInfoModalTitle"),
+        subtitle: document.getElementById("stopInfoModalSubtitle"),
+        body: document.getElementById("stopInfoModalBody")
+    };
+}
+
+function renderStopInfoModalState({ title = "此站停靠車號", subtitle = "", bodyHtml = "" } = {}) {
+    const { title: titleElement, subtitle: subtitleElement, body: bodyElement } = getStopInfoModalElements();
+    if (!titleElement || !subtitleElement || !bodyElement) {
+        return;
+    }
+
+    titleElement.textContent = title;
+    subtitleElement.textContent = subtitle;
+    subtitleElement.hidden = !subtitle;
+    bodyElement.innerHTML = bodyHtml;
+}
+
+function openStopInfoModal() {
+    const { modal } = getStopInfoModalElements();
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("has-modal-open");
+}
+
+function closeStopInfoModal() {
+    const { modal } = getStopInfoModalElements();
+    if (!modal) {
+        return;
+    }
+
+    activeStopInfoModalRequestId += 1;
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("has-modal-open");
+}
+
+function handleStopInfoModalBackdrop(event) {
+    if (event?.target?.id === "stopInfoModal") {
+        closeStopInfoModal();
+    }
+}
+
 // 失敗或切換路線時，統一用這個函式把舊的查詢狀態清乾淨，避免下一次查詢沿用到壞掉的狀態。
 function resetCurrentRouteState() {
     stopLiveUpdates();
+    closeStopInfoModal();
     activeVariantLoadId += 1;
     activeLocationRequestId += 1;
     currentRenderState = null;
@@ -2152,6 +2344,213 @@ function ensureVariantDataBucket(variantKey) {
     return currentRenderState.variantDataByKey[variantKey];
 }
 
+// 站點 Modal 只列出同公司、同方向、且不是目前這條路線的其他車號，避免資訊過雜。
+function buildStopInfoRouteList(stopEtaEntries, currentVariant) {
+    const currentCompany = getItemCompany(currentVariant);
+    const currentDirection = getItemDirection(currentVariant);
+    const currentRoute = normalizeRouteCode(currentVariant?.route);
+    const uniqueRoutes = new Map();
+
+    for (const entry of stopEtaEntries) {
+        const route = normalizeRouteCode(entry?.route);
+        if (!route || route === currentRoute) {
+            continue;
+        }
+
+        if (getItemCompany(entry) !== currentCompany || getItemDirection(entry) !== currentDirection) {
+            continue;
+        }
+
+        if (!uniqueRoutes.has(route)) {
+            uniqueRoutes.set(route, {
+                route,
+                company: currentCompany,
+                direction: currentDirection,
+                serviceType: getServiceType(entry)
+            });
+        }
+    }
+
+    return [...uniqueRoutes.values()].sort((left, right) => {
+        return left.route.localeCompare(right.route, "en", { numeric: true, sensitivity: "base" });
+    });
+}
+
+function findVariantForAutoSelect(variants, autoSelectTarget = {}) {
+    const normalizedCompany = getCompanyConfig(autoSelectTarget.company).code;
+    const normalizedRoute = normalizeRouteCode(autoSelectTarget.route);
+    const normalizedDirection = normalizeDirection(autoSelectTarget.direction);
+    const preferredServiceType = String(autoSelectTarget.serviceType || "").trim();
+
+    return variants
+        .filter((variant) => {
+            return getItemCompany(variant) === normalizedCompany
+                && normalizeRouteCode(variant.route) === normalizedRoute
+                && (!normalizedDirection || getItemDirection(variant) === normalizedDirection);
+        })
+        .sort((left, right) => {
+            const leftPreferred = preferredServiceType && getServiceType(left) === preferredServiceType ? 0 : 1;
+            const rightPreferred = preferredServiceType && getServiceType(right) === preferredServiceType ? 0 : 1;
+
+            if (leftPreferred !== rightPreferred) {
+                return leftPreferred - rightPreferred;
+            }
+
+            return compareVariantsBase(left, right);
+        })[0] || null;
+}
+
+function openStopPanelByStopId(stopId, variantKey = currentRenderState?.selectedVariantKey) {
+    if (!currentRenderState || !variantKey || !stopId) {
+        return false;
+    }
+
+    const variantData = ensureVariantDataBucket(variantKey);
+    const matchingStop = variantData?.routeStopsWithEta.find((stop) => normalizeStopId(stop.stopId) === normalizeStopId(stopId));
+    if (!matchingStop) {
+        return false;
+    }
+
+    const stopKey = getStopPanelKey(variantKey, matchingStop);
+    expandStopPanel(stopKey);
+    renderCurrentState();
+    scrollStopIntoView(stopKey);
+    return true;
+}
+
+async function autoSelectVariantAfterSearch(autoSelectTarget = null) {
+    if (!currentRenderState || !autoSelectTarget) {
+        return false;
+    }
+
+    const matchedVariant = findVariantForAutoSelect(currentRenderState.variants, autoSelectTarget);
+    if (!matchedVariant) {
+        return false;
+    }
+
+    const matchedVariantKey = getVariantKey(matchedVariant);
+    await loadSelectedVariantData(matchedVariantKey, {
+        isAutoRefresh: false,
+        requestFreshLocation: false
+    });
+
+    if (!currentRenderState || currentRenderState.selectedVariantKey !== matchedVariantKey) {
+        return false;
+    }
+
+    // 如果新路線也停靠同一個 stopId，就直接幫使用者展開同一站的 ETA。
+    if (autoSelectTarget.stopId) {
+        openStopPanelByStopId(autoSelectTarget.stopId, matchedVariantKey);
+    }
+
+    return true;
+}
+
+function selectRouteFromStopInfo(encodedRoute, encodedStopId, encodedServiceType = "") {
+    const selectedContext = getSelectedVariantContext();
+    const routeInput = document.getElementById("routeInput");
+    if (!selectedContext || !routeInput) {
+        return;
+    }
+
+    const route = normalizeRouteCode(decodeActionValue(encodedRoute));
+    const stopId = normalizeStopId(decodeActionValue(encodedStopId));
+    const serviceType = String(decodeActionValue(encodedServiceType) || "").trim();
+    if (!route) {
+        return;
+    }
+
+    closeStopInfoModal();
+    routeInput.value = route;
+    routeInput.focus();
+
+    void searchETA({
+        autoSelectTarget: {
+            company: getItemCompany(selectedContext.variant),
+            route,
+            direction: getItemDirection(selectedContext.variant),
+            serviceType,
+            stopId
+        }
+    });
+}
+
+async function showStopInfoModal(encodedStopKey) {
+    const selectedContext = getSelectedVariantContext();
+    if (!selectedContext) {
+        return;
+    }
+
+    const stopKey = decodeActionValue(encodedStopKey);
+    const stop = getSelectedVariantStopByKey(stopKey);
+    if (!stop) {
+        return;
+    }
+
+    const company = getItemCompany(selectedContext.variant);
+    const stopName = getStopDisplayName(stop, company);
+    const requestId = ++activeStopInfoModalRequestId;
+
+    renderStopInfoModalState({
+        title: "此站停靠車號",
+        subtitle: `${stopName} • 正在載入...`,
+        bodyHtml: '<p class="stop-info-modal-empty is-loading">正在整理此站停靠的車號...</p>'
+    });
+    openStopInfoModal();
+
+    try {
+        const stopEtaEntries = await getStopAllEta(company, stop.stopId);
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        const routes = buildStopInfoRouteList(stopEtaEntries, selectedContext.variant);
+        if (routes.length === 0) {
+            renderStopInfoModalState({
+                title: "此站停靠車號",
+                subtitle: `${stopName} • ${getDirectionLabel(getItemDirection(selectedContext.variant))}`,
+                bodyHtml: '<p class="stop-info-modal-empty">目前此站沒有其他路線停靠</p>'
+            });
+            return;
+        }
+
+        const bodyHtml = `
+            <div class="stop-info-route-list">
+                ${routes.map((routeInfo) => {
+                    const encodedRoute = encodeURIComponent(routeInfo.route);
+                    const encodedStopId = encodeURIComponent(stop.stopId);
+                    const encodedServiceType = encodeURIComponent(routeInfo.serviceType || "");
+
+                    return `
+                        <button
+                            type="button"
+                            class="stop-info-route-btn"
+                            onclick="selectRouteFromStopInfo('${encodedRoute}', '${encodedStopId}', '${encodedServiceType}')"
+                        >${escapeHtml(routeInfo.route)}</button>
+                    `;
+                }).join("")}
+            </div>
+        `;
+
+        renderStopInfoModalState({
+            title: "此站停靠車號",
+            subtitle: `${stopName} • ${getDirectionLabel(getItemDirection(selectedContext.variant))}`,
+            bodyHtml
+        });
+    } catch (error) {
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        console.warn("載入站點停靠車號失敗", error);
+        renderStopInfoModalState({
+            title: "此站停靠車號",
+            subtitle: stopName,
+            bodyHtml: '<p class="stop-info-modal-empty">暫時無法載入此站路線資料，請稍後再試。</p>'
+        });
+    }
+}
+
 function stopLiveUpdates() {
     if (liveCountdownTimerId) {
         window.clearInterval(liveCountdownTimerId);
@@ -2257,26 +2656,43 @@ function getSortedCompanyCodesFromVariants(variants) {
     });
 }
 
-function renderVariantCard(variant) {
+function renderVariantCard(variant, favoriteRoutes = null) {
     const variantKey = getVariantKey(variant);
     const isSelected = currentRenderState?.selectedVariantKey === variantKey;
     const encodedKey = encodeURIComponent(variantKey);
     const company = getItemCompany(variant);
     const companyThemeClass = getCompanyThemeClass(company);
     const routeParts = getVariantCardRouteParts(variant);
+    const route = normalizeRouteCode(variant.route);
+    const encodedRoute = encodeURIComponent(route);
+    const isFavorited = favoriteRoutes instanceof Set
+        ? favoriteRoutes.has(route)
+        : isFavoriteRoute(route);
+    const favoriteButtonLabel = isFavorited
+        ? `取消收藏路線 ${route}`
+        : `收藏路線 ${route}`;
 
-    // 卡片再進一步簡化，只保留起點與終點，不再顯示倒數時間文字。
+    // 卡片右上角新增收藏星星，但收藏狀態不放進 currentRenderState，而是即時讀 localStorage。
     return `
-        <button type="button" class="variant-card ${escapeHtml(companyThemeClass)} ${isSelected ? "is-selected" : ""}" onclick="selectVariant('${encodedKey}')">
-            <div class="variant-route">
-                <span class="variant-route-origin">${escapeHtml(routeParts.origin)}</span>
-                <span class="variant-route-connector" aria-hidden="true">
-                    <span class="variant-route-label">前往</span>
-                    <span class="variant-route-arrow">⟶</span>
-                </span>
-                <span class="variant-route-destination">${escapeHtml(routeParts.destination)}</span>
-            </div>
-        </button>
+        <div class="variant-card-shell">
+            <button
+                type="button"
+                class="favorite-route-btn ${isFavorited ? "is-active" : ""}"
+                onclick="toggleFavoriteRoute(event, '${encodedRoute}')"
+                aria-label="${escapeHtml(favoriteButtonLabel)}"
+                aria-pressed="${isFavorited ? "true" : "false"}"
+            >${isFavorited ? "★" : "☆"}</button>
+            <button type="button" class="variant-card ${escapeHtml(companyThemeClass)} ${isSelected ? "is-selected" : ""}" onclick="selectVariant('${encodedKey}')">
+                <div class="variant-route">
+                    <span class="variant-route-origin">${escapeHtml(routeParts.origin)}</span>
+                    <span class="variant-route-connector" aria-hidden="true">
+                        <span class="variant-route-label">前往</span>
+                        <span class="variant-route-arrow">⟶</span>
+                    </span>
+                    <span class="variant-route-destination">${escapeHtml(routeParts.destination)}</span>
+                </div>
+            </button>
+        </div>
     `;
 }
 
@@ -2286,6 +2702,7 @@ function renderDirectionCards() {
     }
 
     const companies = getSortedCompanyCodesFromVariants(currentRenderState.variants);
+    const favoriteRoutes = new Set(getFavoriteRoutes());
 
     return companies.map((company) => {
         const companyVariants = currentRenderState.variants.filter((variant) => getItemCompany(variant) === company);
@@ -2300,7 +2717,7 @@ function renderDirectionCards() {
                     <p class="variant-group-subtitle">找到 ${companyVariants.length} 個可用方向</p>
                 </div>
                 <div class="variant-grid">
-                    ${companyVariants.map((variant) => renderVariantCard(variant)).join("")}
+                    ${companyVariants.map((variant) => renderVariantCard(variant, favoriteRoutes)).join("")}
                 </div>
             </section>
         `;
@@ -2376,20 +2793,30 @@ function renderSelectedVariantPanel() {
         const isExpanded = currentRenderState.expandedStopKeys.includes(stopKey);
         const isNearest = currentRenderState.nearestStopKey === stopKey;
         const stopInfo = stopMap.get(stop.stopId);
-        const stopName = escapeHtml(stopInfo?.name_tc || stopInfo?.name_en || `站點 ${stop.stopId}`);
+        const stopDisplayName = stopInfo?.name_tc || stopInfo?.name_en || `站點 ${stop.stopId}`;
+        const stopName = escapeHtml(stopDisplayName);
+        const stopInfoButtonLabel = escapeHtml(`查看 ${stopDisplayName} 停靠的其他車號`);
 
         return `
             <div class="stop ${isExpanded ? "is-expanded" : ""}" data-stop-key="${encodedStopKey}">
-                <button type="button" class="stop-toggle" onclick="toggleStopDetails('${encodedStopKey}')">
-                    <div class="stop-toggle-main">
-                        <div class="stop-index">第 ${stop.seq} 站</div>
-                        <div class="stop-name-row">
-                            <div class="stop-name">${stopName}</div>
-                            ${isNearest ? '<span class="inline-chip location-chip">📍 最近的站</span>' : ""}
+                <div class="stop-header">
+                    <button type="button" class="stop-toggle" onclick="toggleStopDetails('${encodedStopKey}')">
+                        <div class="stop-toggle-main">
+                            <div class="stop-index">第 ${stop.seq} 站</div>
+                            <div class="stop-name-row">
+                                <div class="stop-name">${stopName}</div>
+                                ${isNearest ? '<span class="inline-chip location-chip">📍 最近的站</span>' : ""}
+                            </div>
                         </div>
-                    </div>
-                    <span class="stop-chevron ${isExpanded ? "is-open" : ""}">▾</span>
-                </button>
+                        <span class="stop-chevron ${isExpanded ? "is-open" : ""}">▾</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="stop-info-btn"
+                        aria-label="${stopInfoButtonLabel}"
+                        onclick="showStopInfoModal('${encodedStopKey}')"
+                    >ℹ</button>
+                </div>
                 ${isExpanded ? `<div class="stop-eta-panel">${renderEtaBlock(stop.etaEntries || [])}</div>` : ""}
             </div>
         `;
@@ -2455,20 +2882,46 @@ function renderCurrentState() {
     resultDiv.innerHTML = renderResult();
 }
 
-// 6A：常用路線快捷鍵只重用既有搜尋入口，不改動原本查詢邏輯。
+// 常用路線膠囊只做「填入並查詢」，實際查詢仍沿用原本的 searchETA。
 function selectQuickRoute(route) {
     const routeInput = document.getElementById("routeInput");
     if (!routeInput) {
         return;
     }
 
-    routeInput.value = String(route || "").trim().toUpperCase();
+    routeInput.value = normalizeRouteCode(decodeActionValue(route));
     routeInput.focus();
     void searchETA();
 }
 
+// 點擊星星時只更新 localStorage 與畫面，不動 currentRenderState 內的查詢資料結構。
+function toggleFavoriteRoute(event, encodedRoute) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    const route = normalizeRouteCode(decodeActionValue(encodedRoute));
+    if (!route) {
+        return;
+    }
+
+    const favoriteRoutes = getFavoriteRoutes();
+    const isFavorited = favoriteRoutes.includes(route);
+    const updatedRoutes = isFavorited
+        ? favoriteRoutes.filter((item) => item !== route)
+        : [route, ...favoriteRoutes.filter((item) => item !== route)];
+
+    saveFavoriteRoutes(updatedRoutes);
+    renderFavoriteRoutes();
+
+    if (currentRenderState) {
+        renderCurrentState();
+    }
+
+    showFavoriteRoutesNotice(isFavorited ? `已移除常用路線 ${route}` : `已加入常用路線 ${route}`);
+}
+
 // 點擊方向卡片後，才真正去載入該方向的站點與 ETA。
-async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {}) {
+async function loadSelectedVariantData(variantKey, { isAutoRefresh = false, requestFreshLocation = !isAutoRefresh } = {}) {
     const statusDiv = document.getElementById("status");
     const variant = findVariantByKey(variantKey);
 
@@ -2571,7 +3024,7 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
         });
 
         renderCurrentState();
-        void locateNearestStop({ requestFreshPosition: !isAutoRefresh });
+        void locateNearestStop({ requestFreshPosition: requestFreshLocation });
         startLiveUpdates();
 
         if (statusDiv && currentRenderState.selectedVariantKey === variantKey) {
@@ -2658,7 +3111,7 @@ function refreshSelectedDirection() {
 }
 
 async function searchETA(options = {}) {
-    const { isAutoRefresh = false } = options;
+    const { isAutoRefresh = false, autoSelectTarget = null } = options;
 
     if (isAutoRefresh) {
         if (currentRenderState) {
@@ -2759,11 +3212,23 @@ async function searchETA(options = {}) {
             return;
         }
 
+        const autoSelectSucceeded = autoSelectTarget
+            ? await autoSelectVariantAfterSearch(autoSelectTarget)
+            : false;
+
+        if (!currentRenderState || currentRenderState.route !== route || searchId !== activeSearchId) {
+            return;
+        }
+
         console.log(`[BUS ${APP_VERSION}] route search`, {
             route,
             companies: [...new Set(expandedMatchingRoutes.map((entry) => getItemCompany(entry)))],
             variantCount: variants.length
         });
+
+        if (autoSelectTarget && autoSelectSucceeded) {
+            return;
+        }
 
         const localModeNotice = restrictedCompanies.length > 0
             ? `。${getLocalModeRestrictionNotice(restrictedCompanies)}`
@@ -2785,8 +3250,23 @@ async function searchETA(options = {}) {
 
 window.onload = () => {
     console.log(`Ready to search KMB, CTB, NLB, and GMB routes like 1A, 2, 20, 24, and 104 (${APP_VERSION})`);
+    renderFavoriteRoutes();
     void initializeLocationOnLoad();
 };
+
+window.addEventListener("storage", () => {
+    renderFavoriteRoutes();
+
+    if (currentRenderState) {
+        renderCurrentState();
+    }
+});
+
+window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        closeStopInfoModal();
+    }
+});
 
 window.addEventListener("beforeunload", () => {
     stopLiveUpdates();

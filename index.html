@@ -24,16 +24,12 @@
         </header>
 
         <section class="quick-routes" aria-label="常用路線">
-            <p class="quick-routes-title">常用路線</p>
-            <div class="quick-routes-list">
-                <button type="button" class="quick-route-btn" onclick="selectQuickRoute('1A')">1A</button>
-                <button type="button" class="quick-route-btn" onclick="selectQuickRoute('2')">2</button>
-                <button type="button" class="quick-route-btn" onclick="selectQuickRoute('24')">24</button>
-                <button type="button" class="quick-route-btn" onclick="selectQuickRoute('104')">104</button>
-                <button type="button" class="quick-route-btn" onclick="selectQuickRoute('20A')">20A</button>
-                <button type="button" class="quick-route-btn" onclick="selectQuickRoute('A33')">A33</button>
-                <button type="button" class="quick-route-btn" onclick="selectQuickRoute('271')">271</button>
+            <div class="quick-routes-header">
+                <p class="quick-routes-title">常用路線</p>
+                <p id="favoriteRoutesNotice" class="quick-routes-feedback" aria-live="polite"></p>
             </div>
+            <!-- 這個容器會由 script.js 依 localStorage 內容動態產生收藏路線。 -->
+            <div id="favoriteRoutesList" class="quick-routes-list"></div>
         </section>
 
         <div class="search-box">
@@ -59,7 +55,30 @@
         <p>版本: <span id="app-version"></span></p>
     </footer>
 
-    <script src="script.js?v=20260329-0105"></script>
+    <div
+        id="stopInfoModal"
+        class="stop-info-modal"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stopInfoModalTitle"
+        onclick="handleStopInfoModalBackdrop(event)"
+    >
+        <div class="stop-info-modal-dialog">
+            <div class="stop-info-modal-header">
+                <div class="stop-info-modal-heading">
+                    <h2 id="stopInfoModalTitle">此站停靠車號</h2>
+                    <p id="stopInfoModalSubtitle" class="stop-info-modal-subtitle" hidden></p>
+                </div>
+                <button type="button" class="stop-info-modal-close" aria-label="關閉站點資訊" onclick="closeStopInfoModal()">×</button>
+            </div>
+            <div id="stopInfoModalBody" class="stop-info-modal-body">
+                <p class="stop-info-modal-empty">正在整理此站停靠的車號...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=20260329-0245"></script>
     <script>
         // 顯示版本
         document.getElementById('app-version').textContent = "2026-03-29";

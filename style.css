@@ -48,18 +48,49 @@ h1 {
     margin-bottom: 10px;
 }
 
+.quick-routes-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 10px;
+    margin-bottom: 6px;
+}
+
 .quick-routes-title {
-    margin: 0 0 6px 0;
+    margin: 0;
     color: #7b1021;
     font-size: 0.9em;
     font-weight: 700;
 }
 
-/* 6A：常用路線做成可換行的快捷膠囊，桌機和手機都能快速點擊。 */
+.quick-routes-feedback {
+    margin: 0;
+    color: #15803d;
+    font-size: 0.82em;
+    font-weight: 700;
+    opacity: 0;
+    transform: translateY(-2px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.quick-routes-feedback.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* 常用路線做成可換行的快捷膠囊；真正內容會由 localStorage 動態產生。 */
 .quick-routes-list {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+.quick-routes-empty {
+    margin: 0;
+    width: 100%;
+    color: #6b7280;
+    font-size: 0.9em;
 }
 
 .quick-route-btn {
@@ -322,11 +353,15 @@ button {
     gap: 8px;
 }
 
+.variant-card-shell {
+    position: relative;
+}
+
 .variant-card {
     width: 100%;
     text-align: left;
-    /* 6A：統一卡片的圓角、陰影和 hover 質感，並再壓縮內距。 */
-    padding: 10px 11px;
+    /* 收藏星星固定在右上角，所以卡片右上預留空間避免文字被蓋住。 */
+    padding: 16px 42px 10px 11px;
     border: 1px solid rgba(15, 23, 42, 0.1);
     border-radius: 16px;
     background: white;
@@ -344,6 +379,47 @@ button {
 .variant-card.is-selected {
     color: white;
     box-shadow: 0 12px 24px rgba(15, 23, 42, 0.16);
+}
+
+/* 星星按鈕獨立於卡片按鈕之外，避免影響整張方向卡片原本的點擊行為。 */
+.favorite-route-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+    width: 29px;
+    height: 29px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94);
+    color: #94a3b8;
+    font-size: 1.08em;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.favorite-route-btn:hover {
+    color: #facc15;
+    background: #fffdf4;
+    border-color: rgba(250, 204, 21, 0.35);
+    transform: translateY(-1px) scale(1.06);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+}
+
+.favorite-route-btn:active {
+    transform: scale(0.88);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
+}
+
+.favorite-route-btn.is-active {
+    color: #facc15;
+    border-color: rgba(250, 204, 21, 0.45);
+    background: #fffbea;
 }
 
 /* 方向卡片改成三欄：起點 / 中央箭頭區 / 終點，讓「前往」能穩定置中在箭頭上方。 */
@@ -518,8 +594,16 @@ button {
     gap: 14px;
 }
 
+.stop-header {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    padding-right: 14px;
+}
+
 .stop-toggle {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -564,6 +648,38 @@ button {
 .inline-chip.location-chip {
     background: #fff1f3;
     color: #c8102e;
+}
+
+.stop-info-btn {
+    width: 34px;
+    height: 34px;
+    align-self: center;
+    border: 1px solid #d3dae6;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #6b7280;
+    font-size: 1em;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+    flex-shrink: 0;
+}
+
+.stop-info-btn:hover {
+    color: #0b63c9;
+    border-color: rgba(11, 99, 201, 0.35);
+    background: #eef6ff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(11, 99, 201, 0.12);
+}
+
+.stop-info-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(11, 99, 201, 0.1);
 }
 
 .stop-chevron {
@@ -654,6 +770,128 @@ button {
     50% { transform: translateX(15px); }
 }
 
+body.has-modal-open {
+    overflow: hidden;
+}
+
+.stop-info-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.56);
+    z-index: 2000;
+}
+
+.stop-info-modal.is-open {
+    display: flex;
+}
+
+.stop-info-modal-dialog {
+    width: min(520px, 100%);
+    max-height: min(78vh, 620px);
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: 22px;
+    box-shadow: 0 28px 60px rgba(15, 23, 42, 0.28);
+    overflow: hidden;
+}
+
+.stop-info-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 18px 20px 12px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.stop-info-modal-heading h2 {
+    margin: 0;
+    color: #111827;
+    font-size: 1.2em;
+}
+
+.stop-info-modal-subtitle {
+    margin: 6px 0 0;
+    color: #6b7280;
+    font-size: 0.92em;
+}
+
+.stop-info-modal-close {
+    width: 38px;
+    height: 38px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 1.4em;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    flex-shrink: 0;
+}
+
+.stop-info-modal-close:hover {
+    background: #eef2f7;
+    color: #111827;
+    transform: translateY(-1px);
+}
+
+.stop-info-modal-body {
+    padding: 18px 20px 20px;
+    overflow: auto;
+}
+
+.stop-info-modal-empty {
+    margin: 0;
+    color: #6b7280;
+    text-align: center;
+    font-size: 0.98em;
+}
+
+.stop-info-modal-empty.is-loading {
+    color: #475569;
+}
+
+.stop-info-route-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 10px;
+}
+
+.stop-info-route-btn {
+    min-height: 48px;
+    padding: 12px 14px;
+    border: 1px solid rgba(11, 99, 201, 0.14);
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    color: #0b63c9;
+    font-size: 1.02em;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 6px 14px rgba(11, 99, 201, 0.08);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.stop-info-route-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(11, 99, 201, 0.28);
+    background: linear-gradient(180deg, #f8fbff 0%, #edf5ff 100%);
+    box-shadow: 0 10px 18px rgba(11, 99, 201, 0.14);
+}
+
+.stop-info-route-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 10px rgba(11, 99, 201, 0.12);
+}
+
 /* Footer */
 .footer {
     text-align: center;
@@ -694,6 +932,15 @@ button {
 
     .quick-routes {
         margin-bottom: 10px;
+    }
+
+    .quick-routes-header {
+        align-items: flex-start;
+    }
+
+    .quick-routes-feedback {
+        width: 100%;
+        font-size: 0.8em;
     }
 
     .quick-routes-list {
@@ -775,8 +1022,16 @@ button {
     }
 
     .variant-card {
-        padding: 11px 10px;
+        padding: 15px 38px 11px 10px;
         border-radius: 14px;
+    }
+
+    .favorite-route-btn {
+        top: 7px;
+        right: 7px;
+        width: 28px;
+        height: 28px;
+        font-size: 1em;
     }
 
     .variant-route {
@@ -801,12 +1056,39 @@ button {
         font-size: 1.28em;
     }
 
+    .stop-header {
+        gap: 8px;
+        padding-right: 10px;
+    }
+
     .stop-toggle {
         align-items: flex-start;
         padding: 16px 14px;
     }
 
+    .stop-info-btn {
+        width: 32px;
+        height: 32px;
+        margin-top: 14px;
+    }
+
     .stop-eta-panel {
         padding: 0 14px 14px;
+    }
+
+    .stop-info-modal {
+        padding: 12px;
+    }
+
+    .stop-info-modal-header {
+        padding: 16px 16px 10px;
+    }
+
+    .stop-info-modal-body {
+        padding: 16px;
+    }
+
+    .stop-info-route-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
