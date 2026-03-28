@@ -277,7 +277,7 @@ button {
 .stop-toggle-main {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     min-width: 0;
 }
 
@@ -291,12 +291,6 @@ button {
     color: #222;
     font-size: 1.15em;
     font-weight: 700;
-}
-
-.stop-secondary {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
 }
 
 .stop-chevron {

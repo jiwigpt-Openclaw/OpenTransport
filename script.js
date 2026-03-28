@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-03-28 01:10";
+const APP_VERSION = "2026-03-28 01:25";
 const API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const COUNTDOWN_REFRESH_MS = 30000;
 const DATA_REFRESH_MS = 60000;
@@ -543,19 +543,12 @@ function formatEtaMinutes(etaValue) {
     }
 
     const diffMilliseconds = etaTimestamp - Date.now();
-    if (diffMilliseconds <= 0) {
+    if (diffMilliseconds <= 60000) {
         return "即將到站";
     }
 
-    const totalSeconds = Math.ceil(diffMilliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-
-    if (minutes === 0) {
-        return `${seconds} 秒`;
-    }
-
-    return seconds === 0 ? `${minutes} 分鐘` : `${minutes} 分 ${seconds} 秒`;
+    const diffMinutes = Math.ceil(diffMilliseconds / 60000);
+    return `${diffMinutes} 分鐘`;
 }
 
 function formatEtaClock(etaValue) {
@@ -697,9 +690,6 @@ function renderSelectedVariantPanel() {
                     <div class="stop-toggle-main">
                         <div class="stop-index">第 ${stop.seq} 站</div>
                         <div class="stop-name">${stopName}</div>
-                        <div class="stop-secondary">
-                            <span class="inline-chip subtle">${escapeHtml(stop.stopId)}</span>
-                        </div>
                     </div>
                     <span class="stop-chevron ${isExpanded ? "is-open" : ""}">▾</span>
                 </button>
@@ -714,7 +704,7 @@ function renderSelectedVariantPanel() {
                 <div>
                     <p class="selection-eyebrow">第 2 步：查看站點</p>
                     <h2 class="selection-title">路線 ${escapeHtml(currentRenderState.route)} • ${escapeHtml(getRouteLabel(variant))}</h2>
-                    <p class="selection-subtitle">服務類型 ${escapeHtml(getServiceType(variant))} • 站點共 ${stops.length} 個 • 資料更新 ${escapeHtml(updatedTimeText)}</p>
+                    <p class="selection-subtitle">服務類型 ${escapeHtml(getServiceType(variant))} • 站點共 ${stops.length} 個 • 點一下站名展開 ETA • 資料更新 ${escapeHtml(updatedTimeText)}</p>
                 </div>
                 <button type="button" class="retry-btn" onclick="refreshSelectedDirection()">更新這個方向</button>
             </div>
@@ -732,7 +722,7 @@ function renderResult() {
 
     const summaryText = currentRenderState.selectedVariantKey
         ? "倒數每 30 秒自動更新，資料每 60 秒重新抓取"
-        : "請先選擇一個方向，再查看該方向的站點與 ETA";
+        : "請先選擇一個方向，再展開站點查看 ETA";
 
     return `
         <div class="route-shell">
