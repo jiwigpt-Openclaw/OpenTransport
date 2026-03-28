@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-03-28 23:45";
+const APP_VERSION = "2026-03-29 00:30";
 const KMB_API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const CTB_API_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
 const NLB_API_BASE = "https://rt.data.gov.hk/v2/transport/nlb";
@@ -238,18 +238,19 @@ function getRouteLabel(routeInfo) {
     return `${origin} → ${destination} (${suffix})`;
 }
 
-function compareVariantsBase(left, right, requestedServiceType = "") {
+// 方向卡片改成「起點 / 前往 / 長箭頭 / 終點」的簡化版版面，讓使用者一眼就看懂目的地。
+function getVariantCardRouteParts(routeInfo) {
+    return {
+        origin: routeInfo.orig_tc || routeInfo.orig_en || "未知起點",
+        destination: routeInfo.dest_tc || routeInfo.dest_en || "未知終點"
+    };
+}
+
+function compareVariantsBase(left, right) {
     const leftCompanyOrder = COMPANY_ORDER[getItemCompany(left)] ?? COMPANY_ORDER.unknown;
     const rightCompanyOrder = COMPANY_ORDER[getItemCompany(right)] ?? COMPANY_ORDER.unknown;
     if (leftCompanyOrder !== rightCompanyOrder) {
         return leftCompanyOrder - rightCompanyOrder;
-    }
-
-    const requestedGroup = getServiceTypeGroup(requestedServiceType);
-    const leftPreferred = getServiceTypeGroup(getServiceType(left)) === requestedGroup ? 0 : 1;
-    const rightPreferred = getServiceTypeGroup(getServiceType(right)) === requestedGroup ? 0 : 1;
-    if (leftPreferred !== rightPreferred) {
-        return leftPreferred - rightPreferred;
     }
 
     const leftServiceTypeGroup = getServiceTypeGroup(getServiceType(left));
@@ -669,11 +670,9 @@ function buildNlbRouteEntries(routes) {
     return [...entriesByRoute.values()].flatMap((entries) => assignDirectionsToBidirectionalEntries(entries));
 }
 
-function createRenderState(route, requestedServiceType, preferredServiceType, variants) {
+function createRenderState(route, variants) {
     return {
         route,
-        requestedServiceType,
-        preferredServiceType,
         variants,
         routeErrorMessage: "",
         stopMapWarningMessage: "",
@@ -1293,7 +1292,7 @@ async function hydrateStopMapForStops(company, stops, baseStopMap) {
     };
 }
 
-function chooseRouteVariants(routeEntries, requestedServiceType) {
+function chooseRouteVariants(routeEntries) {
     const uniqueVariants = new Map();
 
     for (const entry of routeEntries) {
@@ -1308,17 +1307,7 @@ function chooseRouteVariants(routeEntries, requestedServiceType) {
         }
     }
 
-    const variants = [...uniqueVariants.values()].sort((left, right) => compareVariantsBase(left, right, requestedServiceType));
-
-    if (variants.length === 0) {
-        return { preferredServiceType: requestedServiceType, variants: [] };
-    }
-
-    const preferredServiceType = variants.some((variant) => getServiceTypeGroup(getServiceType(variant)) === getServiceTypeGroup(requestedServiceType))
-        ? requestedServiceType
-        : getServiceTypeGroup(getServiceType(variants[0]));
-
-    return { preferredServiceType, variants };
+    return [...uniqueVariants.values()].sort((left, right) => compareVariantsBase(left, right));
 }
 
 function createCtbVariantFromRouteEntry(routeEntry, direction) {
@@ -1540,7 +1529,8 @@ async function loadVariantSummaryPreview(variant, routeEtaPromiseCache) {
 }
 
 function getLocationButtonLabel() {
-    return locationState.enabled ? "停止定位" : "使用我的位置";
+    // 依需求把定位按鈕文字固定成 GPS，開關狀態改用顏色區分。
+    return "GPS";
 }
 
 function getLocationStatusText() {
@@ -2269,39 +2259,23 @@ function getSortedCompanyCodesFromVariants(variants) {
 
 function renderVariantCard(variant) {
     const variantKey = getVariantKey(variant);
-    const variantData = currentRenderState?.variantDataByKey[variantKey];
     const isSelected = currentRenderState?.selectedVariantKey === variantKey;
     const encodedKey = encodeURIComponent(variantKey);
     const company = getItemCompany(variant);
-    const direction = getItemDirection(variant);
-    const serviceTypeLabel = getServiceTypeLabel(getServiceType(variant));
-    const preview = variantData?.summary;
-    const hasUsablePreview = Boolean(preview?.hasUsableEta);
-    const nextEtaText = variantData?.isSummaryLoading
-        ? "正在比較..."
-        : hasUsablePreview
-            ? formatEtaMinutes(preview.nextEtaValue)
-            : "暫無預報";
-    const nextMetaText = variantData?.isSummaryLoading
-        ? "系統正在同時整理這家公司的方向摘要"
-        : hasUsablePreview
-            ? `前往 ${preview.destination}${preview.remark ? ` • ${preview.remark}` : ""}`
-            : "點擊卡片後仍可查看這個方向的站點資料";
+    const companyThemeClass = getCompanyThemeClass(company);
+    const routeParts = getVariantCardRouteParts(variant);
 
+    // 卡片再進一步簡化，只保留起點與終點，不再顯示倒數時間文字。
     return `
-        <button type="button" class="variant-card ${isSelected ? "is-selected" : ""}" onclick="selectVariant('${encodedKey}')">
-            <div class="variant-top">
-                <div class="variant-chip-row">
-                    ${renderCompanyChip(company)}
-                    <span class="inline-chip">${escapeHtml(getDirectionLabel(direction))}</span>
-                </div>
-                <span class="inline-chip subtle">${escapeHtml(serviceTypeLabel)}</span>
+        <button type="button" class="variant-card ${escapeHtml(companyThemeClass)} ${isSelected ? "is-selected" : ""}" onclick="selectVariant('${encodedKey}')">
+            <div class="variant-route">
+                <span class="variant-route-origin">${escapeHtml(routeParts.origin)}</span>
+                <span class="variant-route-connector" aria-hidden="true">
+                    <span class="variant-route-label">前往</span>
+                    <span class="variant-route-arrow">⟶</span>
+                </span>
+                <span class="variant-route-destination">${escapeHtml(routeParts.destination)}</span>
             </div>
-            <div class="variant-route">${escapeHtml(getRouteLabel(variant))}</div>
-            <div class="variant-next">
-                <span class="variant-next-time ${hasUsablePreview ? "" : "is-muted"}">${escapeHtml(nextEtaText)}</span>
-            </div>
-            <div class="variant-meta">${escapeHtml(nextMetaText)}</div>
         </button>
     `;
 }
@@ -2355,7 +2329,6 @@ function renderSelectedVariantPanel() {
             <section class="selection-panel">
                 <div class="selection-hint">
                     <p>請先從上方選擇一個方向。</p>
-                    <p>選擇後才會載入該方向的站點列表與 ETA。</p>
                 </div>
             </section>
         `;
@@ -2447,19 +2420,12 @@ function renderResult() {
 
     const locationButtonText = getLocationButtonLabel();
     const locationStatusText = getLocationStatusText();
-    const summaryText = currentRenderState.selectedVariantKey
-        ? "已同步整理不同公司與班次，可直接切換方向查看站點"
-        : "系統會同時整理不同公司的方向與班次，並保留原本的方向順序";
 
     return `
         <div class="route-shell">
             <section class="selection-panel">
                 <div class="selection-panel-header">
-                    <div>
-                        <p class="selection-eyebrow">第 1 步：選擇方向</p>
-                        <h2 class="selection-title">路線 ${escapeHtml(currentRenderState.route)}</h2>
-                        <p class="selection-subtitle">${escapeHtml(summaryText)}</p>
-                    </div>
+                    <!-- 依需求移除左上角的「路線 XX」標題，保留右側 GPS 控制即可。 -->
                     <div class="panel-actions">
                         <button type="button" class="location-btn ${locationState.enabled ? "is-active" : ""}" onclick="toggleLocationTracking()">${escapeHtml(locationButtonText)}</button>
                         <p class="location-note">${escapeHtml(locationStatusText)}</p>
@@ -2694,14 +2660,10 @@ async function searchETA(options = {}) {
     }
 
     const routeInput = document.getElementById("routeInput");
-    const serviceTypeInput = document.getElementById("serviceType");
     const resultDiv = document.getElementById("result");
     const statusDiv = document.getElementById("status");
     const searchBtn = document.getElementById("searchBtn");
     const route = routeInput.value.trim().toUpperCase();
-    // 這個下拉選單現在主要用來決定「同樣接近時誰排前面」的排序偏好，
-    // 真正查詢時仍會同時比較正常班次與特別班次。
-    const requestedServiceType = serviceTypeInput.value;
     const searchId = ++activeSearchId;
 
     if (!route) {
@@ -2760,7 +2722,8 @@ async function searchETA(options = {}) {
             return;
         }
 
-        const { preferredServiceType, variants } = chooseRouteVariants(expandedMatchingRoutes, requestedServiceType);
+        // 介面已移除班次下拉選單，這裡固定同時整理所有班次，不再依賴使用者手動班次偏好。
+        const variants = chooseRouteVariants(expandedMatchingRoutes);
         if (!variants.length) {
             resetCurrentRouteState();
             renderStandaloneError(resultDiv, `路線 ${route} 暫時無法查詢`, "目前找不到可用方向資料，請稍後再試，或試其他路線例如 1A、2、104。");
@@ -2768,7 +2731,7 @@ async function searchETA(options = {}) {
             return;
         }
 
-        currentRenderState = createRenderState(route, requestedServiceType, preferredServiceType, variants);
+        currentRenderState = createRenderState(route, variants);
 
         for (const variant of variants) {
             const bucket = ensureVariantDataBucket(getVariantKey(variant));
@@ -2786,8 +2749,6 @@ async function searchETA(options = {}) {
 
         console.log(`[BUS ${APP_VERSION}] route search`, {
             route,
-            requestedServiceType,
-            preferredServiceType,
             companies: [...new Set(expandedMatchingRoutes.map((entry) => getItemCompany(entry)))],
             variantCount: variants.length
         });

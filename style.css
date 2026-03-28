@@ -7,7 +7,7 @@ body {
     font-family: "Microsoft JhengHei", "Segoe UI", Arial, sans-serif;
     background: linear-gradient(135deg, #f0f4f8, #e6edf5);
     margin: 0;
-    padding: 20px 10px;
+    padding: 12px 10px;
     color: #333;
     line-height: 1.6;
 }
@@ -16,23 +16,23 @@ body {
     max-width: 820px;
     margin: 0 auto;
     background: white;
-    padding: 30px 25px;
+    padding: 22px 22px;
     border-radius: 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
-/* Header */
+/* Header：進一步壓縮標題區，讓主標和下方紅線更靠近。 */
 .header {
     text-align: center;
-    margin-bottom: 35px;
-    padding-bottom: 20px;
+    margin-bottom: 18px;
+    padding-bottom: 10px;
     border-bottom: 3px solid #c8102e;
 }
 
 h1 {
     color: #c8102e;
-    font-size: 2.4em;
-    margin: 0 0 8px 0;
+    font-size: 2.05em;
+    margin: 0;
 }
 
 .subtitle {
@@ -47,14 +47,14 @@ h1 {
     flex-wrap: wrap;
     gap: 12px;
     justify-content: center;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
 }
 
 .input-group {
     display: flex;
     gap: 10px;
     flex: 1;
-    max-width: 420px;
+    max-width: 520px;
 }
 
 input, select {
@@ -68,6 +68,12 @@ input, select {
 input:focus, select:focus {
     border-color: #c8102e;
     box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.15);
+}
+
+/* 搜尋列現在只保留路線輸入框，讓輸入區更乾淨也更好點擊。 */
+#routeInput {
+    flex: 1;
+    min-width: 0;
 }
 
 button {
@@ -94,7 +100,7 @@ button {
 /* 狀態列 */
 .status {
     text-align: center;
-    margin: 15px 0;
+    margin: 10px 0;
     font-size: 0.95em;
     min-height: 24px;
 }
@@ -107,14 +113,14 @@ button {
 .route-shell {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 18px;
 }
 
 .selection-panel {
     background: linear-gradient(180deg, #fffdfd 0%, #fff5f7 100%);
     border: 1px solid rgba(200, 16, 46, 0.12);
     border-radius: 20px;
-    padding: 22px;
+    padding: 18px;
     box-shadow: 0 6px 18px rgba(200, 16, 46, 0.06);
 }
 
@@ -123,8 +129,8 @@ button {
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 14px;
-    margin-bottom: 18px;
+    gap: 10px;
+    margin-bottom: 12px;
 }
 
 .selection-eyebrow {
@@ -146,42 +152,64 @@ button {
     color: #666;
 }
 
+/* GPS 區改成同一排，按鈕放左邊、說明文字放右邊，讓上方區塊更緊湊。 */
 .panel-actions {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
-    max-width: 320px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    max-width: none;
 }
 
 .location-btn {
-    padding: 12px 18px;
-    border: 1px solid #c8102e;
-    border-radius: 12px;
-    background: white;
-    color: #c8102e;
+    /* GPS 按鈕縮小一點並加上陰影與按壓感，做出更立體的控制感。 */
+    width: 54px;
+    height: 54px;
+    padding: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #f3f4f6 0%, #d1d5db 100%);
+    color: #475569;
     cursor: pointer;
-    font-size: 0.98em;
+    font-size: 0.95em;
     font-weight: 700;
-    transition: background 0.2s, transform 0.2s, color 0.2s;
+    box-shadow: 0 6px 12px rgba(148, 163, 184, 0.28);
+    transition: background 0.2s, transform 0.15s, color 0.2s, box-shadow 0.15s;
 }
 
 .location-btn:hover {
-    background: #fff1f3;
+    background: linear-gradient(180deg, #e5e7eb 0%, #cbd5e1 100%);
     transform: translateY(-1px);
+    box-shadow: 0 8px 14px rgba(148, 163, 184, 0.32);
+}
+
+.location-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 3px 8px rgba(148, 163, 184, 0.25);
 }
 
 .location-btn.is-active {
-    background: #c8102e;
+    background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+    border-color: #22c55e;
     color: white;
+    box-shadow: 0 6px 12px rgba(34, 197, 94, 0.3);
 }
 
 .location-note {
     margin: 0;
     color: #666;
-    font-size: 0.92em;
-    line-height: 1.5;
-    text-align: right;
+    font-size: 0.9em;
+    line-height: 1.35;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.location-note::before {
+    content: "📍";
+    flex-shrink: 0;
 }
 
 .selection-hint,
@@ -195,13 +223,13 @@ button {
 .variant-groups {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 12px;
 }
 
 .variant-group {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
 }
 
 .variant-group-header {
@@ -228,99 +256,147 @@ button {
 .variant-group-subtitle {
     margin: 0;
     color: #666;
-    font-size: 0.92em;
+    font-size: 0.88em;
 }
 
 .variant-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 14px;
+    gap: 10px;
 }
 
 .variant-card {
     width: 100%;
     text-align: left;
-    padding: 18px;
-    border: 2px solid rgba(200, 16, 46, 0.14);
-    border-radius: 16px;
+    /* 再往下縮卡片的 padding 和陰影，讓同一屏能放下更多方向。 */
+    padding: 12px 12px;
+    border: 2px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
     background: white;
     color: #222;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s, background 0.2s;
 }
 
 .variant-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(200, 16, 46, 0.1);
-    border-color: rgba(200, 16, 46, 0.3);
+    box-shadow: 0 10px 18px rgba(15, 23, 42, 0.07);
 }
 
 .variant-card.is-selected {
-    background: linear-gradient(135deg, #c8102e, #9f0c24);
     color: white;
-    border-color: #c8102e;
-    box-shadow: 0 14px 28px rgba(200, 16, 46, 0.22);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
 }
 
-.variant-top {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.variant-chip-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-}
-
+/* 方向卡片改成三欄：起點 / 中央箭頭區 / 終點，讓「前往」能穩定置中在箭頭上方。 */
 .variant-route {
-    margin-top: 12px;
-    font-size: 1.05em;
-    font-weight: 700;
-    line-height: 1.5;
-}
-
-.variant-next {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: 8px;
-    margin-top: 14px;
+    min-height: 46px;
 }
 
-.variant-next-time {
-    color: #c8102e;
-    font-size: 1.5em;
-    font-weight: 800;
-    line-height: 1.2;
-}
-
-.variant-next-time.is-muted {
-    color: #666;
-    font-size: 1.05em;
+.variant-route-origin,
+.variant-route-destination {
+    font-size: 0.94em;
     font-weight: 700;
+    line-height: 1.3;
+    word-break: break-word;
 }
 
-.variant-meta {
-    margin-top: 10px;
-    font-size: 0.92em;
-    color: #666;
+.variant-route-origin {
+    text-align: right;
 }
 
-.variant-card.is-selected .variant-next-time {
+.variant-route-destination {
+    text-align: left;
+}
+
+.variant-route-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 56px;
+}
+
+.variant-route-label {
+    font-size: 0.68em;
+    font-weight: 700;
+    color: #8a8f98;
+    letter-spacing: 0.08em;
+}
+
+.variant-route-arrow {
+    font-size: 1.28em;
+    line-height: 1;
+}
+
+/* 公司標籤已移到群組標題，卡片本身改用邊框與重點字色保留公司色彩。 */
+.variant-card.is-kmb {
+    border-color: rgba(200, 16, 46, 0.18);
+}
+
+.variant-card.is-ctb {
+    border-color: rgba(11, 99, 201, 0.18);
+}
+
+.variant-card.is-nlb {
+    border-color: rgba(46, 139, 87, 0.2);
+}
+
+.variant-card.is-gmb {
+    border-color: rgba(27, 111, 58, 0.22);
+}
+
+.variant-card.is-kmb .variant-route-arrow {
+    color: #c8102e;
+}
+
+.variant-card.is-ctb .variant-route-arrow {
+    color: #0b63c9;
+}
+
+.variant-card.is-nlb .variant-route-arrow {
+    color: #2e8b57;
+}
+
+.variant-card.is-gmb .variant-route-arrow {
+    color: #1b6f3a;
+}
+
+.variant-card.is-selected.is-kmb {
+    background: linear-gradient(135deg, #c8102e, #9f0c24);
+    border-color: #c8102e;
+}
+
+.variant-card.is-selected.is-ctb {
+    background: linear-gradient(135deg, #0b63c9, #084b98);
+    border-color: #0b63c9;
+}
+
+.variant-card.is-selected.is-nlb {
+    background: linear-gradient(135deg, #2e8b57, #236b42);
+    border-color: #2e8b57;
+}
+
+.variant-card.is-selected.is-gmb {
+    background: linear-gradient(135deg, #1b6f3a, #15572d);
+    border-color: #1b6f3a;
+}
+
+.variant-card.is-selected .variant-route {
     color: white;
 }
 
-.variant-card.is-selected .variant-next-time.is-muted {
-    color: #ffe0e6;
+.variant-card.is-selected .variant-route-label {
+    color: rgba(255, 255, 255, 0.82);
 }
 
-.variant-card.is-selected .variant-meta {
-    color: #ffe0e6;
+.variant-card.is-selected .variant-route-arrow {
+    color: white;
 }
 
 .inline-chip {
@@ -358,11 +434,6 @@ button {
 .inline-chip.company-chip.is-gmb {
     background: rgba(27, 111, 58, 0.14);
     color: #1b6f3a;
-}
-
-.variant-card.is-selected .inline-chip {
-    background: rgba(255, 255, 255, 0.16);
-    color: white;
 }
 
 .variant-card.is-selected .inline-chip.subtle {

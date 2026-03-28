@@ -10,8 +10,9 @@
     <div class="container">
         <!-- Header -->
         <header class="header">
-            <h1>🚌 香港巴士及小巴 到站查詢</h1>
-            <p class="subtitle">GitHub Learning Project 1</p>
+            <!-- 依需求把首頁主標題縮成更短的版本。 -->
+            <h1>🚌 到站查詢</h1>
+            <!-- 依需求移除頁面主標題下方的副標文字，讓首頁更乾淨。 -->
         </header>
 
         <!-- 搜尋區域 -->
@@ -23,10 +24,6 @@
                     placeholder="輸入路線號，例如 1A、2、104"
                     value="1A"
                     onkeyup="if(event.key === 'Enter') searchETA()">
-                <select id="serviceType">
-                    <option value="1">正常班次</option>
-                    <option value="2">特別班次</option>
-                </select>
             </div>
             <button onclick="searchETA()" id="searchBtn">🔍 查詢</button>
         </div>
@@ -45,6 +42,6 @@
         <p>這是我的第一個 GitHub 學習專案 • 使用香港政府開放資料 API</p>
     </footer>
 
-    <script src="script.js?v=20260328-2345"></script>
+    <script src="script.js?v=20260329-0030"></script>
 </body>
 </html>
