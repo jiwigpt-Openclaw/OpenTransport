@@ -1,5 +1,6 @@
-const APP_VERSION = "2026-03-28 04:35";
-const API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
+const APP_VERSION = "2026-03-28 05:20";
+const KMB_API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
+const CTB_API_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
 const COUNTDOWN_REFRESH_MS = 30000;
 const DATA_REFRESH_MS = 60000;
 const GEOLOCATION_OPTIONS = {
@@ -7,13 +8,50 @@ const GEOLOCATION_OPTIONS = {
     timeout: 8000,
     maximumAge: 60000
 };
+const COMPANY_ORDER = {
+    KMB: 0,
+    CTB: 1,
+    unknown: 2
+};
+const COMPANY_CONFIGS = {
+    KMB: {
+        code: "KMB",
+        shortLabel: "KMB",
+        displayName: "九巴",
+        themeClass: "is-kmb",
+        supportsServiceType: true,
+        supportsRouteEta: true,
+        supportsStopAllEta: true,
+        getRouteListUrl: () => `${KMB_API_BASE}/route/`,
+        getStopMapUrl: () => `${KMB_API_BASE}/stop`,
+        getRouteStopsUrl: (route, direction, serviceType) => `${KMB_API_BASE}/route-stop/${encodeURIComponent(route)}/${direction}/${serviceType}`,
+        getRouteEtaUrl: (route, serviceType) => `${KMB_API_BASE}/route-eta/${encodeURIComponent(route)}/${serviceType}`,
+        getStopEtaUrl: (stopId, route, serviceType) => `${KMB_API_BASE}/eta/${normalizeStopId(stopId)}/${encodeURIComponent(route)}/${serviceType}`,
+        getStopAllEtaUrl: (stopId) => `${KMB_API_BASE}/stop-eta/${normalizeStopId(stopId)}`,
+        getStopInfoUrl: (stopId) => `${KMB_API_BASE}/stop/${normalizeStopId(stopId)}`
+    },
+    CTB: {
+        code: "CTB",
+        shortLabel: "CTB",
+        displayName: "城巴",
+        themeClass: "is-ctb",
+        supportsServiceType: false,
+        supportsRouteEta: false,
+        supportsStopAllEta: false,
+        getRouteListUrl: () => `${CTB_API_BASE}/route/ctb`,
+        getStopMapUrl: () => `${CTB_API_BASE}/stop`,
+        getRouteStopsUrl: (route, direction) => `${CTB_API_BASE}/route-stop/ctb/${encodeURIComponent(route)}/${direction}`,
+        getStopEtaUrl: (stopId, route) => `${CTB_API_BASE}/eta/ctb/${normalizeStopId(stopId)}/${encodeURIComponent(route)}`,
+        getStopInfoUrl: (stopId) => `${CTB_API_BASE}/stop/${normalizeStopId(stopId)}`
+    }
+};
 const routeStopCache = new Map();
 const stopEtaCache = new Map();
 const stopAllEtaCache = new Map();
 const stopInfoCache = new Map();
 
-let routeListPromise = null;
-let stopMapPromise = null;
+const routeListPromiseByCompany = new Map();
+const stopMapPromiseByCompany = new Map();
 let activeSearchId = 0;
 let activeVariantLoadId = 0;
 let activeLocationRequestId = 0;
@@ -31,7 +69,7 @@ const locationState = {
     userPosition: null
 };
 
-console.log(`KMB ETA enhanced lookup loaded (${APP_VERSION})`);
+console.log(`Bus ETA enhanced lookup loaded (${APP_VERSION})`);
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -40,6 +78,31 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+}
+
+function getCompanyConfig(company) {
+    return COMPANY_CONFIGS[String(company ?? "").trim().toUpperCase()] || COMPANY_CONFIGS.KMB;
+}
+
+function getItemCompany(item) {
+    const normalized = String(item?.company ?? item?.co ?? "").trim().toUpperCase();
+    return normalized || "KMB";
+}
+
+function getCompanyLabel(company) {
+    return getCompanyConfig(company).shortLabel;
+}
+
+function getCompanyDisplayName(company) {
+    return getCompanyConfig(company).displayName;
+}
+
+function getCompanyThemeClass(company) {
+    return getCompanyConfig(company).themeClass;
+}
+
+function renderCompanyChip(company) {
+    return `<span class="inline-chip company-chip ${escapeHtml(getCompanyThemeClass(company))}">${escapeHtml(getCompanyLabel(company))}</span>`;
 }
 
 function normalizeDirection(value) {
@@ -73,6 +136,10 @@ function getDirectionLabel(direction) {
 }
 
 function getServiceType(item) {
+    if (getItemCompany(item) === "CTB") {
+        return "1";
+    }
+
     return String(item?.service_type ?? item?.serviceType ?? "1");
 }
 
@@ -109,6 +176,12 @@ function getRouteLabel(routeInfo) {
 }
 
 function compareVariantsBase(left, right, requestedServiceType = "") {
+    const leftCompanyOrder = COMPANY_ORDER[getItemCompany(left)] ?? COMPANY_ORDER.unknown;
+    const rightCompanyOrder = COMPANY_ORDER[getItemCompany(right)] ?? COMPANY_ORDER.unknown;
+    if (leftCompanyOrder !== rightCompanyOrder) {
+        return leftCompanyOrder - rightCompanyOrder;
+    }
+
     const requestedGroup = getServiceTypeGroup(requestedServiceType);
     const leftPreferred = getServiceTypeGroup(getServiceType(left)) === requestedGroup ? 0 : 1;
     const rightPreferred = getServiceTypeGroup(getServiceType(right)) === requestedGroup ? 0 : 1;
@@ -139,13 +212,14 @@ function compareVariantsBase(left, right, requestedServiceType = "") {
 }
 
 function getVariantKey(routeInfo) {
+    const company = getItemCompany(routeInfo);
     const route = String(routeInfo?.route ?? "").trim().toUpperCase();
     const direction = getItemDirection(routeInfo) || "unknown";
     const serviceType = getServiceType(routeInfo);
     const origin = routeInfo?.orig_tc || routeInfo?.orig_en || "";
     const destination = routeInfo?.dest_tc || routeInfo?.dest_en || "";
 
-    return [route, serviceType, direction, origin, destination].join("|");
+    return [company, route, serviceType, direction, origin, destination].join("|");
 }
 
 function getStopPanelKey(variantKey, stop) {
@@ -222,7 +296,22 @@ function joinWarningMessages(...messages) {
         .join(" ");
 }
 
+function decorateDataEntries(company, entries) {
+    return entries.map((entry) => ({ ...entry, company }));
+}
+
+function getStopMapForCompany(company) {
+    if (!currentRenderState?.stopMapsByCompany) {
+        return new Map();
+    }
+
+    return currentRenderState.stopMapsByCompany[company] instanceof Map
+        ? currentRenderState.stopMapsByCompany[company]
+        : new Map();
+}
+
 function buildFallbackStopsFromEtaEntries(variant, etaEntries) {
+    const company = getItemCompany(variant);
     const direction = getItemDirection(variant);
     const serviceType = getServiceType(variant);
     const uniqueStops = new Map();
@@ -243,6 +332,7 @@ function buildFallbackStopsFromEtaEntries(variant, etaEntries) {
             const stopKey = `${stopId}|${seq}`;
             if (!uniqueStops.has(stopKey)) {
                 uniqueStops.set(stopKey, {
+                    company,
                     seq,
                     stopId,
                     direction: getItemDirection(entry) || direction,
@@ -267,12 +357,13 @@ function buildFallbackStopsFromEtaEntries(variant, etaEntries) {
     return [...uniqueStops.values()].sort((left, right) => left.seq - right.seq);
 }
 
-async function getRouteStopsWithFallback(route, variant, etaEntries) {
+async function getRouteStopsWithFallback(company, route, variant, etaEntries) {
     const direction = getItemDirection(variant);
     const serviceType = getServiceType(variant);
+    const config = getCompanyConfig(company);
 
     try {
-        const routeStops = await getRouteStops(route, direction, serviceType);
+        const routeStops = await getRouteStops(company, route, direction, serviceType);
         if (routeStops.length > 0) {
             return {
                 routeStops,
@@ -280,6 +371,10 @@ async function getRouteStopsWithFallback(route, variant, etaEntries) {
             };
         }
     } catch (error) {
+        if (!config.supportsRouteEta) {
+            throw error;
+        }
+
         const fallbackStops = buildFallbackStopsFromEtaEntries(variant, etaEntries);
         if (fallbackStops.length > 0) {
             console.warn("route-stop 載入失敗，改用 route-eta 推算站點資料", error);
@@ -290,6 +385,10 @@ async function getRouteStopsWithFallback(route, variant, etaEntries) {
         }
 
         throw error;
+    }
+
+    if (!config.supportsRouteEta) {
+        throw new Error(`路線站點 ${company} ${route} ${direction} 暫時沒有可用資料`);
     }
 
     const fallbackStops = buildFallbackStopsFromEtaEntries(variant, etaEntries);
@@ -303,10 +402,11 @@ async function getRouteStopsWithFallback(route, variant, etaEntries) {
     throw new Error(`路線站點 ${route} ${direction} service_type=${serviceType} 暫時沒有可用資料`);
 }
 
-async function getOptionalStopMap() {
-    if (currentRenderState?.stopMap instanceof Map && currentRenderState.stopMap.size > 0) {
+async function getOptionalStopMap(company) {
+    const existingStopMap = getStopMapForCompany(company);
+    if (existingStopMap.size > 0) {
         return {
-            stopMap: currentRenderState.stopMap,
+            stopMap: existingStopMap,
             warningMessage: ""
         };
     }
@@ -321,13 +421,13 @@ async function getOptionalStopMap() {
 
     try {
         return {
-            stopMap: await getStopMap(),
+            stopMap: await getStopMap(company),
             warningMessage: ""
         };
     } catch (error) {
         console.warn("巴士站清單載入失敗，改用降級模式顯示", error);
         return {
-            stopMap: currentRenderState?.stopMap instanceof Map ? currentRenderState.stopMap : new Map(),
+            stopMap: existingStopMap,
             warningMessage: "暫時無法載入完整站名或定位資料，仍可先查看這個方向的 ETA。"
         };
     }
@@ -351,57 +451,70 @@ async function fetchJson(url, label) {
     return response.json();
 }
 
-async function getRouteList() {
-    if (!routeListPromise) {
-        routeListPromise = fetchJson(`${API_BASE}/route/`, "路線清單")
-            .then((payload) => Array.isArray(payload.data) ? payload.data : [])
+async function getRouteList(company) {
+    const normalizedCompany = getCompanyConfig(company).code;
+
+    if (!routeListPromiseByCompany.has(normalizedCompany)) {
+        const config = getCompanyConfig(normalizedCompany);
+        const promise = fetchJson(config.getRouteListUrl(), `${getCompanyDisplayName(normalizedCompany)}路線清單`)
+            .then((payload) => decorateDataEntries(normalizedCompany, Array.isArray(payload.data) ? payload.data : []))
             .catch((error) => {
-                routeListPromise = null;
+                routeListPromiseByCompany.delete(normalizedCompany);
                 throw error;
             });
+
+        routeListPromiseByCompany.set(normalizedCompany, promise);
     }
 
-    return routeListPromise;
+    return routeListPromiseByCompany.get(normalizedCompany);
 }
 
-async function getStopMap() {
-    if (!stopMapPromise) {
-        stopMapPromise = fetchJson(`${API_BASE}/stop`, "巴士站清單")
+async function getStopMap(company) {
+    const normalizedCompany = getCompanyConfig(company).code;
+
+    if (!stopMapPromiseByCompany.has(normalizedCompany)) {
+        const config = getCompanyConfig(normalizedCompany);
+        const promise = fetchJson(config.getStopMapUrl(), `${getCompanyDisplayName(normalizedCompany)}巴士站清單`)
             .then((payload) => {
                 const map = new Map();
                 const stops = Array.isArray(payload.data) ? payload.data : [];
 
                 for (const stop of stops) {
                     if (stop?.stop) {
-                        map.set(stop.stop, stop);
+                        map.set(normalizeStopId(stop.stop), { ...stop, company: normalizedCompany });
                     }
                 }
 
                 return map;
             })
             .catch((error) => {
-                stopMapPromise = null;
+                stopMapPromiseByCompany.delete(normalizedCompany);
                 throw error;
             });
+
+        stopMapPromiseByCompany.set(normalizedCompany, promise);
     }
 
-    return stopMapPromise;
+    return stopMapPromiseByCompany.get(normalizedCompany);
 }
 
-async function getRouteStops(route, direction, serviceType) {
-    const cacheKey = `${route}|${direction}|${serviceType}`;
+async function getRouteStops(company, route, direction, serviceType) {
+    const normalizedCompany = getCompanyConfig(company).code;
+    const cacheKey = `${normalizedCompany}|${route}|${direction}|${serviceType}`;
 
     if (!routeStopCache.has(cacheKey)) {
-        const url = `${API_BASE}/route-stop/${encodeURIComponent(route)}/${direction}/${serviceType}`;
-        const promise = fetchJson(url, `路線站點 ${route} ${direction} service_type=${serviceType}`)
+        const config = getCompanyConfig(normalizedCompany);
+        const url = config.getRouteStopsUrl(route, direction, serviceType);
+        const promise = fetchJson(url, `${getCompanyLabel(normalizedCompany)}路線站點 ${route} ${direction}`)
             .then((payload) => {
                 const stops = Array.isArray(payload.data) ? payload.data : [];
                 return stops
                     .map((item) => ({
+                        company: normalizedCompany,
                         seq: Number(item.seq) || 0,
                         stopId: normalizeStopId(item.stop),
                         direction: getItemDirection(item) || direction,
-                        serviceType: getServiceType(item)
+                        serviceType: config.supportsServiceType ? getServiceType(item) : "1"
                     }))
                     .filter((item) => item.stopId)
                     .sort((a, b) => a.seq - b.seq);
@@ -417,20 +530,29 @@ async function getRouteStops(route, direction, serviceType) {
     return routeStopCache.get(cacheKey);
 }
 
-async function getRouteEta(route, serviceType) {
-    const url = `${API_BASE}/route-eta/${encodeURIComponent(route)}/${serviceType}`;
-    const payload = await fetchJson(url, `到站時間 ${route} service_type=${serviceType}`);
-    return Array.isArray(payload.data) ? payload.data : [];
+async function getRouteEta(company, route, serviceType) {
+    const normalizedCompany = getCompanyConfig(company).code;
+    const config = getCompanyConfig(normalizedCompany);
+
+    if (!config.supportsRouteEta) {
+        return [];
+    }
+
+    const url = config.getRouteEtaUrl(route, serviceType);
+    const payload = await fetchJson(url, `${getCompanyLabel(normalizedCompany)}到站時間 ${route}`);
+    return decorateDataEntries(normalizedCompany, Array.isArray(payload.data) ? payload.data : []);
 }
 
-async function getStopEta(route, serviceType, stopId) {
+async function getStopEta(company, route, serviceType, stopId) {
+    const normalizedCompany = getCompanyConfig(company).code;
     const normalizedStopId = normalizeStopId(stopId);
-    const cacheKey = `${normalizedStopId}|${route}|${serviceType}`;
+    const cacheKey = `${normalizedCompany}|${normalizedStopId}|${route}|${serviceType}`;
 
     if (!stopEtaCache.has(cacheKey)) {
-        const url = `${API_BASE}/eta/${normalizedStopId}/${encodeURIComponent(route)}/${serviceType}`;
-        const promise = fetchJson(url, `站點到站時間 ${normalizedStopId} ${route} service_type=${serviceType}`)
-            .then((payload) => Array.isArray(payload.data) ? payload.data : [])
+        const config = getCompanyConfig(normalizedCompany);
+        const url = config.getStopEtaUrl(normalizedStopId, route, serviceType);
+        const promise = fetchJson(url, `${getCompanyLabel(normalizedCompany)}站點到站時間 ${normalizedStopId} ${route}`)
+            .then((payload) => decorateDataEntries(normalizedCompany, Array.isArray(payload.data) ? payload.data : []))
             .catch((error) => {
                 stopEtaCache.delete(cacheKey);
                 throw error;
@@ -442,47 +564,58 @@ async function getStopEta(route, serviceType, stopId) {
     return stopEtaCache.get(cacheKey);
 }
 
-async function getStopAllEta(stopId) {
+async function getStopAllEta(company, stopId) {
+    const normalizedCompany = getCompanyConfig(company).code;
+    const config = getCompanyConfig(normalizedCompany);
     const normalizedStopId = normalizeStopId(stopId);
+    const cacheKey = `${normalizedCompany}|${normalizedStopId}`;
 
-    if (!stopAllEtaCache.has(normalizedStopId)) {
-        const url = `${API_BASE}/stop-eta/${normalizedStopId}`;
-        const promise = fetchJson(url, `巴士站所有路線 ETA ${normalizedStopId}`)
-            .then((payload) => Array.isArray(payload.data) ? payload.data : [])
+    if (!config.supportsStopAllEta) {
+        return [];
+    }
+
+    if (!stopAllEtaCache.has(cacheKey)) {
+        const url = config.getStopAllEtaUrl(normalizedStopId);
+        const promise = fetchJson(url, `${getCompanyLabel(normalizedCompany)}巴士站所有路線 ETA ${normalizedStopId}`)
+            .then((payload) => decorateDataEntries(normalizedCompany, Array.isArray(payload.data) ? payload.data : []))
             .catch((error) => {
-                stopAllEtaCache.delete(normalizedStopId);
+                stopAllEtaCache.delete(cacheKey);
                 throw error;
             });
 
-        stopAllEtaCache.set(normalizedStopId, promise);
+        stopAllEtaCache.set(cacheKey, promise);
     }
 
-    return stopAllEtaCache.get(normalizedStopId);
+    return stopAllEtaCache.get(cacheKey);
 }
 
-async function getStopInfo(stopId) {
+async function getStopInfo(company, stopId) {
+    const normalizedCompany = getCompanyConfig(company).code;
+    const config = getCompanyConfig(normalizedCompany);
     const normalizedStopId = normalizeStopId(stopId);
 
     if (!normalizedStopId) {
         return null;
     }
 
-    if (!stopInfoCache.has(normalizedStopId)) {
-        const url = `${API_BASE}/stop/${normalizedStopId}`;
-        const promise = fetchJson(url, `巴士站資料 ${normalizedStopId}`)
-            .then((payload) => payload?.data || null)
+    const cacheKey = `${normalizedCompany}|${normalizedStopId}`;
+
+    if (!stopInfoCache.has(cacheKey)) {
+        const url = config.getStopInfoUrl(normalizedStopId);
+        const promise = fetchJson(url, `${getCompanyLabel(normalizedCompany)}巴士站資料 ${normalizedStopId}`)
+            .then((payload) => payload?.data ? { ...payload.data, company: normalizedCompany } : null)
             .catch((error) => {
-                stopInfoCache.delete(normalizedStopId);
+                stopInfoCache.delete(cacheKey);
                 throw error;
             });
 
-        stopInfoCache.set(normalizedStopId, promise);
+        stopInfoCache.set(cacheKey, promise);
     }
 
-    return stopInfoCache.get(normalizedStopId);
+    return stopInfoCache.get(cacheKey);
 }
 
-async function hydrateStopMapForStops(stops, baseStopMap) {
+async function hydrateStopMapForStops(company, stops, baseStopMap) {
     const mergedStopMap = baseStopMap instanceof Map ? new Map(baseStopMap) : new Map();
     const missingStopIds = [...new Set(
         stops
@@ -502,7 +635,7 @@ async function hydrateStopMapForStops(stops, baseStopMap) {
 
     // 先試第一個站點；如果連第一個都被 CORS/403 擋下來，就不要把整排站點都打一遍失敗 request。
     try {
-        const firstStopInfo = await getStopInfo(firstStopId);
+        const firstStopInfo = await getStopInfo(company, firstStopId);
         if (firstStopInfo?.stop) {
             mergedStopMap.set(normalizeStopId(firstStopInfo.stop), firstStopInfo);
             successCount += 1;
@@ -527,7 +660,7 @@ async function hydrateStopMapForStops(stops, baseStopMap) {
     // 整包 /stop 清單在本機模式下可能被 CORS 擋住，所以這裡改成針對目前方向逐站補站名。
     const results = await Promise.allSettled(remainingStopIds.map(async (stopId) => ({
         stopId,
-        stopInfo: await getStopInfo(stopId)
+        stopInfo: await getStopInfo(company, stopId)
     })));
 
     for (const result of results) {
@@ -587,6 +720,67 @@ function chooseRouteVariants(routeEntries, requestedServiceType) {
     return { preferredServiceType, variants };
 }
 
+function createCtbVariantFromRouteEntry(routeEntry, direction) {
+    const isInbound = direction === "inbound";
+    const originTc = String(routeEntry.orig_tc || "").trim();
+    const destinationTc = String(routeEntry.dest_tc || "").trim();
+    const originEn = String(routeEntry.orig_en || "").trim();
+    const destinationEn = String(routeEntry.dest_en || "").trim();
+
+    return {
+        ...routeEntry,
+        company: "CTB",
+        bound: direction,
+        direction,
+        dir: direction,
+        service_type: "1",
+        orig_tc: isInbound ? (destinationTc || originTc) : originTc,
+        dest_tc: isInbound ? (originTc || destinationTc) : destinationTc,
+        orig_en: isInbound ? (destinationEn || originEn) : originEn,
+        dest_en: isInbound ? (originEn || destinationEn) : destinationEn
+    };
+}
+
+async function expandRouteEntriesForSearch(routeEntries) {
+    const expandedEntries = [];
+
+    for (const routeEntry of routeEntries) {
+        const company = getItemCompany(routeEntry);
+        const existingDirection = getItemDirection(routeEntry);
+
+        if (company !== "CTB" || existingDirection) {
+            expandedEntries.push(routeEntry);
+            continue;
+        }
+
+        const route = String(routeEntry.route || "").trim().toUpperCase();
+
+        // CTB 路線清單不一定直接附帶方向，所以這裡先試 outbound / inbound 的 route-stop，
+        // 成功哪一個就把哪個方向做成卡片。
+        const directionResults = await Promise.allSettled(["outbound", "inbound"].map(async (direction) => ({
+            direction,
+            stops: await getRouteStops("CTB", route, direction, "1")
+        })));
+
+        let hasResolvedDirection = false;
+
+        for (const result of directionResults) {
+            if (result.status !== "fulfilled" || result.value.stops.length === 0) {
+                continue;
+            }
+
+            expandedEntries.push(createCtbVariantFromRouteEntry(routeEntry, result.value.direction));
+            hasResolvedDirection = true;
+        }
+
+        if (!hasResolvedDirection) {
+            expandedEntries.push(routeEntry);
+        }
+    }
+
+    return expandedEntries;
+}
+
 function getEtaTimestamp(etaValue) {
     const etaTimestamp = Date.parse(etaValue);
     return Number.isNaN(etaTimestamp) ? Number.POSITIVE_INFINITY : etaTimestamp;
@@ -594,6 +788,10 @@ function getEtaTimestamp(etaValue) {
 
 function isEtaEntryForVariant(entry, variant) {
     if (!entry || !variant) {
+        return false;
+    }
+
+    if (getItemCompany(entry) !== getItemCompany(variant)) {
         return false;
     }
 
@@ -659,6 +857,42 @@ function buildVariantEtaPreview(variant, etaEntries) {
         destination: nextEntry.dest_tc || nextEntry.dest_en || variant.dest_tc || variant.dest_en || "",
         remark: nextEntry.rmk_tc || nextEntry.rmk_en || ""
     };
+}
+
+function buildEmptyVariantEtaPreview() {
+    return {
+        hasUsableEta: false,
+        nextEtaValue: "",
+        nextEtaTimestamp: Number.POSITIVE_INFINITY,
+        destination: "",
+        remark: ""
+    };
+}
+
+async function loadVariantSummaryPreview(variant, routeEtaPromiseCache) {
+    const company = getItemCompany(variant);
+    const route = String(variant.route || "").trim().toUpperCase();
+    const serviceType = getServiceType(variant);
+
+    if (getCompanyConfig(company).supportsRouteEta) {
+        const cacheKey = `${company}|${route}|${serviceType}`;
+        if (!routeEtaPromiseCache.has(cacheKey)) {
+            routeEtaPromiseCache.set(cacheKey, getRouteEta(company, route, serviceType));
+        }
+
+        const etaEntries = await routeEtaPromiseCache.get(cacheKey);
+        return buildVariantEtaPreview(variant, etaEntries);
+    }
+
+    // Citybus 沒有 route-eta，所以方向卡片先用該方向第一個站的 ETA 當摘要。
+    const routeStopsResult = await getRouteStopsWithFallback(company, route, variant, []);
+    const firstStop = routeStopsResult.routeStops[0];
+    if (!firstStop) {
+        return buildEmptyVariantEtaPreview();
+    }
+
+    const stopEtaEntries = await getStopEta(company, route, serviceType, firstStop.stopId);
+    return buildVariantEtaPreview(variant, stopEtaEntries);
 }
 
 function getLocationButtonLabel() {
@@ -770,13 +1004,17 @@ function updateNearestStopFromUserPosition() {
         return false;
     }
 
+    const variant = findVariantByKey(currentRenderState.selectedVariantKey);
     const variantData = ensureVariantDataBucket(currentRenderState.selectedVariantKey);
-    if (!variantData?.routeStopsWithEta.length) {
+    if (!variant || !variantData?.routeStopsWithEta.length) {
         return false;
     }
 
+    const company = getItemCompany(variant);
+    const stopMap = getStopMapForCompany(company);
+
     // stop 清單偶爾會被 API 擋下來；這時先保留 ETA 功能，但不要硬做最近站計算。
-    if (!(currentRenderState.stopMap instanceof Map) || currentRenderState.stopMap.size === 0) {
+    if (stopMap.size === 0) {
         currentRenderState.nearestStopKey = "";
         locationState.statusMessage = "暫時無法載入站點座標，請手動選擇站點";
         renderCurrentState();
@@ -785,7 +1023,7 @@ function updateNearestStopFromUserPosition() {
 
     const nearestMatch = getNearestStopMatch(
         variantData.routeStopsWithEta,
-        currentRenderState.stopMap,
+        stopMap,
         locationState.userPosition,
         currentRenderState.selectedVariantKey
     );
@@ -979,7 +1217,7 @@ async function refreshVariantSummaries() {
     }
 
     const { route, variants } = currentRenderState;
-    const uniqueServiceTypes = [...new Set(variants.map((variant) => getServiceType(variant)))];
+    const routeEtaPromiseCache = new Map();
 
     for (const variant of variants) {
         const bucket = ensureVariantDataBucket(getVariantKey(variant));
@@ -988,20 +1226,20 @@ async function refreshVariantSummaries() {
 
     renderCurrentState();
 
-    const results = await Promise.allSettled(uniqueServiceTypes.map(async (serviceType) => ({
-        serviceType,
-        etaEntries: await getRouteEta(route, serviceType)
+    const results = await Promise.allSettled(variants.map(async (variant) => ({
+        variantKey: getVariantKey(variant),
+        summary: await loadVariantSummaryPreview(variant, routeEtaPromiseCache)
     })));
 
     if (!currentRenderState || currentRenderState.route !== route) {
         return;
     }
 
-    const etaEntriesByServiceType = new Map();
+    const summaryByVariantKey = new Map();
 
     for (const result of results) {
         if (result.status === "fulfilled") {
-            etaEntriesByServiceType.set(result.value.serviceType, result.value.etaEntries);
+            summaryByVariantKey.set(result.value.variantKey, result.value.summary);
             continue;
         }
 
@@ -1011,17 +1249,19 @@ async function refreshVariantSummaries() {
     for (const variant of variants) {
         const variantKey = getVariantKey(variant);
         const bucket = ensureVariantDataBucket(variantKey);
-        const etaEntries = etaEntriesByServiceType.get(getServiceType(variant)) || [];
-
-        bucket.summary = buildVariantEtaPreview(variant, etaEntries);
+        bucket.summary = summaryByVariantKey.get(variantKey) || buildEmptyVariantEtaPreview();
         bucket.isSummaryLoading = false;
     }
 
     renderCurrentState();
 
-    console.log(`[KMB ${APP_VERSION}] route overview`, {
+    console.log(`[BUS ${APP_VERSION}] route overview`, {
         route,
-        comparedServiceTypes: uniqueServiceTypes
+        comparedVariants: variants.map((variant) => ({
+            company: getItemCompany(variant),
+            direction: getItemDirection(variant),
+            serviceType: getServiceType(variant)
+        }))
     });
 }
 
@@ -1152,7 +1392,7 @@ function preferUsableEtaEntries(entries, preferredServiceType = "") {
     return matchingServiceTypeEntries.length > 0 ? matchingServiceTypeEntries : sourceEntries;
 }
 
-async function attachEtaEntriesToStops(route, serviceType, variants, routeStopsByDirection, etaMaps) {
+async function attachEtaEntriesToStops(company, route, serviceType, variants, routeStopsByDirection, etaMaps) {
     const entries = await Promise.all(variants.map(async (variant) => {
         const direction = getItemDirection(variant);
         const stops = routeStopsByDirection.get(direction) || [];
@@ -1164,9 +1404,11 @@ async function attachEtaEntriesToStops(route, serviceType, variants, routeStopsB
             }
 
             try {
-                const stopAllEtaEntries = await getStopAllEta(stop.stopId);
+                const stopAllEtaEntries = await getStopAllEta(company, stop.stopId);
                 const filteredStopAllEtaEntries = stopAllEtaEntries.filter((entry) => {
-                    return isSameRoute(entry, route) && getItemDirection(entry) === direction;
+                    return getItemCompany(entry) === company
+                        && isSameRoute(entry, route)
+                        && getItemDirection(entry) === direction;
                 });
 
                 if (filteredStopAllEtaEntries.length > 0) {
@@ -1188,7 +1430,7 @@ async function attachEtaEntriesToStops(route, serviceType, variants, routeStopsB
             }
 
             try {
-                const stopEtaEntries = await getStopEta(route, serviceType, stop.stopId);
+                const stopEtaEntries = await getStopEta(company, route, serviceType, stop.stopId);
                 const stopEtaMaps = buildEtaMaps(stopEtaEntries, serviceType);
                 const fallbackEtaEntries = getEtaEntriesForStop(stopEtaMaps, direction, stop.stopId, stop.seq, serviceType);
 
@@ -1360,6 +1602,7 @@ function renderDirectionCards() {
         const variantData = currentRenderState.variantDataByKey[variantKey];
         const isSelected = currentRenderState.selectedVariantKey === variantKey;
         const encodedKey = encodeURIComponent(variantKey);
+        const company = getItemCompany(variant);
         const direction = getItemDirection(variant);
         const serviceTypeLabel = getServiceTypeLabel(getServiceType(variant));
         const preview = variantData?.summary;
@@ -1378,7 +1621,10 @@ function renderDirectionCards() {
         return `
             <button type="button" class="variant-card ${isSelected ? "is-selected" : ""}" onclick="selectVariant('${encodedKey}')">
                 <div class="variant-top">
-                    <span class="inline-chip">${escapeHtml(getDirectionLabel(direction))}</span>
+                    <div class="variant-chip-row">
+                        ${renderCompanyChip(company)}
+                        <span class="inline-chip">${escapeHtml(getDirectionLabel(direction))}</span>
+                    </div>
                     <span class="inline-chip subtle">${escapeHtml(serviceTypeLabel)}</span>
                 </div>
                 <div class="variant-route">${escapeHtml(getRouteLabel(variant))}</div>
@@ -1447,6 +1693,9 @@ function renderSelectedVariantPanel() {
     }
 
     const stops = variantData.routeStopsWithEta;
+    const company = getItemCompany(variant);
+    const companyLabel = getCompanyLabel(company);
+    const stopMap = getStopMapForCompany(company);
     const updatedTimeText = formatDisplayTime(variantData.fetchedAt);
     const stopMapWarningHtml = currentRenderState.stopMapWarningMessage
         ? `<p class="selection-subtitle">${escapeHtml(currentRenderState.stopMapWarningMessage)}</p>`
@@ -1457,7 +1706,7 @@ function renderSelectedVariantPanel() {
         const encodedStopKey = encodeURIComponent(stopKey);
         const isExpanded = currentRenderState.expandedStopKeys.includes(stopKey);
         const isNearest = currentRenderState.nearestStopKey === stopKey;
-        const stopInfo = currentRenderState.stopMap?.get(stop.stopId);
+        const stopInfo = stopMap.get(stop.stopId);
         const stopName = escapeHtml(stopInfo?.name_tc || stopInfo?.name_en || `站點 ${stop.stopId}`);
 
         return `
@@ -1483,7 +1732,7 @@ function renderSelectedVariantPanel() {
                 <div>
                     <p class="selection-eyebrow">第 2 步：查看站點</p>
                     <h2 class="selection-title">路線 ${escapeHtml(currentRenderState.route)} • ${escapeHtml(getRouteLabel(variant))}</h2>
-                    <p class="selection-subtitle">${escapeHtml(getServiceTypeLabel(getServiceType(variant)))} • 站點共 ${stops.length} 個 • 點一下站名展開 ETA • 資料更新 ${escapeHtml(updatedTimeText)}</p>
+                    <p class="selection-subtitle">${escapeHtml(companyLabel)} • ${escapeHtml(getServiceTypeLabel(getServiceType(variant)))} • 站點共 ${stops.length} 個 • 點一下站名展開 ETA • 資料更新 ${escapeHtml(updatedTimeText)}</p>
                     ${stopMapWarningHtml}
                 </div>
                 <button type="button" class="retry-btn" onclick="refreshSelectedDirection()">更新這個方向</button>
@@ -1555,6 +1804,7 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
 
     const variantData = ensureVariantDataBucket(variantKey);
     const route = currentRenderState.route;
+    const company = getItemCompany(variant);
     const direction = getItemDirection(variant);
     const serviceType = getServiceType(variant);
     const serviceTypeLabel = getServiceTypeLabel(serviceType);
@@ -1576,15 +1826,15 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
 
     if (statusDiv) {
         statusDiv.innerHTML = isAutoRefresh
-            ? `正在自動更新 <strong>${escapeHtml(getRouteLabel(variant))}</strong>...`
-            : `正在載入 <strong>${escapeHtml(getRouteLabel(variant))}</strong> 的站點與 ETA（${escapeHtml(serviceTypeLabel)}）...`;
+            ? `正在自動更新 <strong>${escapeHtml(getCompanyLabel(company))} ${escapeHtml(getRouteLabel(variant))}</strong>...`
+            : `正在載入 <strong>${escapeHtml(getCompanyLabel(company))} ${escapeHtml(getRouteLabel(variant))}</strong> 的站點與 ETA（${escapeHtml(serviceTypeLabel)}）...`;
     }
 
     try {
-        const etaEntries = await getRouteEta(route, serviceType);
+        const etaEntries = await getRouteEta(company, route, serviceType);
         const [routeStopsResult, stopMapResult] = await Promise.all([
-            getRouteStopsWithFallback(route, variant, etaEntries),
-            getOptionalStopMap()
+            getRouteStopsWithFallback(company, route, variant, etaEntries),
+            getOptionalStopMap(company)
         ]);
 
         if (!currentRenderState || currentRenderState.route !== route || requestId !== activeVariantLoadId) {
@@ -1593,13 +1843,13 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
 
         const routeStops = routeStopsResult.routeStops;
         // 先用可取得的 stopMap，再逐站補目前方向需要的站名，避免畫面只剩下 stop ID。
-        const hydratedStopMapResult = await hydrateStopMapForStops(routeStops, stopMapResult.stopMap);
+        const hydratedStopMapResult = await hydrateStopMapForStops(company, routeStops, stopMapResult.stopMap);
 
         if (!currentRenderState || currentRenderState.route !== route || requestId !== activeVariantLoadId) {
             return;
         }
 
-        currentRenderState.stopMap = hydratedStopMapResult.stopMap;
+        currentRenderState.stopMapsByCompany[company] = hydratedStopMapResult.stopMap;
         currentRenderState.stopMapWarningMessage = joinWarningMessages(
             routeStopsResult.warningMessage,
             stopMapResult.warningMessage,
@@ -1609,6 +1859,7 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
         const routeStopsByDirection = new Map([[direction, routeStops]]);
         const etaMaps = buildEtaMaps(etaEntries, serviceType);
         const routeStopsWithEtaMap = await attachEtaEntriesToStops(
+            company,
             route,
             serviceType,
             [variant],
@@ -1630,7 +1881,8 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
         variantData.routeStopsWithEta = stopsWithEta;
         variantData.fetchedAt = new Date();
 
-        console.log(`[KMB ${APP_VERSION}] variant loaded`, {
+        console.log(`[BUS ${APP_VERSION}] variant loaded`, {
+            company,
             route,
             direction,
             serviceType,
@@ -1643,7 +1895,7 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
         startLiveUpdates();
 
         if (statusDiv && currentRenderState.selectedVariantKey === variantKey) {
-            statusDiv.innerHTML = `已載入 <strong>${escapeHtml(getRouteLabel(variant))}</strong>（${escapeHtml(serviceTypeLabel)}），可展開站點查看 ETA`;
+            statusDiv.innerHTML = `已載入 <strong>${escapeHtml(getCompanyLabel(company))} ${escapeHtml(getRouteLabel(variant))}</strong>（${escapeHtml(serviceTypeLabel)}），可展開站點查看 ETA`;
         }
     } catch (error) {
         if (!currentRenderState || currentRenderState.route !== route || requestId !== activeVariantLoadId) {
@@ -1676,7 +1928,7 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
             }
         }
 
-        console.error("KMB variant load failed", error);
+        console.error("Bus variant load failed", error);
     }
 }
 
@@ -1762,21 +2014,41 @@ async function searchETA(options = {}) {
     searchBtn.textContent = "查詢中...";
 
     try {
-        const routeList = await getRouteList();
+        const routeListResults = await Promise.allSettled(["KMB", "CTB"].map(async (company) => ({
+            company,
+            routeList: await getRouteList(company)
+        })));
 
         if (searchId !== activeSearchId) {
             return;
         }
 
-        const matchingRoutes = routeList.filter((entry) => String(entry.route || "").toUpperCase() === route);
+        const availableRouteLists = routeListResults
+            .filter((result) => result.status === "fulfilled")
+            .map((result) => result.value);
+
+        if (availableRouteLists.length === 0) {
+            throw routeListResults.find((result) => result.status === "rejected")?.reason || new Error("路線清單暫時無法載入");
+        }
+
+        const matchingRoutes = availableRouteLists.flatMap(({ routeList }) => {
+            return routeList.filter((entry) => String(entry.route || "").toUpperCase() === route);
+        });
+
         if (!matchingRoutes.length) {
             resetCurrentRouteState();
-            renderStandaloneError(resultDiv, `找不到路線 ${route}`, "請確認路線號是否正確，或試其他路線例如 1A、2、104。");
-            statusDiv.innerHTML = "找不到這條路線";
+            renderStandaloneError(resultDiv, `目前不支援路線 ${route}`, "目前支援九巴 KMB 和城巴 CTB 路線，請試其他路線例如 1A、2、104。");
+            statusDiv.innerHTML = "目前不支援此路線";
             return;
         }
 
-        const { preferredServiceType, variants } = chooseRouteVariants(matchingRoutes, requestedServiceType);
+        const expandedMatchingRoutes = await expandRouteEntriesForSearch(matchingRoutes);
+
+        if (searchId !== activeSearchId) {
+            return;
+        }
+
+        const { preferredServiceType, variants } = chooseRouteVariants(expandedMatchingRoutes, requestedServiceType);
         if (!variants.length) {
             resetCurrentRouteState();
             renderStandaloneError(resultDiv, `路線 ${route} 暫時無法查詢`, "目前找不到可用方向資料，請稍後再試，或試其他路線例如 1A、2、104。");
@@ -1794,7 +2066,7 @@ async function searchETA(options = {}) {
             selectedVariantKey: null,
             expandedStopKeys: [],
             nearestStopKey: "",
-            stopMap: null,
+            stopMapsByCompany: {},
             variantDataByKey: {}
         };
 
@@ -1812,16 +2084,17 @@ async function searchETA(options = {}) {
             return;
         }
 
-        console.log(`[KMB ${APP_VERSION}] route search`, {
+        console.log(`[BUS ${APP_VERSION}] route search`, {
             route,
             requestedServiceType,
             preferredServiceType,
+            companies: [...new Set(expandedMatchingRoutes.map((entry) => getItemCompany(entry)))],
             variantCount: variants.length
         });
 
         statusDiv.innerHTML = `已找到 ${variants.length} 個可用方向，並已同步載入班次摘要`;
     } catch (error) {
-        console.error("KMB route search failed", error);
+        console.error("Bus route search failed", error);
         const friendlyErrorMessage = getFriendlyRouteErrorMessage(error);
         resetCurrentRouteState();
         renderStandaloneError(resultDiv, "查詢失敗", friendlyErrorMessage);
@@ -1835,7 +2108,7 @@ async function searchETA(options = {}) {
 }
 
 window.onload = () => {
-    console.log(`Ready to search KMB routes like 1A, 2, and 104 (${APP_VERSION})`);
+    console.log(`Ready to search KMB and CTB routes like 1A, 2, 24, and 104 (${APP_VERSION})`);
     void initializeLocationOnLoad();
 };
 

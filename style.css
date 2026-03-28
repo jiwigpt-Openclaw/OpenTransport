@@ -231,6 +231,13 @@ button {
     align-items: center;
 }
 
+.variant-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
 .variant-route {
     margin-top: 12px;
     font-size: 1.05em;
@@ -292,6 +299,16 @@ button {
 .inline-chip.subtle {
     background: #f3f4f6;
     color: #666;
+}
+
+.inline-chip.company-chip.is-kmb {
+    background: rgba(200, 16, 46, 0.14);
+    color: #c8102e;
+}
+
+.inline-chip.company-chip.is-ctb {
+    background: rgba(0, 102, 204, 0.12);
+    color: #0b63c9;
 }
 
 .variant-card.is-selected .inline-chip {
