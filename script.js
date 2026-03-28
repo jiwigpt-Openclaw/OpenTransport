@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-03-29 00:30";
+const APP_VERSION = "2026-03-29 01:05";
 const KMB_API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const CTB_API_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
 const NLB_API_BASE = "https://rt.data.gov.hk/v2/transport/nlb";
@@ -2424,7 +2424,7 @@ function renderResult() {
     return `
         <div class="route-shell">
             <section class="selection-panel">
-                <div class="selection-panel-header">
+                <div class="selection-panel-header selection-panel-header-compact">
                     <!-- 依需求移除左上角的「路線 XX」標題，保留右側 GPS 控制即可。 -->
                     <div class="panel-actions">
                         <button type="button" class="location-btn ${locationState.enabled ? "is-active" : ""}" onclick="toggleLocationTracking()">${escapeHtml(locationButtonText)}</button>
@@ -2453,6 +2453,18 @@ function renderCurrentState() {
     }
 
     resultDiv.innerHTML = renderResult();
+}
+
+// 6A：常用路線快捷鍵只重用既有搜尋入口，不改動原本查詢邏輯。
+function selectQuickRoute(route) {
+    const routeInput = document.getElementById("routeInput");
+    if (!routeInput) {
+        return;
+    }
+
+    routeInput.value = String(route || "").trim().toUpperCase();
+    routeInput.focus();
+    void searchETA();
 }
 
 // 點擊方向卡片後，才真正去載入該方向的站點與 ETA。
