@@ -200,10 +200,39 @@ button {
     line-height: 1.5;
 }
 
+.variant-next {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.variant-next-time {
+    color: #c8102e;
+    font-size: 1.5em;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.variant-next-time.is-muted {
+    color: #666;
+    font-size: 1.05em;
+    font-weight: 700;
+}
+
 .variant-meta {
     margin-top: 10px;
     font-size: 0.92em;
     color: #666;
+}
+
+.variant-card.is-selected .variant-next-time {
+    color: white;
+}
+
+.variant-card.is-selected .variant-next-time.is-muted {
+    color: #ffe0e6;
 }
 
 .variant-card.is-selected .variant-meta {
