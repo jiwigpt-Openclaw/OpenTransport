@@ -1,7 +1,12 @@
-const APP_VERSION = "2026-03-28 02:25";
+const APP_VERSION = "2026-03-28 04:10";
 const API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const COUNTDOWN_REFRESH_MS = 30000;
 const DATA_REFRESH_MS = 60000;
+const GEOLOCATION_OPTIONS = {
+    enableHighAccuracy: false,
+    timeout: 8000,
+    maximumAge: 60000
+};
 const routeStopCache = new Map();
 const stopEtaCache = new Map();
 const stopAllEtaCache = new Map();
@@ -10,11 +15,20 @@ let routeListPromise = null;
 let stopMapPromise = null;
 let activeSearchId = 0;
 let activeVariantLoadId = 0;
+let activeLocationRequestId = 0;
 let liveCountdownTimerId = null;
 let dataRefreshTimerId = null;
+let pendingScrollTimerId = null;
 
 // 這個物件會保存目前畫面所需的所有狀態，方便重繪與自動更新。
 let currentRenderState = null;
+
+// 定位功能的開關與狀態獨立保存，讓使用者換路線後也能保留偏好。
+const locationState = {
+    enabled: true,
+    statusMessage: "定位已開啟，選擇方向後會自動尋找最近的站",
+    userPosition: null
+};
 
 console.log(`KMB ETA enhanced lookup loaded (${APP_VERSION})`);
 
@@ -147,6 +161,75 @@ function findVariantByKey(variantKey) {
     }
 
     return currentRenderState.variants.find((variant) => getVariantKey(variant) === variantKey) || null;
+}
+
+// 失敗或切換路線時，統一用這個函式把舊的查詢狀態清乾淨，避免下一次查詢沿用到壞掉的狀態。
+function resetCurrentRouteState() {
+    stopLiveUpdates();
+    activeVariantLoadId += 1;
+    activeLocationRequestId += 1;
+    currentRenderState = null;
+}
+
+function clearSelectedVariantState() {
+    if (!currentRenderState) {
+        return;
+    }
+
+    currentRenderState.selectedVariantKey = null;
+    currentRenderState.expandedStopKeys = [];
+    currentRenderState.nearestStopKey = "";
+}
+
+function getFriendlyRouteErrorMessage(error) {
+    const rawMessage = String(error?.message || "");
+
+    if (rawMessage.includes("403") || rawMessage.includes("Failed to fetch") || rawMessage.includes("NetworkError")) {
+        return "該路線目前無法查詢站點資料，請試其他路線，例如 1A、2、104。";
+    }
+
+    if (rawMessage) {
+        return `${rawMessage}。你可以試其他路線，例如 1A、2、104。`;
+    }
+
+    return "該路線目前無法查詢，請稍後再試，或試其他路線例如 1A、2、104。";
+}
+
+function renderStandaloneError(resultDiv, title, message) {
+    if (!resultDiv) {
+        return;
+    }
+
+    resultDiv.innerHTML = `
+        <div class="selection-panel">
+            <div class="selection-error">
+                <p>${escapeHtml(title)}</p>
+                <p>${escapeHtml(message)}</p>
+            </div>
+        </div>
+    `;
+}
+
+async function getOptionalStopMap() {
+    if (currentRenderState?.stopMap instanceof Map && currentRenderState.stopMap.size > 0) {
+        return {
+            stopMap: currentRenderState.stopMap,
+            warningMessage: ""
+        };
+    }
+
+    try {
+        return {
+            stopMap: await getStopMap(),
+            warningMessage: ""
+        };
+    } catch (error) {
+        console.warn("巴士站清單載入失敗，改用降級模式顯示", error);
+        return {
+            stopMap: currentRenderState?.stopMap instanceof Map ? currentRenderState.stopMap : new Map(),
+            warningMessage: "暫時無法載入完整站名或定位資料，仍可先查看這個方向的 ETA。"
+        };
+    }
 }
 
 async function fetchJson(url, label) {
@@ -376,6 +459,308 @@ function buildVariantEtaPreview(variant, etaEntries) {
         destination: nextEntry.dest_tc || nextEntry.dest_en || variant.dest_tc || variant.dest_en || "",
         remark: nextEntry.rmk_tc || nextEntry.rmk_en || ""
     };
+}
+
+function getLocationButtonLabel() {
+    return locationState.enabled ? "停止定位" : "使用我的位置";
+}
+
+function getLocationStatusText() {
+    return locationState.statusMessage || "你可以手動選擇站點";
+}
+
+function getStopCoordinates(stopInfo) {
+    const latitude = Number(stopInfo?.lat ?? stopInfo?.latitude);
+    const longitude = Number(stopInfo?.long ?? stopInfo?.lng ?? stopInfo?.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        return null;
+    }
+
+    return { latitude, longitude };
+}
+
+// 這裡用簡化版 Haversine，香港範圍內計算最近站已經足夠準確。
+function getDistanceInKm(latitude1, longitude1, latitude2, longitude2) {
+    const toRadians = (degrees) => degrees * (Math.PI / 180);
+    const earthRadiusKm = 6371;
+    const deltaLatitude = toRadians(latitude2 - latitude1);
+    const deltaLongitude = toRadians(longitude2 - longitude1);
+    const a = Math.sin(deltaLatitude / 2) ** 2
+        + Math.cos(toRadians(latitude1)) * Math.cos(toRadians(latitude2)) * Math.sin(deltaLongitude / 2) ** 2;
+
+    return 2 * earthRadiusKm * Math.asin(Math.sqrt(a));
+}
+
+function getNearestStopMatch(stops, stopMap, userPosition, variantKey) {
+    if (!userPosition || !stopMap) {
+        return null;
+    }
+
+    let nearestMatch = null;
+
+    for (const stop of stops) {
+        const stopInfo = stopMap.get(stop.stopId);
+        const coordinates = getStopCoordinates(stopInfo);
+
+        if (!coordinates) {
+            continue;
+        }
+
+        const distanceKm = getDistanceInKm(
+            userPosition.latitude,
+            userPosition.longitude,
+            coordinates.latitude,
+            coordinates.longitude
+        );
+
+        if (!nearestMatch || distanceKm < nearestMatch.distanceKm) {
+            nearestMatch = {
+                stopKey: getStopPanelKey(variantKey, stop),
+                stopName: stopInfo?.name_tc || stopInfo?.name_en || `站點 ${stop.stopId}`,
+                distanceKm
+            };
+        }
+    }
+
+    return nearestMatch;
+}
+
+// 不直接呼叫 toggleStopDetails，避免重複定位時把已展開面板反而關掉。
+function expandStopPanel(stopKey) {
+    if (!currentRenderState || !stopKey) {
+        return;
+    }
+
+    currentRenderState.expandedStopKeys = [stopKey, ...currentRenderState.expandedStopKeys.filter((item) => item !== stopKey)];
+}
+
+function clearPendingScrollTimer() {
+    if (pendingScrollTimerId) {
+        window.clearTimeout(pendingScrollTimerId);
+        pendingScrollTimerId = null;
+    }
+}
+
+// 最近站展開後，稍等一下再平滑捲動到畫面中間，避免展開時畫面跳動。
+function scrollStopIntoView(stopKey) {
+    if (!stopKey) {
+        return;
+    }
+
+    const encodedStopKey = encodeURIComponent(stopKey);
+    clearPendingScrollTimer();
+
+    pendingScrollTimerId = window.setTimeout(() => {
+        const stopElement = document.querySelector(`[data-stop-key="${encodedStopKey}"]`);
+        if (!stopElement) {
+            return;
+        }
+
+        stopElement.scrollIntoView({
+            behavior: "smooth",
+            block: "center"
+        });
+        pendingScrollTimerId = null;
+    }, 300);
+}
+
+function updateNearestStopFromUserPosition() {
+    if (!currentRenderState?.selectedVariantKey || !locationState.userPosition) {
+        return false;
+    }
+
+    const variantData = ensureVariantDataBucket(currentRenderState.selectedVariantKey);
+    if (!variantData?.routeStopsWithEta.length) {
+        return false;
+    }
+
+    // stop 清單偶爾會被 API 擋下來；這時先保留 ETA 功能，但不要硬做最近站計算。
+    if (!(currentRenderState.stopMap instanceof Map) || currentRenderState.stopMap.size === 0) {
+        currentRenderState.nearestStopKey = "";
+        locationState.statusMessage = "暫時無法載入站點座標，請手動選擇站點";
+        renderCurrentState();
+        return false;
+    }
+
+    const nearestMatch = getNearestStopMatch(
+        variantData.routeStopsWithEta,
+        currentRenderState.stopMap,
+        locationState.userPosition,
+        currentRenderState.selectedVariantKey
+    );
+
+    if (!nearestMatch) {
+        currentRenderState.nearestStopKey = "";
+        locationState.statusMessage = "找不到可定位的站點座標，請手動選擇站點";
+        renderCurrentState();
+        return false;
+    }
+
+    const previousNearestStopKey = currentRenderState.nearestStopKey;
+    const wasExpanded = currentRenderState.expandedStopKeys.includes(nearestMatch.stopKey);
+    currentRenderState.nearestStopKey = nearestMatch.stopKey;
+    expandStopPanel(nearestMatch.stopKey);
+    locationState.statusMessage = `已找到最近的站：${nearestMatch.stopName}`;
+    renderCurrentState();
+
+    if (previousNearestStopKey !== nearestMatch.stopKey || !wasExpanded) {
+        scrollStopIntoView(nearestMatch.stopKey);
+    }
+
+    return true;
+}
+
+function getGeolocationErrorMessage(error) {
+    if (!error) {
+        return "無法取得位置，請手動選擇站點";
+    }
+
+    if (error.code === 1) {
+        return "你已拒絕位置權限，請手動選擇站點";
+    }
+
+    if (error.code === 2) {
+        return "目前無法取得位置，請手動選擇站點";
+    }
+
+    if (error.code === 3) {
+        return "定位逾時，請手動選擇站點";
+    }
+
+    return "無法取得位置，請手動選擇站點";
+}
+
+function requestCurrentPosition() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error("你的瀏覽器不支援定位功能"));
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(resolve, reject, GEOLOCATION_OPTIONS);
+    });
+}
+
+// 頁面載入後先嘗試詢問定位權限，之後選方向時就能直接用這個位置幫使用者找最近站點。
+async function initializeLocationOnLoad() {
+    const requestId = ++activeLocationRequestId;
+    locationState.statusMessage = "正在確認定位權限...";
+
+    try {
+        const position = await requestCurrentPosition();
+        if (requestId !== activeLocationRequestId) {
+            return;
+        }
+
+        locationState.enabled = true;
+        locationState.userPosition = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            timestamp: position.timestamp || Date.now()
+        };
+        locationState.statusMessage = "定位已開啟，選擇方向後會自動尋找最近的站";
+        renderCurrentState();
+    } catch (error) {
+        if (requestId !== activeLocationRequestId) {
+            return;
+        }
+
+        locationState.enabled = false;
+        locationState.userPosition = null;
+        locationState.statusMessage = error instanceof Error
+            ? error.message
+            : getGeolocationErrorMessage(error);
+
+        renderCurrentState();
+        console.warn("KMB initial geolocation failed", error);
+    }
+}
+
+async function locateNearestStop({ requestFreshPosition = false, triggeredByUser = false } = {}) {
+    if (!locationState.enabled && !triggeredByUser) {
+        return;
+    }
+
+    if (!currentRenderState?.selectedVariantKey) {
+        locationState.statusMessage = locationState.enabled
+            ? "請先選擇一個方向，再幫你尋找最近的站"
+            : "定位已關閉，你可以手動選擇站點";
+        renderCurrentState();
+        return;
+    }
+
+    const variantData = ensureVariantDataBucket(currentRenderState.selectedVariantKey);
+    if (!variantData?.routeStopsWithEta.length) {
+        locationState.statusMessage = "正在載入站點資料，完成後會自動尋找最近的站";
+        renderCurrentState();
+        return;
+    }
+
+    if (!requestFreshPosition && locationState.userPosition) {
+        updateNearestStopFromUserPosition();
+        return;
+    }
+
+    if (!requestFreshPosition && !locationState.userPosition && !triggeredByUser) {
+        return;
+    }
+
+    const requestId = ++activeLocationRequestId;
+    locationState.statusMessage = "正在取得你的位置...";
+    renderCurrentState();
+
+    try {
+        const position = await requestCurrentPosition();
+        if (requestId !== activeLocationRequestId || !currentRenderState) {
+            return;
+        }
+
+        locationState.userPosition = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            timestamp: position.timestamp || Date.now()
+        };
+        locationState.enabled = true;
+        updateNearestStopFromUserPosition();
+    } catch (error) {
+        if (requestId !== activeLocationRequestId || !currentRenderState) {
+            return;
+        }
+
+        currentRenderState.nearestStopKey = "";
+        locationState.userPosition = null;
+        locationState.statusMessage = error instanceof Error
+            ? error.message
+            : getGeolocationErrorMessage(error);
+
+        if (error?.code === 1) {
+            locationState.enabled = false;
+        }
+
+        renderCurrentState();
+        console.warn("KMB geolocation failed", error);
+    }
+}
+
+function toggleLocationTracking() {
+    locationState.enabled = !locationState.enabled;
+    activeLocationRequestId += 1;
+
+    if (!locationState.enabled) {
+        if (currentRenderState) {
+            currentRenderState.nearestStopKey = "";
+        }
+
+        locationState.userPosition = null;
+        locationState.statusMessage = "定位已停止，你可以手動選擇站點";
+        renderCurrentState();
+        return;
+    }
+
+    locationState.statusMessage = "定位已開啟，會自動尋找最近的站";
+    renderCurrentState();
+    void locateNearestStop({ requestFreshPosition: true, triggeredByUser: true });
 }
 
 // 搜尋路線後，先同時抓每個班次的 route-eta，讓方向卡片可以先顯示「下一班」摘要。
@@ -667,6 +1052,8 @@ function stopLiveUpdates() {
         window.clearTimeout(dataRefreshTimerId);
         dataRefreshTimerId = null;
     }
+
+    clearPendingScrollTimer();
 }
 
 function startLiveUpdates() {
@@ -801,6 +1188,18 @@ function renderSelectedVariantPanel() {
     }
 
     if (!currentRenderState.selectedVariantKey) {
+        if (currentRenderState.routeErrorMessage) {
+            return `
+                <section class="selection-panel">
+                    <div class="selection-error">
+                        <p>載入方向資料失敗</p>
+                        <p>${escapeHtml(currentRenderState.routeErrorMessage)}</p>
+                        <p>你可以改查其他路線，例如 1A、2、104。</p>
+                    </div>
+                </section>
+            `;
+        }
+
         return `
             <section class="selection-panel">
                 <div class="selection-hint">
@@ -840,20 +1239,27 @@ function renderSelectedVariantPanel() {
 
     const stops = variantData.routeStopsWithEta;
     const updatedTimeText = formatDisplayTime(variantData.fetchedAt);
+    const stopMapWarningHtml = currentRenderState.stopMapWarningMessage
+        ? `<p class="selection-subtitle">${escapeHtml(currentRenderState.stopMapWarningMessage)}</p>`
+        : "";
 
     const stopsHtml = stops.map((stop) => {
         const stopKey = getStopPanelKey(currentRenderState.selectedVariantKey, stop);
         const encodedStopKey = encodeURIComponent(stopKey);
         const isExpanded = currentRenderState.expandedStopKeys.includes(stopKey);
+        const isNearest = currentRenderState.nearestStopKey === stopKey;
         const stopInfo = currentRenderState.stopMap?.get(stop.stopId);
         const stopName = escapeHtml(stopInfo?.name_tc || stopInfo?.name_en || `站點 ${stop.stopId}`);
 
         return `
-            <div class="stop ${isExpanded ? "is-expanded" : ""}">
+            <div class="stop ${isExpanded ? "is-expanded" : ""}" data-stop-key="${encodedStopKey}">
                 <button type="button" class="stop-toggle" onclick="toggleStopDetails('${encodedStopKey}')">
                     <div class="stop-toggle-main">
                         <div class="stop-index">第 ${stop.seq} 站</div>
-                        <div class="stop-name">${stopName}</div>
+                        <div class="stop-name-row">
+                            <div class="stop-name">${stopName}</div>
+                            ${isNearest ? '<span class="inline-chip location-chip">📍 最近的站</span>' : ""}
+                        </div>
                     </div>
                     <span class="stop-chevron ${isExpanded ? "is-open" : ""}">▾</span>
                 </button>
@@ -869,6 +1275,7 @@ function renderSelectedVariantPanel() {
                     <p class="selection-eyebrow">第 2 步：查看站點</p>
                     <h2 class="selection-title">路線 ${escapeHtml(currentRenderState.route)} • ${escapeHtml(getRouteLabel(variant))}</h2>
                     <p class="selection-subtitle">${escapeHtml(getServiceTypeLabel(getServiceType(variant)))} • 站點共 ${stops.length} 個 • 點一下站名展開 ETA • 資料更新 ${escapeHtml(updatedTimeText)}</p>
+                    ${stopMapWarningHtml}
                 </div>
                 <button type="button" class="retry-btn" onclick="refreshSelectedDirection()">更新這個方向</button>
             </div>
@@ -884,6 +1291,8 @@ function renderResult() {
         return "";
     }
 
+    const locationButtonText = getLocationButtonLabel();
+    const locationStatusText = getLocationStatusText();
     const summaryText = currentRenderState.selectedVariantKey
         ? "已同步比較正常班次與特別班次，可直接切換方向查看站點"
         : "系統會同時比較正常班次與特別班次，並保留原本的方向順序";
@@ -896,6 +1305,10 @@ function renderResult() {
                         <p class="selection-eyebrow">第 1 步：選擇方向</p>
                         <h2 class="selection-title">路線 ${escapeHtml(currentRenderState.route)}</h2>
                         <p class="selection-subtitle">${escapeHtml(summaryText)}</p>
+                    </div>
+                    <div class="panel-actions">
+                        <button type="button" class="location-btn ${locationState.enabled ? "is-active" : ""}" onclick="toggleLocationTracking()">${escapeHtml(locationButtonText)}</button>
+                        <p class="location-note">${escapeHtml(locationStatusText)}</p>
                     </div>
                 </div>
                 <div class="variant-grid">
@@ -939,9 +1352,12 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
     const requestId = ++activeVariantLoadId;
 
     currentRenderState.selectedVariantKey = variantKey;
+    currentRenderState.routeErrorMessage = "";
+    currentRenderState.stopMapWarningMessage = "";
 
     if (!isAutoRefresh) {
         currentRenderState.expandedStopKeys = [];
+        currentRenderState.nearestStopKey = "";
         stopLiveUpdates();
     }
 
@@ -956,17 +1372,19 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
     }
 
     try {
-        const [stopMap, etaEntries, routeStops] = await Promise.all([
-            currentRenderState.stopMap ? Promise.resolve(currentRenderState.stopMap) : getStopMap(),
+        // stopMap 主要用來補站名與座標；即使它失敗，也不應該讓整個方向 ETA 無法載入。
+        const [etaEntries, routeStops, stopMapResult] = await Promise.all([
             getRouteEta(route, serviceType),
-            getRouteStops(route, direction, serviceType)
+            getRouteStops(route, direction, serviceType),
+            getOptionalStopMap()
         ]);
 
         if (!currentRenderState || currentRenderState.route !== route || requestId !== activeVariantLoadId) {
             return;
         }
 
-        currentRenderState.stopMap = stopMap;
+        currentRenderState.stopMap = stopMapResult.stopMap;
+        currentRenderState.stopMapWarningMessage = stopMapResult.warningMessage;
 
         const routeStopsByDirection = new Map([[direction, routeStops]]);
         const etaMaps = buildEtaMaps(etaEntries, serviceType);
@@ -1001,6 +1419,7 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
         });
 
         renderCurrentState();
+        void locateNearestStop({ requestFreshPosition: !isAutoRefresh });
         startLiveUpdates();
 
         if (statusDiv && currentRenderState.selectedVariantKey === variantKey) {
@@ -1011,18 +1430,30 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
             return;
         }
 
+        const friendlyErrorMessage = getFriendlyRouteErrorMessage(error);
         variantData.isLoading = false;
         variantData.isSummaryLoading = false;
-        variantData.error = error.message || "載入失敗";
-        renderCurrentState();
+        variantData.error = friendlyErrorMessage;
 
         if (isAutoRefresh && variantData.routeStopsWithEta.length > 0) {
+            renderCurrentState();
             startLiveUpdates();
             if (statusDiv) {
                 statusDiv.innerHTML = `自動更新失敗，暫時顯示 ${formatDisplayTime(variantData.fetchedAt)} 的資料`;
             }
-        } else if (statusDiv) {
-            statusDiv.innerHTML = "載入方向資料失敗";
+        } else {
+            // 手動載入失敗時，把方向選取狀態清回安全狀態，避免下一次查詢沿用到失敗中的資料。
+            variantData.summary = null;
+            variantData.routeStopsWithEta = [];
+            variantData.fetchedAt = null;
+            clearSelectedVariantState();
+            currentRenderState.routeErrorMessage = friendlyErrorMessage;
+            stopLiveUpdates();
+            renderCurrentState();
+
+            if (statusDiv) {
+                statusDiv.innerHTML = "該方向目前無法查詢，請試其他方向或其他路線";
+            }
         }
 
         console.error("KMB variant load failed", error);
@@ -1036,8 +1467,11 @@ function selectVariant(encodedVariantKey) {
         const existingData = ensureVariantDataBucket(variantKey);
         if (existingData && existingData.fetchedAt && existingData.routeStopsWithEta.length > 0) {
             currentRenderState.selectedVariantKey = variantKey;
+            currentRenderState.routeErrorMessage = "";
             currentRenderState.expandedStopKeys = [];
+            currentRenderState.nearestStopKey = "";
             renderCurrentState();
+            void locateNearestStop({ requestFreshPosition: true });
             startLiveUpdates();
             return;
         }
@@ -1097,13 +1531,11 @@ async function searchETA(options = {}) {
     if (!route) {
         statusDiv.innerHTML = '<span style="color:red">請輸入路線號，例如 1A、2、104。</span>';
         resultDiv.innerHTML = "";
-        currentRenderState = null;
-        stopLiveUpdates();
+        resetCurrentRouteState();
         return;
     }
 
-    stopLiveUpdates();
-    currentRenderState = null;
+    resetCurrentRouteState();
     statusDiv.innerHTML = `正在分析路線 <strong>${escapeHtml(route)}</strong>...`;
     resultDiv.innerHTML = '<div class="loading">正在整理方向選擇資料...</div>';
     searchBtn.disabled = true;
@@ -1118,27 +1550,16 @@ async function searchETA(options = {}) {
 
         const matchingRoutes = routeList.filter((entry) => String(entry.route || "").toUpperCase() === route);
         if (!matchingRoutes.length) {
-            resultDiv.innerHTML = `
-                <div class="selection-panel">
-                    <div class="selection-error">
-                        <p>找不到路線 <strong>${escapeHtml(route)}</strong>。</p>
-                        <p>請確認路線號是否正確，例如 1A、2、104。</p>
-                    </div>
-                </div>
-            `;
+            resetCurrentRouteState();
+            renderStandaloneError(resultDiv, `找不到路線 ${route}`, "請確認路線號是否正確，或試其他路線例如 1A、2、104。");
             statusDiv.innerHTML = "找不到這條路線";
             return;
         }
 
         const { preferredServiceType, variants } = chooseRouteVariants(matchingRoutes, requestedServiceType);
         if (!variants.length) {
-            resultDiv.innerHTML = `
-                <div class="selection-panel">
-                    <div class="selection-error">
-                        <p>找不到路線 <strong>${escapeHtml(route)}</strong> 的可用方向資料。</p>
-                    </div>
-                </div>
-            `;
+            resetCurrentRouteState();
+            renderStandaloneError(resultDiv, `路線 ${route} 暫時無法查詢`, "目前找不到可用方向資料，請稍後再試，或試其他路線例如 1A、2、104。");
             statusDiv.innerHTML = "找不到方向資料";
             return;
         }
@@ -1148,8 +1569,11 @@ async function searchETA(options = {}) {
             requestedServiceType,
             preferredServiceType,
             variants,
+            routeErrorMessage: "",
+            stopMapWarningMessage: "",
             selectedVariantKey: null,
             expandedStopKeys: [],
+            nearestStopKey: "",
             stopMap: null,
             variantDataByKey: {}
         };
@@ -1178,16 +1602,10 @@ async function searchETA(options = {}) {
         statusDiv.innerHTML = `已找到 ${variants.length} 個可用方向，並已同步載入班次摘要`;
     } catch (error) {
         console.error("KMB route search failed", error);
-        resultDiv.innerHTML = `
-            <div class="selection-panel">
-                <div class="selection-error">
-                    <p>查詢失敗</p>
-                    <p>${escapeHtml(error.message || "請稍後再試")}</p>
-                </div>
-            </div>
-        `;
+        const friendlyErrorMessage = getFriendlyRouteErrorMessage(error);
+        resetCurrentRouteState();
+        renderStandaloneError(resultDiv, "查詢失敗", friendlyErrorMessage);
         statusDiv.innerHTML = "查詢失敗";
-        currentRenderState = null;
     } finally {
         if (searchId === activeSearchId) {
             searchBtn.disabled = false;
@@ -1198,6 +1616,7 @@ async function searchETA(options = {}) {
 
 window.onload = () => {
     console.log(`Ready to search KMB routes like 1A, 2, and 104 (${APP_VERSION})`);
+    void initializeLocationOnLoad();
 };
 
 window.addEventListener("beforeunload", () => {

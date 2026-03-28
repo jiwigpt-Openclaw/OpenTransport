@@ -146,6 +146,44 @@ button {
     color: #666;
 }
 
+.panel-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    max-width: 320px;
+}
+
+.location-btn {
+    padding: 12px 18px;
+    border: 1px solid #c8102e;
+    border-radius: 12px;
+    background: white;
+    color: #c8102e;
+    cursor: pointer;
+    font-size: 0.98em;
+    font-weight: 700;
+    transition: background 0.2s, transform 0.2s, color 0.2s;
+}
+
+.location-btn:hover {
+    background: #fff1f3;
+    transform: translateY(-1px);
+}
+
+.location-btn.is-active {
+    background: #c8102e;
+    color: white;
+}
+
+.location-note {
+    margin: 0;
+    color: #666;
+    font-size: 0.92em;
+    line-height: 1.5;
+    text-align: right;
+}
+
 .selection-hint,
 .selection-error,
 .direction-empty,
@@ -320,6 +358,18 @@ button {
     color: #222;
     font-size: 1.15em;
     font-weight: 700;
+}
+
+.stop-name-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.inline-chip.location-chip {
+    background: #fff1f3;
+    color: #c8102e;
 }
 
 .stop-chevron {
