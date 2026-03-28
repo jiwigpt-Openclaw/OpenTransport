@@ -10,6 +10,7 @@ const GEOLOCATION_OPTIONS = {
     timeout: 8000,
     maximumAge: 60000
 };
+const LOCAL_FILE_GMB_RESTRICTION_MESSAGE = "綠色小巴資料在本機檔案模式下會被限制，請改用 VS Code Live Server 或部署到 GitHub Pages 才能完整使用。";
 const GMB_REGIONS = ["HKI", "KLN", "NT"];
 const COMPANY_ORDER = {
     KMB: 0,
@@ -358,10 +359,15 @@ function isCompanyRestrictedInLocalFileMode(company) {
 
 function getLocalModeCompanyRestrictionMessage(company) {
     if (getCompanyConfig(company).code === "GMB") {
-        return "綠色小巴 GMB 資料在本機檔案模式下會被瀏覽器限制，請改用本機 HTTP 伺服器開啟頁面。";
+        return LOCAL_FILE_GMB_RESTRICTION_MESSAGE;
     }
 
     return "";
+}
+
+function getLocalModeRestrictionNotice(companies = []) {
+    const messages = [...new Set(companies.map((company) => getLocalModeCompanyRestrictionMessage(company)).filter(Boolean))];
+    return messages.join(" ");
 }
 
 function joinWarningMessages(...messages) {
@@ -392,7 +398,62 @@ function getVariantMeta(variant, stop = null) {
     };
 }
 
-function mergeStopMaps(...stopMaps) {
+function hasMeaningfulStopInfoValue(value) {
+    if (value === null || value === undefined) {
+        return false;
+    }
+
+    if (typeof value === "string") {
+        return value.trim() !== "";
+    }
+
+    return true;
+}
+
+// stop map 合併時只補缺少欄位，並優先保留指定公司的資料，避免多家公司共用 stopId 時互相覆蓋。
+function mergeStopInfo(existingStopInfo = {}, incomingStopInfo = {}, preferredCompany = "") {
+    const normalizedPreferredCompany = String(preferredCompany || "").trim().toUpperCase();
+    const existingCompany = String(existingStopInfo?.company || "").trim().toUpperCase();
+    const incomingCompany = String(incomingStopInfo?.company || "").trim().toUpperCase();
+
+    if (normalizedPreferredCompany && incomingCompany && incomingCompany !== normalizedPreferredCompany) {
+        return {
+            ...existingStopInfo,
+            company: existingCompany || normalizedPreferredCompany,
+            stop: normalizeStopId(existingStopInfo?.stop ?? incomingStopInfo?.stop ?? "")
+        };
+    }
+
+    const shouldResetToPreferredCompany = normalizedPreferredCompany
+        && existingCompany
+        && existingCompany !== normalizedPreferredCompany
+        && (!incomingCompany || incomingCompany === normalizedPreferredCompany);
+
+    const mergedStopInfo = {
+        ...(shouldResetToPreferredCompany ? {} : existingStopInfo),
+        company: incomingCompany || existingCompany || normalizedPreferredCompany || "",
+        stop: normalizeStopId(
+            shouldResetToPreferredCompany
+                ? incomingStopInfo?.stop
+                : existingStopInfo?.stop ?? incomingStopInfo?.stop ?? ""
+        )
+    };
+
+    for (const [key, value] of Object.entries(incomingStopInfo || {})) {
+        if (key === "company" || key === "stop") {
+            continue;
+        }
+
+        if (!hasMeaningfulStopInfoValue(mergedStopInfo[key]) && hasMeaningfulStopInfoValue(value)) {
+            mergedStopInfo[key] = value;
+        }
+    }
+
+    return mergedStopInfo;
+}
+
+function mergeStopMaps(preferredCompany, ...stopMaps) {
+    const normalizedPreferredCompany = String(preferredCompany || "").trim().toUpperCase();
     const merged = new Map();
 
     for (const stopMap of stopMaps) {
@@ -402,12 +463,13 @@ function mergeStopMaps(...stopMaps) {
 
         for (const [stopId, stopInfo] of stopMap.entries()) {
             const normalizedStopId = normalizeStopId(stopId);
-            const existingStopInfo = merged.get(normalizedStopId) || {};
-            merged.set(normalizedStopId, {
-                ...existingStopInfo,
+            const normalizedStopInfo = {
                 ...stopInfo,
+                company: String(stopInfo?.company || normalizedPreferredCompany || "").trim().toUpperCase(),
                 stop: normalizeStopId(stopInfo?.stop ?? normalizedStopId)
-            });
+            };
+            const existingStopInfo = merged.get(normalizedStopId) || {};
+            merged.set(normalizedStopId, mergeStopInfo(existingStopInfo, normalizedStopInfo, normalizedPreferredCompany));
         }
     }
 
@@ -481,52 +543,94 @@ function areEntriesReversed(left, right) {
         && labelsMatch(left.dest_tc, left.dest_en, right.orig_tc, right.orig_en);
 }
 
+function applyDirectionToEntry(entry, direction) {
+    return {
+        ...entry,
+        direction,
+        bound: direction,
+        dir: direction
+    };
+}
+
+function getNlbTerminusPairKey(entry) {
+    const origin = normalizeTerminusLabel(entry?.orig_tc || entry?.orig_en);
+    const destination = normalizeTerminusLabel(entry?.dest_tc || entry?.dest_en);
+
+    if (!origin || !destination) {
+        return "";
+    }
+
+    return [origin, destination].sort().join("|");
+}
+
+function getNlbDirectionGroupKey(entry) {
+    const terminusPairKey = getNlbTerminusPairKey(entry);
+
+    if (!terminusPairKey) {
+        return "";
+    }
+
+    return [
+        String(entry?.route || "").trim().toUpperCase(),
+        getServiceType(entry),
+        terminusPairKey
+    ].join("|");
+}
+
 function assignDirectionsToBidirectionalEntries(entries) {
     const assignedEntries = [];
-    const consumedIndexes = new Set();
+    const pairedGroups = new Map();
+    const fallbackEntries = [];
+    const seenVariantIds = new Set();
 
-    for (let index = 0; index < entries.length; index += 1) {
-        if (consumedIndexes.has(index)) {
+    for (const entry of entries) {
+        const variantId = getVariantUniqueId(entry) || `${String(entry?.route || "").trim().toUpperCase()}|${String(entry?.routeId || "").trim()}`;
+        if (seenVariantIds.has(variantId)) {
             continue;
         }
 
-        const baseEntry = entries[index];
-        consumedIndexes.add(index);
-        assignedEntries.push({
-            ...baseEntry,
-            direction: "outbound",
-            bound: "outbound",
-            dir: "outbound"
-        });
+        seenVariantIds.add(variantId);
+        const groupKey = getNlbDirectionGroupKey(entry);
 
-        for (let compareIndex = index + 1; compareIndex < entries.length; compareIndex += 1) {
-            if (consumedIndexes.has(compareIndex)) {
-                continue;
-            }
-
-            const candidateEntry = entries[compareIndex];
-
-            if (areEntriesReversed(baseEntry, candidateEntry)) {
-                consumedIndexes.add(compareIndex);
-                assignedEntries.push({
-                    ...candidateEntry,
-                    direction: "inbound",
-                    bound: "inbound",
-                    dir: "inbound"
-                });
-                continue;
-            }
-
-            if (areEntriesSameOrientation(baseEntry, candidateEntry)) {
-                consumedIndexes.add(compareIndex);
-                assignedEntries.push({
-                    ...candidateEntry,
-                    direction: "outbound",
-                    bound: "outbound",
-                    dir: "outbound"
-                });
-            }
+        // NLB 先按「路線 + 班次 + 起終點集合」分組，再在組內配 outbound / inbound，
+        // 比直接整包 route 互相比對更穩，能減少方向卡片重複或漏掉。
+        if (!groupKey) {
+            fallbackEntries.push(entry);
+            continue;
         }
+
+        if (!pairedGroups.has(groupKey)) {
+            pairedGroups.set(groupKey, []);
+        }
+
+        pairedGroups.get(groupKey).push(entry);
+    }
+
+    for (const groupEntries of pairedGroups.values()) {
+        const baseEntry = groupEntries[0];
+        let hasAssignedInbound = false;
+
+        for (const entry of groupEntries) {
+            if (entry === baseEntry || areEntriesSameOrientation(baseEntry, entry)) {
+                assignedEntries.push(applyDirectionToEntry(entry, "outbound"));
+                continue;
+            }
+
+            if (areEntriesReversed(baseEntry, entry)) {
+                assignedEntries.push(applyDirectionToEntry(entry, "inbound"));
+                hasAssignedInbound = true;
+                continue;
+            }
+
+            // 少數 NLB 資料欄位不完整時，至少保留卡片並補上一個穩定方向，不讓它整張消失。
+            const fallbackDirection = hasAssignedInbound ? "outbound" : "inbound";
+            assignedEntries.push(applyDirectionToEntry(entry, fallbackDirection));
+            hasAssignedInbound = hasAssignedInbound || fallbackDirection === "inbound";
+        }
+    }
+
+    for (const entry of fallbackEntries) {
+        assignedEntries.push(applyDirectionToEntry(entry, "outbound"));
     }
 
     return assignedEntries;
@@ -561,7 +665,25 @@ function buildNlbRouteEntries(routes) {
         entriesByRoute.get(entry.route).push(entry);
     }
 
+    // 每條 NLB 路線各自做方向分配，避免不同路線或不同班次互相干擾。
     return [...entriesByRoute.values()].flatMap((entries) => assignDirectionsToBidirectionalEntries(entries));
+}
+
+function createRenderState(route, requestedServiceType, preferredServiceType, variants) {
+    return {
+        route,
+        requestedServiceType,
+        preferredServiceType,
+        variants,
+        routeErrorMessage: "",
+        stopMapWarningMessage: "",
+        selectedVariantKey: null,
+        expandedStopKeys: [],
+        nearestStopKey: "",
+        // 每次建立新的 render state 都明確補齊這兩個物件，避免後續讀到 undefined。
+        stopMapsByCompany: {},
+        variantDataByKey: {}
+    };
 }
 
 function buildGmbRouteListIndex(region, routeCodes) {
@@ -658,9 +780,11 @@ function normalizeGmbEtaEntries(payload, meta, route) {
 }
 
 function getStopMapForCompany(company) {
-    if (!currentRenderState?.stopMapsByCompany) {
+    if (!currentRenderState) {
         return new Map();
     }
+
+    currentRenderState.stopMapsByCompany ||= {};
 
     return currentRenderState.stopMapsByCompany[company] instanceof Map
         ? currentRenderState.stopMapsByCompany[company]
@@ -822,15 +946,15 @@ async function fetchJson(url, label) {
 async function getRouteList(company) {
     const normalizedCompany = getCompanyConfig(company).code;
 
+    // file:// 模式下直接在最外層跳過 GMB，避免建立 Promise 後又在裡面發出 request。
+    if (isCompanyRestrictedInLocalFileMode(normalizedCompany)) {
+        routeListPromiseByCompany.delete(normalizedCompany);
+        return [];
+    }
+
     if (!routeListPromiseByCompany.has(normalizedCompany)) {
         const config = getCompanyConfig(normalizedCompany);
         const promise = (async () => {
-            // GMB 在 file:// 模式下會被瀏覽器的 CORS 規則擋住。
-            // 這裡直接跳過請求，避免每次搜尋都在 console 多噴一串紅字錯誤。
-            if (isCompanyRestrictedInLocalFileMode(normalizedCompany)) {
-                return [];
-            }
-
             if (normalizedCompany === "GMB") {
                 const regionResults = await Promise.allSettled(config.regions.map(async (region) => {
                     const payload = await fetchJson(config.getRouteListUrl(region), `${getCompanyDisplayName(normalizedCompany)} ${region} 路線清單`);
@@ -1107,10 +1231,10 @@ async function hydrateStopMapForStops(company, stops, baseStopMap) {
         const firstStopInfo = await getStopInfo(company, firstStopId);
         if (firstStopInfo?.stop) {
             const normalizedStopId = normalizeStopId(firstStopInfo.stop);
-            mergedStopMap.set(normalizedStopId, {
-                ...(mergedStopMap.get(normalizedStopId) || {}),
-                ...firstStopInfo
-            });
+            mergedStopMap.set(
+                normalizedStopId,
+                mergeStopInfo(mergedStopMap.get(normalizedStopId) || {}, firstStopInfo, company)
+            );
             successCount += 1;
         }
     } catch (error) {
@@ -1142,10 +1266,10 @@ async function hydrateStopMapForStops(company, stops, baseStopMap) {
         }
 
         const normalizedStopId = normalizeStopId(result.value.stopInfo.stop);
-        mergedStopMap.set(normalizedStopId, {
-            ...(mergedStopMap.get(normalizedStopId) || {}),
-            ...result.value.stopInfo
-        });
+        mergedStopMap.set(
+            normalizedStopId,
+            mergeStopInfo(mergedStopMap.get(normalizedStopId) || {}, result.value.stopInfo, company)
+        );
         successCount += 1;
     }
 
@@ -1755,30 +1879,42 @@ async function refreshVariantSummaries() {
 
     renderCurrentState();
 
-    const results = await Promise.allSettled(variants.map(async (variant) => ({
-        variantKey: getVariantKey(variant),
-        summary: await loadVariantSummaryPreview(variant, routeEtaPromiseCache)
-    })));
+    // 自動更新時每個方向摘要都各自 try/catch，單一公司失敗不會中斷整批更新。
+    const results = await Promise.all(variants.map(async (variant) => {
+        const variantKey = getVariantKey(variant);
+
+        try {
+            return {
+                ok: true,
+                variantKey,
+                summary: await loadVariantSummaryPreview(variant, routeEtaPromiseCache)
+            };
+        } catch (error) {
+            return {
+                ok: false,
+                variantKey,
+                error
+            };
+        }
+    }));
 
     if (!currentRenderState || currentRenderState.route !== route) {
         return;
     }
 
-    const summaryByVariantKey = new Map();
-
     for (const result of results) {
-        if (result.status === "fulfilled") {
-            summaryByVariantKey.set(result.value.variantKey, result.value.summary);
+        const bucket = ensureVariantDataBucket(result.variantKey);
+        if (!bucket) {
             continue;
         }
 
-        console.warn("方向卡片 ETA 摘要載入失敗", result.reason);
-    }
+        if (result.ok) {
+            bucket.summary = result.summary;
+        } else {
+            bucket.summary = bucket.summary || buildEmptyVariantEtaPreview();
+            console.warn("方向卡片 ETA 摘要載入失敗", result.error);
+        }
 
-    for (const variant of variants) {
-        const variantKey = getVariantKey(variant);
-        const bucket = ensureVariantDataBucket(variantKey);
-        bucket.summary = summaryByVariantKey.get(variantKey) || buildEmptyVariantEtaPreview();
         bucket.isSummaryLoading = false;
     }
 
@@ -2008,6 +2144,8 @@ function ensureVariantDataBucket(variantKey) {
     if (!currentRenderState) {
         return null;
     }
+
+    currentRenderState.variantDataByKey ||= {};
 
     if (!currentRenderState.variantDataByKey[variantKey]) {
         currentRenderState.variantDataByKey[variantKey] = {
@@ -2404,13 +2542,14 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
         const routeStopMap = buildStopMapFromRouteStops(company, routeStops);
         // NLB / GMB 的 route-stop 本身就帶有部分站名資料，所以先把這些資料併進來，
         // 再用單站 API 補缺少的座標或剩餘站名，避免畫面只剩下 stop ID。
-        const baseStopMap = mergeStopMaps(stopMapResult.stopMap, routeStopMap);
+        const baseStopMap = mergeStopMaps(company, stopMapResult.stopMap, routeStopMap);
         const hydratedStopMapResult = await hydrateStopMapForStops(company, routeStops, baseStopMap);
 
         if (!currentRenderState || currentRenderState.route !== route || requestId !== activeVariantLoadId) {
             return;
         }
 
+        currentRenderState.stopMapsByCompany ||= {};
         currentRenderState.stopMapsByCompany[company] = hydratedStopMapResult.stopMap;
         variantData.warningMessage = joinWarningMessages(
             routeStopsResult.warningMessage,
@@ -2608,7 +2747,7 @@ async function searchETA(options = {}) {
         if (!matchingRoutes.length) {
             resetCurrentRouteState();
             const restrictedMessage = restrictedCompanies.length > 0
-                ? ` ${restrictedCompanies.map((company) => getLocalModeCompanyRestrictionMessage(company)).filter(Boolean).join(" ")}`
+                ? ` ${getLocalModeRestrictionNotice(restrictedCompanies)}`
                 : "";
             renderStandaloneError(resultDiv, `目前不支援路線 ${route}`, `目前不支援此路線，或請確認路線號。${restrictedMessage}`);
             statusDiv.innerHTML = "目前不支援此路線";
@@ -2629,19 +2768,7 @@ async function searchETA(options = {}) {
             return;
         }
 
-        currentRenderState = {
-            route,
-            requestedServiceType,
-            preferredServiceType,
-            variants,
-            routeErrorMessage: "",
-            stopMapWarningMessage: "",
-            selectedVariantKey: null,
-            expandedStopKeys: [],
-            nearestStopKey: "",
-            stopMapsByCompany: {},
-            variantDataByKey: {}
-        };
+        currentRenderState = createRenderState(route, requestedServiceType, preferredServiceType, variants);
 
         for (const variant of variants) {
             const bucket = ensureVariantDataBucket(getVariantKey(variant));
@@ -2666,7 +2793,7 @@ async function searchETA(options = {}) {
         });
 
         const localModeNotice = restrictedCompanies.length > 0
-            ? `（本機檔案模式下暫不載入 ${restrictedCompanies.map((company) => getCompanyLabel(company)).join("、")}）`
+            ? `。${getLocalModeRestrictionNotice(restrictedCompanies)}`
             : "";
         statusDiv.innerHTML = `已找到 ${variants.length} 個可用方向，並已同步載入班次摘要${localModeNotice}`;
     } catch (error) {
