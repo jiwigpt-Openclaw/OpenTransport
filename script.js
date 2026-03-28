@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-03-28 04:10";
+const APP_VERSION = "2026-03-28 04:35";
 const API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const COUNTDOWN_REFRESH_MS = 30000;
 const DATA_REFRESH_MS = 60000;
@@ -10,6 +10,7 @@ const GEOLOCATION_OPTIONS = {
 const routeStopCache = new Map();
 const stopEtaCache = new Map();
 const stopAllEtaCache = new Map();
+const stopInfoCache = new Map();
 
 let routeListPromise = null;
 let stopMapPromise = null;
@@ -210,11 +211,111 @@ function renderStandaloneError(resultDiv, title, message) {
     `;
 }
 
+function isLocalFileOrigin() {
+    return window.location.protocol === "file:" || window.location.origin === "null";
+}
+
+function joinWarningMessages(...messages) {
+    return messages
+        .map((message) => String(message || "").trim())
+        .filter(Boolean)
+        .join(" ");
+}
+
+function buildFallbackStopsFromEtaEntries(variant, etaEntries) {
+    const direction = getItemDirection(variant);
+    const serviceType = getServiceType(variant);
+    const uniqueStops = new Map();
+
+    const collectStops = (matcher) => {
+        for (const entry of etaEntries) {
+            if (!matcher(entry)) {
+                continue;
+            }
+
+            const stopId = normalizeStopId(entry?.stop);
+            const seq = Number(entry?.seq) || 0;
+
+            if (!stopId || seq <= 0) {
+                continue;
+            }
+
+            const stopKey = `${stopId}|${seq}`;
+            if (!uniqueStops.has(stopKey)) {
+                uniqueStops.set(stopKey, {
+                    seq,
+                    stopId,
+                    direction: getItemDirection(entry) || direction,
+                    serviceType: getServiceType(entry) || serviceType
+                });
+            }
+        }
+    };
+
+    // 先盡量用和目前方向卡片完全相符的 ETA，避免環線混到別的方向資料。
+    collectStops((entry) => isEtaEntryForVariant(entry, variant));
+
+    // 如果環線的目的地標記不完整，再退一步用同方向、同班次的 ETA 推回站點列表。
+    if (uniqueStops.size === 0) {
+        collectStops((entry) => {
+            return isSameRoute(entry, variant.route)
+                && getItemDirection(entry) === direction
+                && getServiceType(entry) === serviceType;
+        });
+    }
+
+    return [...uniqueStops.values()].sort((left, right) => left.seq - right.seq);
+}
+
+async function getRouteStopsWithFallback(route, variant, etaEntries) {
+    const direction = getItemDirection(variant);
+    const serviceType = getServiceType(variant);
+
+    try {
+        const routeStops = await getRouteStops(route, direction, serviceType);
+        if (routeStops.length > 0) {
+            return {
+                routeStops,
+                warningMessage: ""
+            };
+        }
+    } catch (error) {
+        const fallbackStops = buildFallbackStopsFromEtaEntries(variant, etaEntries);
+        if (fallbackStops.length > 0) {
+            console.warn("route-stop 載入失敗，改用 route-eta 推算站點資料", error);
+            return {
+                routeStops: fallbackStops,
+                warningMessage: "這條路線的站點清單暫時無法取得，已改用 ETA 資料推算站點順序。"
+            };
+        }
+
+        throw error;
+    }
+
+    const fallbackStops = buildFallbackStopsFromEtaEntries(variant, etaEntries);
+    if (fallbackStops.length > 0) {
+        return {
+            routeStops: fallbackStops,
+            warningMessage: "這條路線的站點清單暫時無法取得，已改用 ETA 資料推算站點順序。"
+        };
+    }
+
+    throw new Error(`路線站點 ${route} ${direction} service_type=${serviceType} 暫時沒有可用資料`);
+}
+
 async function getOptionalStopMap() {
     if (currentRenderState?.stopMap instanceof Map && currentRenderState.stopMap.size > 0) {
         return {
             stopMap: currentRenderState.stopMap,
             warningMessage: ""
+        };
+    }
+
+    // 直接用 file:// 開啟頁面時，/stop API 會被瀏覽器 CORS 擋下來，這裡直接走降級模式避免整頁報錯。
+    if (isLocalFileOrigin()) {
+        return {
+            stopMap: new Map(),
+            warningMessage: "目前以本機檔案模式開啟，完整站名或定位資料可能受限制，仍可先查看這個方向的 ETA。"
         };
     }
 
@@ -357,6 +458,105 @@ async function getStopAllEta(stopId) {
     }
 
     return stopAllEtaCache.get(normalizedStopId);
+}
+
+async function getStopInfo(stopId) {
+    const normalizedStopId = normalizeStopId(stopId);
+
+    if (!normalizedStopId) {
+        return null;
+    }
+
+    if (!stopInfoCache.has(normalizedStopId)) {
+        const url = `${API_BASE}/stop/${normalizedStopId}`;
+        const promise = fetchJson(url, `巴士站資料 ${normalizedStopId}`)
+            .then((payload) => payload?.data || null)
+            .catch((error) => {
+                stopInfoCache.delete(normalizedStopId);
+                throw error;
+            });
+
+        stopInfoCache.set(normalizedStopId, promise);
+    }
+
+    return stopInfoCache.get(normalizedStopId);
+}
+
+async function hydrateStopMapForStops(stops, baseStopMap) {
+    const mergedStopMap = baseStopMap instanceof Map ? new Map(baseStopMap) : new Map();
+    const missingStopIds = [...new Set(
+        stops
+            .map((stop) => normalizeStopId(stop?.stopId))
+            .filter((stopId) => stopId && !mergedStopMap.has(stopId))
+    )];
+
+    if (missingStopIds.length === 0) {
+        return {
+            stopMap: mergedStopMap,
+            warningMessage: ""
+        };
+    }
+
+    let successCount = 0;
+    const [firstStopId, ...remainingStopIds] = missingStopIds;
+
+    // 先試第一個站點；如果連第一個都被 CORS/403 擋下來，就不要把整排站點都打一遍失敗 request。
+    try {
+        const firstStopInfo = await getStopInfo(firstStopId);
+        if (firstStopInfo?.stop) {
+            mergedStopMap.set(normalizeStopId(firstStopInfo.stop), firstStopInfo);
+            successCount += 1;
+        }
+    } catch (error) {
+        const rawMessage = String(error?.message || "");
+        if (rawMessage.includes("403") || rawMessage.includes("Failed to fetch") || rawMessage.includes("NetworkError")) {
+            return {
+                stopMap: mergedStopMap,
+                warningMessage: "暫時未能載入站名資料，先以站點編號顯示 ETA。"
+            };
+        }
+    }
+
+    if (remainingStopIds.length === 0) {
+        return {
+            stopMap: mergedStopMap,
+            warningMessage: successCount > 0 ? "" : "暫時未能載入站名資料，先以站點編號顯示 ETA。"
+        };
+    }
+
+    // 整包 /stop 清單在本機模式下可能被 CORS 擋住，所以這裡改成針對目前方向逐站補站名。
+    const results = await Promise.allSettled(remainingStopIds.map(async (stopId) => ({
+        stopId,
+        stopInfo: await getStopInfo(stopId)
+    })));
+
+    for (const result of results) {
+        if (result.status !== "fulfilled" || !result.value.stopInfo?.stop) {
+            continue;
+        }
+
+        mergedStopMap.set(normalizeStopId(result.value.stopInfo.stop), result.value.stopInfo);
+        successCount += 1;
+    }
+
+    if (successCount === 0) {
+        return {
+            stopMap: mergedStopMap,
+            warningMessage: "暫時未能載入站名資料，先以站點編號顯示 ETA。"
+        };
+    }
+
+    if (successCount < missingStopIds.length) {
+        return {
+            stopMap: mergedStopMap,
+            warningMessage: "部分站名暫時未能載入，其餘站點仍可正常查看 ETA。"
+        };
+    }
+
+    return {
+        stopMap: mergedStopMap,
+        warningMessage: ""
+    };
 }
 
 function chooseRouteVariants(routeEntries, requestedServiceType) {
@@ -631,6 +831,15 @@ function getGeolocationErrorMessage(error) {
     return "無法取得位置，請手動選擇站點";
 }
 
+function logGeolocationFailure(label, error) {
+    if (error?.code === 3) {
+        console.info(label, error);
+        return;
+    }
+
+    console.warn(label, error);
+}
+
 function requestCurrentPosition() {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
@@ -673,7 +882,7 @@ async function initializeLocationOnLoad() {
             : getGeolocationErrorMessage(error);
 
         renderCurrentState();
-        console.warn("KMB initial geolocation failed", error);
+        logGeolocationFailure("KMB initial geolocation failed", error);
     }
 }
 
@@ -739,7 +948,7 @@ async function locateNearestStop({ requestFreshPosition = false, triggeredByUser
         }
 
         renderCurrentState();
-        console.warn("KMB geolocation failed", error);
+        logGeolocationFailure("KMB geolocation failed", error);
     }
 }
 
@@ -1372,10 +1581,9 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
     }
 
     try {
-        // stopMap 主要用來補站名與座標；即使它失敗，也不應該讓整個方向 ETA 無法載入。
-        const [etaEntries, routeStops, stopMapResult] = await Promise.all([
-            getRouteEta(route, serviceType),
-            getRouteStops(route, direction, serviceType),
+        const etaEntries = await getRouteEta(route, serviceType);
+        const [routeStopsResult, stopMapResult] = await Promise.all([
+            getRouteStopsWithFallback(route, variant, etaEntries),
             getOptionalStopMap()
         ]);
 
@@ -1383,8 +1591,20 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false } = {
             return;
         }
 
-        currentRenderState.stopMap = stopMapResult.stopMap;
-        currentRenderState.stopMapWarningMessage = stopMapResult.warningMessage;
+        const routeStops = routeStopsResult.routeStops;
+        // 先用可取得的 stopMap，再逐站補目前方向需要的站名，避免畫面只剩下 stop ID。
+        const hydratedStopMapResult = await hydrateStopMapForStops(routeStops, stopMapResult.stopMap);
+
+        if (!currentRenderState || currentRenderState.route !== route || requestId !== activeVariantLoadId) {
+            return;
+        }
+
+        currentRenderState.stopMap = hydratedStopMapResult.stopMap;
+        currentRenderState.stopMapWarningMessage = joinWarningMessages(
+            routeStopsResult.warningMessage,
+            stopMapResult.warningMessage,
+            hydratedStopMapResult.warningMessage
+        );
 
         const routeStopsByDirection = new Map([[direction, routeStops]]);
         const etaMaps = buildEtaMaps(etaEntries, serviceType);
