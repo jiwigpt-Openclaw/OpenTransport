@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-04-01 12:05";
+const APP_VERSION = "2026-04-01 16:05";
 const KMB_API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const CTB_API_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
 const NLB_API_BASE = "https://rt.data.gov.hk/v2/transport/nlb";
@@ -142,6 +142,11 @@ let activeStopInfoModalRequestId = 0;
 let lastStopInfoModalTrigger = null;
 let officialBusStopIndexPromise = null;
 let officialBusStopIndexScriptPromise = null;
+let shouldAutoScrollToNearestStop = false;
+let lastAutoScrolledNearestStopKey = "";
+let nearestStopScrollObserver = null;
+let nearestStopScrollObserverTimerId = null;
+let locationRequestPromise = null;
 
 // 這個物件會保存目前畫面所需的所有狀態，方便重繪與自動更新。
 let currentRenderState = null;
@@ -537,9 +542,10 @@ function handleStopInfoModalBackdrop(event) {
 // 失敗或切換路線時，統一用這個函式把舊的查詢狀態清乾淨，避免下一次查詢沿用到壞掉的狀態。
 function resetCurrentRouteState() {
     stopLiveUpdates();
+    clearPendingScrollTimer();
     closeStopInfoModal();
+    clearNearestStopScrollObserver();
     activeVariantLoadId += 1;
-    activeLocationRequestId += 1;
     currentRenderState = null;
 }
 
@@ -2253,30 +2259,234 @@ function clearPendingScrollTimer() {
     }
 }
 
-// 最近站展開後，稍等一下再平滑捲動到畫面中間，避免展開時畫面跳動。
+function clearNearestStopScrollObserver() {
+    if (nearestStopScrollObserver) {
+        nearestStopScrollObserver.disconnect();
+        nearestStopScrollObserver = null;
+    }
+
+    if (nearestStopScrollObserverTimerId) {
+        window.clearTimeout(nearestStopScrollObserverTimerId);
+        nearestStopScrollObserverTimerId = null;
+    }
+}
+
+function getScrollableAncestor(element) {
+    let current = element?.parentElement || null;
+
+    while (current) {
+        const styles = window.getComputedStyle(current);
+        const overflowY = styles.overflowY;
+        const isScrollable = (overflowY === "auto" || overflowY === "scroll") && current.scrollHeight > current.clientHeight;
+        if (isScrollable) {
+            return current;
+        }
+
+        current = current.parentElement;
+    }
+
+    return null;
+}
+
+// 最近站展開後，稍等一下再平滑捲到視窗中央。
+// 不直接依賴 scrollIntoView，避免不同瀏覽器把錯的容器拿來捲動。
 function scrollStopIntoView(stopKey) {
     if (!stopKey) {
         return;
     }
 
     const encodedStopKey = encodeURIComponent(stopKey);
+    const attemptDelays = [120, 320, 620, 980];
     clearPendingScrollTimer();
 
-    pendingScrollTimerId = window.setTimeout(() => {
+    const runScrollAttempt = (attemptIndex = 0) => {
         const stopElement = document.querySelector(`[data-stop-key="${encodedStopKey}"]`);
         if (!stopElement) {
+            if (attemptIndex < attemptDelays.length - 1) {
+                pendingScrollTimerId = window.setTimeout(() => {
+                    runScrollAttempt(attemptIndex + 1);
+                }, attemptDelays[attemptIndex + 1] - attemptDelays[attemptIndex]);
+            } else {
+                pendingScrollTimerId = null;
+            }
             return;
         }
 
-        stopElement.scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-        });
-        pendingScrollTimerId = null;
-    }, 300);
+        const scrollContainer = getScrollableAncestor(stopElement);
+        if (scrollContainer) {
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const stopRect = stopElement.getBoundingClientRect();
+            const targetTop = scrollContainer.scrollTop
+                + (stopRect.top - containerRect.top)
+                - ((scrollContainer.clientHeight - stopRect.height) / 2);
+
+            scrollContainer.scrollTo({
+                top: Math.max(0, targetTop),
+                behavior: "smooth"
+            });
+        } else {
+            const stopRect = stopElement.getBoundingClientRect();
+            const rootScroller = document.scrollingElement || document.documentElement || document.body;
+            const currentTop = rootScroller.scrollTop;
+            const targetTop = currentTop + stopRect.top - ((window.innerHeight - stopRect.height) / 2);
+
+            rootScroller.scrollTo({
+                top: Math.max(0, targetTop),
+                behavior: "smooth"
+            });
+        }
+
+        if (attemptIndex < attemptDelays.length - 1) {
+            pendingScrollTimerId = window.setTimeout(() => {
+                runScrollAttempt(attemptIndex + 1);
+            }, attemptDelays[attemptIndex + 1] - attemptDelays[attemptIndex]);
+        } else {
+            pendingScrollTimerId = null;
+        }
+    };
+
+    pendingScrollTimerId = window.setTimeout(() => {
+        runScrollAttempt(0);
+    }, attemptDelays[0]);
 }
 
-function updateNearestStopFromUserPosition() {
+function requestNearestStopAutoScroll() {
+    shouldAutoScrollToNearestStop = true;
+    lastAutoScrolledNearestStopKey = "";
+
+    clearNearestStopScrollObserver();
+
+    const resultDiv = document.getElementById("result");
+    if (!resultDiv || typeof MutationObserver !== "function") {
+        return;
+    }
+
+    nearestStopScrollObserver = new MutationObserver(() => {
+        scrollToNearestStop();
+    });
+    nearestStopScrollObserver.observe(resultDiv, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "data-stop-key"]
+    });
+
+    nearestStopScrollObserverTimerId = window.setTimeout(() => {
+        clearNearestStopScrollObserver();
+    }, 4000);
+}
+
+function performScrollToStop(stopKey, { respectManualScroll = false } = {}) {
+    if (!stopKey) {
+        return;
+    }
+
+    clearPendingScrollTimer();
+    const attemptDelays = [220, 520, 900];
+
+    const runScrollAttempt = (attemptIndex = 0) => {
+        pendingScrollTimerId = window.setTimeout(() => {
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
+                try {
+                    const encodedStopKey = encodeURIComponent(stopKey);
+                    const rawStopKey = String(stopKey)
+                        .replaceAll("\\", "\\\\")
+                        .replaceAll("\"", "\\\"");
+                    const stopElement = document.querySelector(`.stop[data-stop-key="${rawStopKey}"]`)
+                        || document.querySelector(`.stop[data-stop-key-encoded="${encodedStopKey}"]`)
+                        || document.querySelector(".stop.is-nearest-stop");
+                    if (!stopElement) {
+                        if (attemptIndex >= attemptDelays.length - 1) {
+                            console.warn("自動捲動找不到最近車站元素", stopKey);
+                        }
+                        pendingScrollTimerId = null;
+                        return;
+                    }
+
+                    // 強制 reflow，確保展開後的高度已經套用，再做置中捲動。
+                    void stopElement.offsetHeight;
+                    stopElement.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                        inline: "nearest"
+                    });
+
+                    // 再補一次用頁面主捲動容器手動對中，避免某些瀏覽器忽略第一發 scrollIntoView。
+                    window.setTimeout(() => {
+                        try {
+                            const rootScroller = document.scrollingElement || document.documentElement || document.body;
+                            const stopRect = stopElement.getBoundingClientRect();
+                            const targetTop = rootScroller.scrollTop
+                                + stopRect.top
+                                - ((window.innerHeight - stopRect.height) / 2);
+
+                            rootScroller.scrollTo({
+                                top: Math.max(0, targetTop),
+                                behavior: "smooth"
+                            });
+                        } catch (error) {
+                            console.warn("最近車站手動置中失敗", error);
+                        }
+                    }, 180);
+
+                    lastAutoScrolledNearestStopKey = stopKey;
+                } catch (error) {
+                    console.warn("自動捲動到站點失敗", error);
+                } finally {
+                    pendingScrollTimerId = null;
+                }
+
+                if (attemptIndex < attemptDelays.length - 1) {
+                    runScrollAttempt(attemptIndex + 1);
+                }
+                });
+            });
+        }, attemptDelays[attemptIndex]);
+    };
+
+    runScrollAttempt(0);
+}
+
+// === 新增：自動捲動到最近車站（置中顯示）===
+function scrollToNearestStop() {
+    try {
+        const nearestStopKey = currentRenderState?.nearestStopKey || "";
+        if (!nearestStopKey || !shouldAutoScrollToNearestStop) {
+            return;
+        }
+
+        if (lastAutoScrolledNearestStopKey === nearestStopKey) {
+            shouldAutoScrollToNearestStop = false;
+            clearNearestStopScrollObserver();
+            return;
+        }
+
+        const encodedStopKey = encodeURIComponent(nearestStopKey);
+        const rawStopKey = String(nearestStopKey)
+            .replaceAll("\\", "\\\\")
+            .replaceAll("\"", "\\\"");
+        const stopElement = document.querySelector(`.stop[data-stop-key="${rawStopKey}"]`)
+            || document.querySelector(`.stop[data-stop-key-encoded="${encodedStopKey}"]`)
+            || document.querySelector(".stop.is-nearest-stop");
+        if (!stopElement) {
+            console.warn("自動捲動找不到最近車站元素", nearestStopKey);
+            return;
+        }
+
+        performScrollToStop(nearestStopKey, { respectManualScroll: false });
+        shouldAutoScrollToNearestStop = false;
+        clearNearestStopScrollObserver();
+    } catch (error) {
+        console.warn("自動捲動到最近車站失敗", error);
+    }
+}
+
+function scrollStopIntoView(stopKey) {
+    performScrollToStop(stopKey, { respectManualScroll: false });
+}
+
+function updateNearestStopFromUserPosition({ forceScroll = false } = {}) {
     if (!currentRenderState?.selectedVariantKey || !locationState.userPosition) {
         return false;
     }
@@ -2316,11 +2526,12 @@ function updateNearestStopFromUserPosition() {
     const wasExpanded = currentRenderState.expandedStopKeys.includes(nearestMatch.stopKey);
     currentRenderState.nearestStopKey = nearestMatch.stopKey;
     expandStopPanel(nearestMatch.stopKey);
+    requestNearestStopAutoScroll();
     locationState.statusMessage = `已找到最近的站：${nearestMatch.stopName}`;
     renderCurrentState();
 
-    if (previousNearestStopKey !== nearestMatch.stopKey || !wasExpanded) {
-        scrollStopIntoView(nearestMatch.stopKey);
+    if (forceScroll || previousNearestStopKey !== nearestMatch.stopKey || !wasExpanded) {
+        scrollToNearestStop();
     }
 
     return true;
@@ -2356,14 +2567,22 @@ function logGeolocationFailure(label, error) {
 }
 
 function requestCurrentPosition() {
-    return new Promise((resolve, reject) => {
+    if (locationRequestPromise) {
+        return locationRequestPromise;
+    }
+
+    locationRequestPromise = new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
             reject(new Error("你的瀏覽器不支援定位功能"));
             return;
         }
 
         navigator.geolocation.getCurrentPosition(resolve, reject, GEOLOCATION_OPTIONS);
+    }).finally(() => {
+        locationRequestPromise = null;
     });
+
+    return locationRequestPromise;
 }
 
 // 頁面載入後先嘗試詢問定位權限，之後選方向時就能直接用這個位置幫使用者找最近站點。
@@ -2387,7 +2606,7 @@ async function initializeLocationOnLoad() {
         // 首次權限回應如果晚於使用者已選好路線，就直接沿用這次授權的座標，
         // 避免後續因切方向或載入站點又再問一次定位權限。
         if (currentRenderState?.selectedVariantKey) {
-            void locateNearestStop({ requestFreshPosition: false });
+            void locateNearestStop({ requestFreshPosition: false, forceScroll: true });
         } else {
             renderCurrentState();
         }
@@ -2407,7 +2626,7 @@ async function initializeLocationOnLoad() {
     }
 }
 
-async function locateNearestStop({ requestFreshPosition = false, triggeredByUser = false } = {}) {
+async function locateNearestStop({ requestFreshPosition = false, triggeredByUser = false, forceScroll = false } = {}) {
     // 只有使用者主動按 GPS 時，才允許重新抓一次新的定位；
     // 其餘自動流程一律優先沿用既有座標，避免瀏覽器重複跳出「這次運行」權限視窗。
     const shouldRequestFreshPosition = Boolean(requestFreshPosition && triggeredByUser);
@@ -2432,11 +2651,11 @@ async function locateNearestStop({ requestFreshPosition = false, triggeredByUser
     }
 
     if (!shouldRequestFreshPosition && locationState.userPosition) {
-        updateNearestStopFromUserPosition();
+        updateNearestStopFromUserPosition({ forceScroll });
         return;
     }
 
-    if (!shouldRequestFreshPosition && !locationState.userPosition && !triggeredByUser) {
+    if (!shouldRequestFreshPosition && !locationState.userPosition && !triggeredByUser && !locationRequestPromise) {
         return;
     }
 
@@ -2456,7 +2675,7 @@ async function locateNearestStop({ requestFreshPosition = false, triggeredByUser
             timestamp: position.timestamp || Date.now()
         };
         locationState.enabled = true;
-        updateNearestStopFromUserPosition();
+        updateNearestStopFromUserPosition({ forceScroll });
     } catch (error) {
         if (requestId !== activeLocationRequestId || !currentRenderState) {
             return;
@@ -2494,7 +2713,7 @@ function toggleLocationTracking() {
 
     locationState.statusMessage = "定位已開啟，會自動尋找最近的站";
     renderCurrentState();
-    void locateNearestStop({ requestFreshPosition: true, triggeredByUser: true });
+    void locateNearestStop({ requestFreshPosition: true, triggeredByUser: true, forceScroll: true });
 }
 
 // 搜尋路線後，先同時抓每個班次的 route-eta，讓方向卡片可以先顯示「下一班」摘要。
@@ -2550,6 +2769,10 @@ async function refreshVariantSummaries() {
         }
 
         bucket.isSummaryLoading = false;
+    }
+
+    if (currentRenderState?.nearestStopKey) {
+        requestNearestStopAutoScroll();
     }
 
     renderCurrentState();
@@ -5074,8 +5297,6 @@ function stopLiveUpdates() {
         window.clearTimeout(dataRefreshTimerId);
         dataRefreshTimerId = null;
     }
-
-    clearPendingScrollTimer();
 }
 
 function startLiveUpdates() {
@@ -5311,7 +5532,11 @@ function renderSelectedVariantPanel() {
         const stopInfoButtonLabel = escapeHtml(`查看 ${stopDisplayName} 停靠的其他車號`);
 
         return `
-            <div class="stop ${isExpanded ? "is-expanded" : ""}" data-stop-key="${encodedStopKey}">
+            <div
+                class="stop ${isExpanded ? "is-expanded" : ""} ${isNearest ? "is-nearest-stop" : ""}"
+                data-stop-key="${escapeHtml(stopKey)}"
+                data-stop-key-encoded="${encodedStopKey}"
+            >
                 <div class="stop-header">
                     <button type="button" class="stop-toggle" onclick="toggleStopDetails('${encodedStopKey}')">
                         <div class="stop-toggle-main">
@@ -5393,6 +5618,8 @@ function renderCurrentState() {
     }
 
     resultDiv.innerHTML = renderResult();
+    // === 在 renderCurrentState() 結尾呼叫 ===
+    scrollToNearestStop();
 }
 
 // 常用路線膠囊只做「填入並查詢」，實際查詢仍沿用原本的 searchETA。
@@ -5435,7 +5662,7 @@ function toggleFavoriteRoute(event, encodedRoute) {
 
 // 點擊方向卡片後，才真正去載入該方向的站點與 ETA。
 // 方向切換與手動重新整理都沿用目前已有的位置，只有按 GPS 才重新要求定位。
-async function loadSelectedVariantData(variantKey, { isAutoRefresh = false, requestFreshLocation = false } = {}) {
+async function loadSelectedVariantData(variantKey, { isAutoRefresh = false, requestFreshLocation = false, scrollNearestStop = !isAutoRefresh } = {}) {
     const statusDiv = document.getElementById("status");
     const variant = findVariantByKey(variantKey);
 
@@ -5537,8 +5764,15 @@ async function loadSelectedVariantData(variantKey, { isAutoRefresh = false, requ
             stopsWithEta: etaSummary.stopsWithEta
         });
 
+        if (isAutoRefresh && currentRenderState?.nearestStopKey) {
+            requestNearestStopAutoScroll();
+        }
+
         renderCurrentState();
-        void locateNearestStop({ requestFreshPosition: requestFreshLocation });
+        void locateNearestStop({
+            requestFreshPosition: requestFreshLocation,
+            forceScroll: scrollNearestStop
+        });
         startLiveUpdates();
 
         if (statusDiv && currentRenderState.selectedVariantKey === variantKey) {
@@ -5592,7 +5826,7 @@ function selectVariant(encodedVariantKey) {
             currentRenderState.expandedStopKeys = [];
             currentRenderState.nearestStopKey = "";
             renderCurrentState();
-            void locateNearestStop({ requestFreshPosition: false });
+            void locateNearestStop({ requestFreshPosition: false, forceScroll: true });
             startLiveUpdates();
             return;
         }
@@ -5784,6 +6018,8 @@ window.addEventListener("keydown", (event) => {
 
 window.addEventListener("beforeunload", () => {
     stopLiveUpdates();
+    clearPendingScrollTimer();
+    clearNearestStopScrollObserver();
 });
 
 // Final stop-info modal rewrite:

@@ -10,7 +10,10 @@
 
     <script>
         if (window.location.protocol !== "file:") {
-            document.write('<link rel="manifest" href="manifest.json?v=20260401-1205">');
+            const manifestLink = document.createElement("link");
+            manifestLink.rel = "manifest";
+            manifestLink.href = "manifest.json?v=20260401-1605";
+            document.head.appendChild(manifestLink);
         }
     </script>
     <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3098/3098090.png" type="image/png">
@@ -18,7 +21,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="香港巴士到站">
 
-    <link rel="stylesheet" href="style.css?v=20260401-1205">
+    <link rel="stylesheet" href="style.css?v=20260401-1605">
 </head>
 <body>
     <div class="container">
@@ -85,11 +88,11 @@
         </div>
     </div>
 
-    <script src="official-bus-stop-index.js?v=20260401-1205" data-official-stop-index="true"></script>
-    <script src="script.js?v=20260401-1205"></script>
-    <script src="stable-overrides.js?v=20260401-1205"></script>
+    <script src="official-bus-stop-index.js?v=20260401-1605" data-official-stop-index="true"></script>
+    <script src="script.js?v=20260401-1605"></script>
+    <script src="stable-overrides.js?v=20260401-1605"></script>
     <script>
-        document.getElementById("app-version").textContent = "2026-04-01 12:05";
+        document.getElementById("app-version").textContent = "2026-04-01 16:05";
 
         function shareApp() {
             if (navigator.share) {
