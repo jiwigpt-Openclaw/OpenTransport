@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-04-01 00:20";
+const APP_VERSION = "2026-04-01 12:05";
 const KMB_API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const CTB_API_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
 const NLB_API_BASE = "https://rt.data.gov.hk/v2/transport/nlb";
@@ -2384,7 +2384,13 @@ async function initializeLocationOnLoad() {
             timestamp: position.timestamp || Date.now()
         };
         locationState.statusMessage = "定位已開啟，選擇方向後會自動尋找最近的站";
-        renderCurrentState();
+        // 首次權限回應如果晚於使用者已選好路線，就直接沿用這次授權的座標，
+        // 避免後續因切方向或載入站點又再問一次定位權限。
+        if (currentRenderState?.selectedVariantKey) {
+            void locateNearestStop({ requestFreshPosition: false });
+        } else {
+            renderCurrentState();
+        }
     } catch (error) {
         if (requestId !== activeLocationRequestId) {
             return;
@@ -2402,6 +2408,10 @@ async function initializeLocationOnLoad() {
 }
 
 async function locateNearestStop({ requestFreshPosition = false, triggeredByUser = false } = {}) {
+    // 只有使用者主動按 GPS 時，才允許重新抓一次新的定位；
+    // 其餘自動流程一律優先沿用既有座標，避免瀏覽器重複跳出「這次運行」權限視窗。
+    const shouldRequestFreshPosition = Boolean(requestFreshPosition && triggeredByUser);
+
     if (!locationState.enabled && !triggeredByUser) {
         return;
     }
@@ -2421,12 +2431,12 @@ async function locateNearestStop({ requestFreshPosition = false, triggeredByUser
         return;
     }
 
-    if (!requestFreshPosition && locationState.userPosition) {
+    if (!shouldRequestFreshPosition && locationState.userPosition) {
         updateNearestStopFromUserPosition();
         return;
     }
 
-    if (!requestFreshPosition && !locationState.userPosition && !triggeredByUser) {
+    if (!shouldRequestFreshPosition && !locationState.userPosition && !triggeredByUser) {
         return;
     }
 
@@ -5424,7 +5434,8 @@ function toggleFavoriteRoute(event, encodedRoute) {
 }
 
 // 點擊方向卡片後，才真正去載入該方向的站點與 ETA。
-async function loadSelectedVariantData(variantKey, { isAutoRefresh = false, requestFreshLocation = !isAutoRefresh } = {}) {
+// 方向切換與手動重新整理都沿用目前已有的位置，只有按 GPS 才重新要求定位。
+async function loadSelectedVariantData(variantKey, { isAutoRefresh = false, requestFreshLocation = false } = {}) {
     const statusDiv = document.getElementById("status");
     const variant = findVariantByKey(variantKey);
 
@@ -5581,7 +5592,7 @@ function selectVariant(encodedVariantKey) {
             currentRenderState.expandedStopKeys = [];
             currentRenderState.nearestStopKey = "";
             renderCurrentState();
-            void locateNearestStop({ requestFreshPosition: true });
+            void locateNearestStop({ requestFreshPosition: false });
             startLiveUpdates();
             return;
         }
