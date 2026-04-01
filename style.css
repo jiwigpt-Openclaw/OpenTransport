@@ -849,6 +849,20 @@ body.has-modal-open {
     overflow: auto;
 }
 
+.stop-info-section + .stop-info-section {
+    margin-top: 18px;
+}
+
+.stop-info-section-header {
+    margin-bottom: 10px;
+}
+
+.stop-info-section-title {
+    margin: 0;
+    color: #111827;
+    font-size: 1em;
+}
+
 .stop-info-modal-empty {
     margin: 0;
     color: #6b7280;
@@ -862,12 +876,42 @@ body.has-modal-open {
 
 .stop-info-route-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 10px;
 }
 
+.stop-info-nearby-stop-card {
+    padding: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 16px;
+    background: #f8fafc;
+}
+
+.stop-info-nearby-stop-card + .stop-info-nearby-stop-card {
+    margin-top: 10px;
+}
+
+.stop-info-nearby-stop-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 10px;
+    margin-bottom: 10px;
+}
+
+.stop-info-nearby-stop-name {
+    color: #111827;
+    font-weight: 700;
+}
+
+.stop-info-nearby-stop-meta {
+    color: #64748b;
+    font-size: 0.9em;
+}
+
 .stop-info-route-btn {
-    min-height: 48px;
+    min-height: 72px;
     padding: 12px 14px;
     border: 1px solid rgba(11, 99, 201, 0.14);
     border-radius: 14px;
@@ -875,9 +919,50 @@ body.has-modal-open {
     color: #0b63c9;
     font-size: 1.02em;
     font-weight: 700;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 6px;
+    text-align: left;
     cursor: pointer;
     box-shadow: 0 6px 14px rgba(11, 99, 201, 0.08);
     transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.stop-info-route-btn .company-chip {
+    flex-shrink: 0;
+}
+
+.stop-info-route-company-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.company-chip.is-neutral {
+    background: rgba(15, 23, 42, 0.08);
+    color: #334155;
+}
+
+.stop-info-route-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.stop-info-route-code {
+    color: #0f172a;
+    line-height: 1.15;
+}
+
+.stop-info-route-destination {
+    color: #475569;
+    font-size: 0.88em;
+    font-weight: 600;
+    line-height: 1.35;
 }
 
 .stop-info-route-btn:hover {
@@ -1088,7 +1173,21 @@ body.has-modal-open {
         padding: 16px;
     }
 
+    .stop-info-nearby-stop-card {
+        padding: 10px;
+    }
+
+    .stop-info-nearby-stop-header {
+        align-items: flex-start;
+    }
+
     .stop-info-route-list {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .stop-info-route-btn {
+        min-height: 64px;
+        padding: 10px 12px;
+        gap: 8px;
     }
 }

@@ -1,7 +1,7 @@
 {
-  "name": "香港巴士到站查詢",
-  "short_name": "巴士ETA",
-  "description": "香港巴士及小巴實時到站查詢工具",
+  "name": "OpenTransport 香港巴士到站查詢",
+  "short_name": "OpenTransport",
+  "description": "支援 KMB、CTB、NLB、GMB 的香港巴士到站查詢網站。",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#f0f4f8",

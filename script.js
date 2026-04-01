@@ -1,10 +1,16 @@
-const APP_VERSION = "2026-03-29 02:45";
+const APP_VERSION = "2026-04-01 00:20";
 const KMB_API_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const CTB_API_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
 const NLB_API_BASE = "https://rt.data.gov.hk/v2/transport/nlb";
 const GMB_API_BASE = "https://data.etagmb.gov.hk";
+const TRANSPORT_BATCH_API_BASE = "https://rt.data.gov.hk";
 const COUNTDOWN_REFRESH_MS = 30000;
 const DATA_REFRESH_MS = 60000;
+const NEARBY_STOP_THRESHOLD_METERS = 20;
+// Modal 會優先使用 data.gov.hk 的官方站位主資料，補齊跨公司共站資訊。
+const OFFICIAL_BUS_STOP_INDEX_URL = "official-bus-stop-index.json";
+const OFFICIAL_BUS_STOP_INDEX_SCRIPT_URL = "official-bus-stop-index.js";
+const SAME_STOP_THRESHOLD_METERS = 6;
 const GEOLOCATION_OPTIONS = {
     enableHighAccuracy: false,
     timeout: 8000,
@@ -58,12 +64,14 @@ const COMPANY_CONFIGS = {
         directionFormat: "inbound/outbound",
         supportsServiceType: false,
         supportsRouteEta: false,
-        supportsStopAllEta: false,
-        hasGlobalStopMap: true,
+        supportsStopAllEta: true,
+        hasGlobalStopMap: false,
         getRouteListUrl: () => `${CTB_API_BASE}/route/ctb`,
         getStopMapUrl: () => `${CTB_API_BASE}/stop`,
         getRouteStopsUrl: (route, direction) => `${CTB_API_BASE}/route-stop/ctb/${encodeURIComponent(route)}/${direction}`,
         getStopEtaUrl: (stopId, route) => `${CTB_API_BASE}/eta/ctb/${normalizeStopId(stopId)}/${encodeURIComponent(route)}`,
+        getStopAllEtaUrl: (stopId) => `${TRANSPORT_BATCH_API_BASE}/v1/transport/batch/stop-eta/CTB/${normalizeStopId(stopId)}?lang=zh-hant`,
+        getStopRouteListUrl: (stopId) => `${TRANSPORT_BATCH_API_BASE}/v1.1/transport/batch/stop-route/CTB/${normalizeStopId(stopId)}?lang=zh-hant`,
         getStopInfoUrl: (stopId) => `${CTB_API_BASE}/stop/${normalizeStopId(stopId)}`
     },
     NLB: {
@@ -79,11 +87,13 @@ const COMPANY_CONFIGS = {
         directionFormat: "routeId",
         supportsServiceType: false,
         supportsRouteEta: false,
-        supportsStopAllEta: false,
+        supportsStopAllEta: true,
         hasGlobalStopMap: false,
         getRouteListUrl: () => `${NLB_API_BASE}/route.php?action=list`,
         getRouteStopsUrl: (route, direction, serviceType, meta = {}) => `${NLB_API_BASE}/stop.php?action=list&routeId=${encodeURIComponent(String(meta.routeId || "").trim())}`,
-        getStopEtaUrl: (stopId, route, serviceType, meta = {}) => `${NLB_API_BASE}/stop.php?action=estimatedArrivals&routeId=${encodeURIComponent(String(meta.routeId || "").trim())}&stopId=${encodeURIComponent(String(stopId || "").trim())}&language=zh`
+        getStopEtaUrl: (stopId, route, serviceType, meta = {}) => `${NLB_API_BASE}/stop.php?action=estimatedArrivals&routeId=${encodeURIComponent(String(meta.routeId || "").trim())}&stopId=${encodeURIComponent(String(stopId || "").trim())}&language=zh`,
+        getStopAllEtaUrl: (stopId) => `${TRANSPORT_BATCH_API_BASE}/v1/transport/batch/stop-eta/NLB/${normalizeStopId(stopId)}?lang=zh-hant`,
+        getStopRouteListUrl: (stopId) => `${TRANSPORT_BATCH_API_BASE}/v1.1/transport/batch/stop-route/NLB/${normalizeStopId(stopId)}?lang=zh-hant`
     },
     GMB: {
         code: "GMB",
@@ -98,13 +108,16 @@ const COMPANY_CONFIGS = {
         directionFormat: "route_seq",
         supportsServiceType: false,
         supportsRouteEta: false,
-        supportsStopAllEta: false,
+        supportsStopAllEta: true,
         hasGlobalStopMap: false,
         regions: GMB_REGIONS,
         getRouteListUrl: (region) => `${GMB_API_BASE}/route/${encodeURIComponent(region)}`,
         getRouteDetailUrl: (region, route) => `${GMB_API_BASE}/route/${encodeURIComponent(region)}/${encodeURIComponent(route)}`,
+        getRouteDetailByIdUrl: (routeId) => `${GMB_API_BASE}/route/${encodeURIComponent(String(routeId || "").trim())}`,
         getRouteStopsUrl: (route, direction, serviceType, meta = {}) => `${GMB_API_BASE}/route-stop/${encodeURIComponent(String(meta.routeId || "").trim())}/${encodeURIComponent(String(meta.routeSeq || "").trim())}`,
         getStopEtaUrl: (stopId, route, serviceType, meta = {}) => `${GMB_API_BASE}/eta/route-stop/${encodeURIComponent(String(meta.routeId || "").trim())}/${encodeURIComponent(String(meta.routeSeq || "").trim())}/${encodeURIComponent(String(meta.stopSeq || "").trim())}`,
+        getStopAllEtaUrl: (stopId) => `${GMB_API_BASE}/eta/stop/${encodeURIComponent(String(stopId || "").trim())}`,
+        getStopRouteListUrl: (stopId) => `${GMB_API_BASE}/stop-route/${encodeURIComponent(String(stopId || "").trim())}`,
         getStopInfoUrl: (stopId) => `${GMB_API_BASE}/stop/${encodeURIComponent(String(stopId || "").trim())}`
     }
 };
@@ -112,6 +125,9 @@ const routeStopCache = new Map();
 const stopEtaCache = new Map();
 const stopAllEtaCache = new Map();
 const stopInfoCache = new Map();
+const stopRouteListCache = new Map();
+const stopIndexPromiseByCompany = new Map();
+const gmbRouteMetadataPromiseByRouteId = new Map();
 
 const routeListPromiseByCompany = new Map();
 const stopMapPromiseByCompany = new Map();
@@ -123,6 +139,9 @@ let dataRefreshTimerId = null;
 let pendingScrollTimerId = null;
 let favoriteRouteNoticeTimerId = null;
 let activeStopInfoModalRequestId = 0;
+let lastStopInfoModalTrigger = null;
+let officialBusStopIndexPromise = null;
+let officialBusStopIndexScriptPromise = null;
 
 // 這個物件會保存目前畫面所需的所有狀態，方便重繪與自動更新。
 let currentRenderState = null;
@@ -453,7 +472,7 @@ function getStopInfoModalElements() {
     };
 }
 
-function renderStopInfoModalState({ title = "此站停靠車號", subtitle = "", bodyHtml = "" } = {}) {
+function renderStopInfoModalState({ title = "此站及附近停靠車號", subtitle = "", bodyHtml = "" } = {}) {
     const { title: titleElement, subtitle: subtitleElement, body: bodyElement } = getStopInfoModalElements();
     if (!titleElement || !subtitleElement || !bodyElement) {
         return;
@@ -471,9 +490,20 @@ function openStopInfoModal() {
         return;
     }
 
+    if (document.activeElement instanceof HTMLElement && !modal.contains(document.activeElement)) {
+        lastStopInfoModalTrigger = document.activeElement;
+    }
+
     modal.classList.add("is-open");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("has-modal-open");
+
+    const closeButton = modal.querySelector(".stop-info-modal-close");
+    if (closeButton instanceof HTMLElement) {
+        window.setTimeout(() => {
+            closeButton.focus();
+        }, 0);
+    }
 }
 
 function closeStopInfoModal() {
@@ -483,9 +513,19 @@ function closeStopInfoModal() {
     }
 
     activeStopInfoModalRequestId += 1;
+
+    if (modal.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+    }
+
     modal.classList.remove("is-open");
     modal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("has-modal-open");
+
+    if (lastStopInfoModalTrigger instanceof HTMLElement && document.contains(lastStopInfoModalTrigger)) {
+        lastStopInfoModalTrigger.focus();
+    }
+    lastStopInfoModalTrigger = null;
 }
 
 function handleStopInfoModalBackdrop(event) {
@@ -970,6 +1010,205 @@ function normalizeGmbEtaEntries(payload, meta, route) {
     }));
 }
 
+function getEntryDestinationLabel(entry) {
+    return String(
+        entry?.dest_tc
+        ?? entry?.dest_en
+        ?? entry?.dest
+        ?? entry?.destinationTc
+        ?? entry?.destinationEn
+        ?? entry?.destination
+        ?? ""
+    ).trim();
+}
+
+function normalizeBatchStopAllEtaEntries(company, payload, stopId) {
+    const entries = Array.isArray(payload?.data) ? payload.data : [];
+
+    return entries.flatMap((entry, index) => {
+        const etaValue = entry?.eta ?? entry?.eta_time ?? "";
+        return [{
+            ...entry,
+            company,
+            route: normalizeRouteCode(entry?.route),
+            stop: normalizeStopId(entry?.stop ?? stopId),
+            seq: Number(entry?.seq) || 0,
+            eta_seq: Number(entry?.eta_seq) || index + 1,
+            eta: etaValue,
+            direction: getItemDirection(entry),
+            service_type: getServiceType(entry),
+            dest_tc: entry?.dest_tc || entry?.dest || "",
+            dest_en: entry?.dest_en || entry?.dest || "",
+            rmk_tc: entry?.rmk_tc || entry?.rmk || entry?.routeVariantName || "",
+            rmk_en: entry?.rmk_en || entry?.rmk || entry?.routeVariantName || ""
+        }];
+    });
+}
+
+function normalizeBatchStopRouteEntries(company, payload, stopId) {
+    const entries = Array.isArray(payload?.data) ? payload.data : [];
+
+    return entries.map((entry) => ({
+        ...entry,
+        company,
+        route: normalizeRouteCode(entry?.route),
+        stop: normalizeStopId(entry?.stop ?? stopId),
+        seq: Number(entry?.seq) || 0,
+        direction: getItemDirection(entry),
+        service_type: getServiceType(entry),
+        dest_tc: entry?.dest_tc || entry?.dest || "",
+        dest_en: entry?.dest_en || entry?.dest || ""
+    }));
+}
+
+function normalizeGmbRouteDetailPayload(payload) {
+    if (Array.isArray(payload?.data)) {
+        return payload.data;
+    }
+
+    if (payload?.data && typeof payload.data === "object") {
+        return [payload.data];
+    }
+
+    return [];
+}
+
+async function getGmbRouteMetadata(routeId) {
+    const normalizedRouteId = String(routeId || "").trim();
+    if (!normalizedRouteId) {
+        return new Map();
+    }
+
+    if (!gmbRouteMetadataPromiseByRouteId.has(normalizedRouteId)) {
+        const config = getCompanyConfig("GMB");
+        const promise = fetchJson(
+            config.getRouteDetailByIdUrl(normalizedRouteId),
+            `${getCompanyDisplayName("GMB")} 路線詳情 ${normalizedRouteId}`
+        )
+            .then((payload) => {
+                const routeEntries = normalizeGmbRouteDetailPayload(payload);
+                const metadataBySeq = new Map();
+
+                for (const routeEntry of routeEntries) {
+                    const routeCode = normalizeRouteCode(routeEntry?.route_code || routeEntry?.route);
+                    const routeDescription = `${String(routeEntry?.description_tc || "").trim()} ${String(routeEntry?.description_en || "").trim()}`.toLowerCase();
+                    const serviceType = routeDescription.includes("正常") || routeDescription.includes("normal") ? "1" : "2";
+                    const directions = Array.isArray(routeEntry?.directions) ? routeEntry.directions : [];
+
+                    directions.forEach((directionEntry, directionIndex) => {
+                        const routeSeq = String(directionEntry?.route_seq || "").trim();
+                        const normalizedDirection = Number(directionEntry?.route_seq) === 2
+                            ? "inbound"
+                            : directionIndex === 0
+                                ? "outbound"
+                                : "inbound";
+
+                        metadataBySeq.set(routeSeq, {
+                            route: routeCode,
+                            direction: normalizedDirection,
+                            serviceType,
+                            destinationTc: String(directionEntry?.dest_tc || "").trim(),
+                            destinationEn: String(directionEntry?.dest_en || "").trim(),
+                            originTc: String(directionEntry?.orig_tc || "").trim(),
+                            originEn: String(directionEntry?.orig_en || "").trim()
+                        });
+                    });
+                }
+
+                return metadataBySeq;
+            })
+            .catch((error) => {
+                gmbRouteMetadataPromiseByRouteId.delete(normalizedRouteId);
+                throw error;
+            });
+
+        gmbRouteMetadataPromiseByRouteId.set(normalizedRouteId, promise);
+    }
+
+    return gmbRouteMetadataPromiseByRouteId.get(normalizedRouteId);
+}
+
+async function normalizeGmbStopAllEtaEntries(payload, stopId) {
+    const routes = Array.isArray(payload?.data) ? payload.data : [];
+    const normalizedStopId = normalizeStopId(stopId);
+
+    const normalizedEntries = await Promise.all(routes.map(async (routeEntry) => {
+        const routeId = String(routeEntry?.route_id || "").trim();
+        const routeSeq = String(routeEntry?.route_seq || "").trim();
+        const stopSeq = Number(routeEntry?.stop_seq) || 0;
+        const routeMetadataMap = await getGmbRouteMetadata(routeId);
+        const routeMetadata = routeMetadataMap.get(routeSeq) || {};
+        const etaEntries = Array.isArray(routeEntry?.eta) ? routeEntry.eta : [];
+
+        if (etaEntries.length === 0) {
+            return [{
+                company: "GMB",
+                route: routeMetadata.route || "",
+                routeId,
+                routeSeq,
+                stop: normalizedStopId,
+                seq: stopSeq,
+                direction: routeMetadata.direction || "",
+                service_type: routeMetadata.serviceType || "1",
+                dest_tc: routeMetadata.destinationTc || "",
+                dest_en: routeMetadata.destinationEn || "",
+                eta_seq: 1,
+                eta: "",
+                rmk_tc: String(routeEntry?.description_tc || "").trim(),
+                rmk_en: String(routeEntry?.description_en || "").trim()
+            }];
+        }
+
+        return etaEntries.map((etaEntry, index) => ({
+            company: "GMB",
+            route: routeMetadata.route || "",
+            routeId,
+            routeSeq,
+            stop: normalizedStopId,
+            seq: stopSeq,
+            direction: routeMetadata.direction || "",
+            service_type: routeMetadata.serviceType || "1",
+            dest_tc: routeMetadata.destinationTc || "",
+            dest_en: routeMetadata.destinationEn || "",
+            eta_seq: Number(etaEntry?.eta_seq) || index + 1,
+            eta: etaEntry?.timestamp || "",
+            rmk_tc: etaEntry?.remarks_tc || "",
+            rmk_en: etaEntry?.remarks_en || ""
+        }));
+    }));
+
+    return normalizedEntries.flat();
+}
+
+async function normalizeGmbStopRouteEntries(payload, stopId) {
+    const routes = Array.isArray(payload?.data) ? payload.data : [];
+    const normalizedStopId = normalizeStopId(stopId);
+
+    const normalizedEntries = await Promise.all(routes.map(async (routeEntry) => {
+        const routeId = String(routeEntry?.route_id || "").trim();
+        const routeSeq = String(routeEntry?.route_seq || "").trim();
+        const routeMetadataMap = await getGmbRouteMetadata(routeId);
+        const routeMetadata = routeMetadataMap.get(routeSeq) || {};
+
+        return {
+            company: "GMB",
+            route: routeMetadata.route || "",
+            routeId,
+            routeSeq,
+            stop: normalizedStopId,
+            seq: Number(routeEntry?.stop_seq) || 0,
+            direction: routeMetadata.direction || "",
+            service_type: routeMetadata.serviceType || "1",
+            dest_tc: routeMetadata.destinationTc || "",
+            dest_en: routeMetadata.destinationEn || "",
+            name_tc: routeEntry?.name_tc || "",
+            name_en: routeEntry?.name_en || ""
+        };
+    }));
+
+    return normalizedEntries.filter((entry) => entry.route);
+}
+
 function getStopMapForCompany(company) {
     if (!currentRenderState) {
         return new Map();
@@ -1338,7 +1577,17 @@ async function getStopAllEta(company, stopId) {
     if (!stopAllEtaCache.has(cacheKey)) {
         const url = config.getStopAllEtaUrl(normalizedStopId);
         const promise = fetchJson(url, `${getCompanyLabel(normalizedCompany)}巴士站所有路線 ETA ${normalizedStopId}`)
-            .then((payload) => decorateDataEntries(normalizedCompany, Array.isArray(payload.data) ? payload.data : []))
+            .then(async (payload) => {
+                if (normalizedCompany === "CTB" || normalizedCompany === "NLB") {
+                    return normalizeBatchStopAllEtaEntries(normalizedCompany, payload, normalizedStopId);
+                }
+
+                if (normalizedCompany === "GMB") {
+                    return normalizeGmbStopAllEtaEntries(payload, normalizedStopId);
+                }
+
+                return decorateDataEntries(normalizedCompany, Array.isArray(payload.data) ? payload.data : []);
+            })
             .catch((error) => {
                 stopAllEtaCache.delete(cacheKey);
                 throw error;
@@ -1348,6 +1597,199 @@ async function getStopAllEta(company, stopId) {
     }
 
     return stopAllEtaCache.get(cacheKey);
+}
+
+async function getStopRouteList(company, stopId) {
+    const normalizedCompany = getCompanyConfig(company).code;
+    const config = getCompanyConfig(normalizedCompany);
+    const normalizedStopId = normalizeStopId(stopId);
+    const cacheKey = `${normalizedCompany}|${normalizedStopId}`;
+
+    if (typeof config.getStopRouteListUrl !== "function") {
+        return [];
+    }
+
+    if (!stopRouteListCache.has(cacheKey)) {
+        const url = config.getStopRouteListUrl(normalizedStopId);
+        const promise = fetchJson(url, `${getCompanyLabel(normalizedCompany)}巴士站路線清單 ${normalizedStopId}`)
+            .then(async (payload) => {
+                if (normalizedCompany === "CTB" || normalizedCompany === "NLB") {
+                    return normalizeBatchStopRouteEntries(normalizedCompany, payload, normalizedStopId);
+                }
+
+                if (normalizedCompany === "GMB") {
+                    return normalizeGmbStopRouteEntries(payload, normalizedStopId);
+                }
+
+                return [];
+            })
+            .catch((error) => {
+                stopRouteListCache.delete(cacheKey);
+                throw error;
+            });
+
+        stopRouteListCache.set(cacheKey, promise);
+    }
+
+    return stopRouteListCache.get(cacheKey);
+}
+
+function createStopIndexEntry(company, stopId, stopInfo = {}) {
+    const normalizedStopId = normalizeStopId(stopId || stopInfo?.stop || stopInfo?.stopId);
+    const coordinates = getStopCoordinates(stopInfo);
+    if (!normalizedStopId || !coordinates) {
+        return null;
+    }
+
+    return {
+        company: getCompanyConfig(company).code,
+        stopId: normalizedStopId,
+        name_tc: stopInfo?.name_tc || stopInfo?.nameTc || "",
+        name_en: stopInfo?.name_en || stopInfo?.nameEn || "",
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude
+    };
+}
+
+function appendStopIndexEntries(indexMap, entries = []) {
+    for (const entry of entries) {
+        if (!entry?.stopId) {
+            continue;
+        }
+
+        const existingEntry = indexMap.get(entry.stopId);
+        if (!existingEntry) {
+            indexMap.set(entry.stopId, entry);
+            continue;
+        }
+
+        indexMap.set(entry.stopId, {
+            ...existingEntry,
+            name_tc: existingEntry.name_tc || entry.name_tc || "",
+            name_en: existingEntry.name_en || entry.name_en || "",
+            latitude: existingEntry.latitude ?? entry.latitude,
+            longitude: existingEntry.longitude ?? entry.longitude
+        });
+    }
+}
+
+async function buildNlbStopIndex() {
+    const routeEntries = await getRouteList("NLB");
+    const uniqueRoutes = new Map();
+
+    for (const routeEntry of routeEntries) {
+        const routeId = String(routeEntry?.routeId || "").trim();
+        if (!routeId || uniqueRoutes.has(routeId)) {
+            continue;
+        }
+
+        uniqueRoutes.set(routeId, routeEntry);
+    }
+
+    const results = await Promise.allSettled([...uniqueRoutes.values()].map((routeEntry) => {
+        return getRouteStops(
+            "NLB",
+            routeEntry.route,
+            getItemDirection(routeEntry) || "outbound",
+            getServiceType(routeEntry),
+            {
+                routeId: routeEntry.routeId,
+                serviceType: getServiceType(routeEntry)
+            }
+        );
+    }));
+
+    const stopIndex = new Map();
+
+    for (const result of results) {
+        if (result.status !== "fulfilled") {
+            continue;
+        }
+
+        appendStopIndexEntries(stopIndex, result.value.map((stop) => createStopIndexEntry("NLB", stop.stopId, stop)).filter(Boolean));
+    }
+
+    return stopIndex;
+}
+
+async function getKnownStopIndex(company) {
+    const normalizedCompany = getCompanyConfig(company).code;
+    const stopIndex = new Map();
+    const currentStopMap = getStopMapForCompany(normalizedCompany);
+
+    appendStopIndexEntries(
+        stopIndex,
+        [...currentStopMap.entries()]
+            .map(([stopId, stopInfo]) => createStopIndexEntry(normalizedCompany, stopId, stopInfo))
+            .filter(Boolean)
+    );
+
+    const stopInfoCachePromises = [...stopInfoCache.entries()]
+        .filter(([cacheKey]) => cacheKey.startsWith(`${normalizedCompany}|`))
+        .map(([, promise]) => promise.catch(() => null));
+
+    if (stopInfoCachePromises.length > 0) {
+        const stopInfos = await Promise.all(stopInfoCachePromises);
+        appendStopIndexEntries(
+            stopIndex,
+            stopInfos.map((stopInfo) => createStopIndexEntry(normalizedCompany, stopInfo?.stop, stopInfo)).filter(Boolean)
+        );
+    }
+
+    const routeStopCachePromises = [...routeStopCache.entries()]
+        .filter(([cacheKey]) => cacheKey.startsWith(`${normalizedCompany}|`))
+        .map(([, promise]) => promise.catch(() => []));
+
+    if (routeStopCachePromises.length > 0) {
+        const routeStopLists = await Promise.all(routeStopCachePromises);
+        appendStopIndexEntries(
+            stopIndex,
+            routeStopLists
+                .flat()
+                .map((stop) => createStopIndexEntry(normalizedCompany, stop?.stopId, stop))
+                .filter(Boolean)
+        );
+    }
+
+    return stopIndex;
+}
+
+async function getStopIndexByCompany(company) {
+    const normalizedCompany = getCompanyConfig(company).code;
+
+    if (!stopIndexPromiseByCompany.has(normalizedCompany)) {
+        const promise = (async () => {
+            if (getCompanyConfig(normalizedCompany).hasGlobalStopMap) {
+                try {
+                    const stopMap = await getStopMap(normalizedCompany);
+                    const stopIndex = new Map();
+                    appendStopIndexEntries(
+                        stopIndex,
+                        [...stopMap.entries()]
+                            .map(([stopId, stopInfo]) => createStopIndexEntry(normalizedCompany, stopId, stopInfo))
+                            .filter(Boolean)
+                    );
+                    return stopIndex;
+                } catch (error) {
+                    return getKnownStopIndex(normalizedCompany);
+                }
+            }
+
+            if (normalizedCompany === "NLB") {
+                return buildNlbStopIndex();
+            }
+
+            return getKnownStopIndex(normalizedCompany);
+        })()
+            .catch((error) => {
+                stopIndexPromiseByCompany.delete(normalizedCompany);
+                throw error;
+            });
+
+        stopIndexPromiseByCompany.set(normalizedCompany, promise);
+    }
+
+    return stopIndexPromiseByCompany.get(normalizedCompany);
 }
 
 async function getStopInfo(company, stopId) {
@@ -2344,36 +2786,214 @@ function ensureVariantDataBucket(variantKey) {
     return currentRenderState.variantDataByKey[variantKey];
 }
 
-// 站點 Modal 只列出同公司、同方向、且不是目前這條路線的其他車號，避免資訊過雜。
-function buildStopInfoRouteList(stopEtaEntries, currentVariant) {
-    const currentCompany = getItemCompany(currentVariant);
-    const currentDirection = getItemDirection(currentVariant);
-    const currentRoute = normalizeRouteCode(currentVariant?.route);
+// 站點資訊 Modal 需要保留「公司 + 路線 + 方向」這組唯一鍵，才能正確切回對應路線。
+// 站點資訊 Modal 會把 ETA / stop-route 回來的資料整理成「公司 + 路線 + 方向 + 終點」唯一組合，
+// 這樣同一路線不同班次不會重複列出，但如果終點或方向不同，仍會保留成不同按鈕。
+function buildStopInfoRouteList(routeEntries = [], fallbackEntries = []) {
     const uniqueRoutes = new Map();
+    const getRouteInfoScore = (routeInfo) => {
+        let score = 0;
+        if (routeInfo.destination) {
+            score += 40;
+        }
 
-    for (const entry of stopEtaEntries) {
+        if (routeInfo.direction) {
+            score += 20;
+        }
+
+        if (routeInfo.serviceType === "1") {
+            score += 10;
+        }
+
+        if (routeInfo.stopId) {
+            score += 5;
+        }
+
+        return score;
+    };
+
+    const collectRoute = (entry) => {
+        const company = getCompanyConfig(getItemCompany(entry)).code;
         const route = normalizeRouteCode(entry?.route);
-        if (!route || route === currentRoute) {
-            continue;
+        if (!company || !route) {
+            return;
         }
 
-        if (getItemCompany(entry) !== currentCompany || getItemDirection(entry) !== currentDirection) {
-            continue;
+        const direction = getItemDirection(entry);
+        const destination = getEntryDestinationLabel(entry);
+        const routeKey = [company, route, direction || "unknown"].join("|");
+        const nextValue = {
+            company,
+            route,
+            stopId: normalizeStopId(entry?.stop ?? entry?.stopId ?? ""),
+            direction,
+            serviceType: getServiceType(entry),
+            destination
+        };
+
+        const existingValue = uniqueRoutes.get(routeKey);
+        if (!existingValue) {
+            uniqueRoutes.set(routeKey, nextValue);
+            return;
         }
 
-        if (!uniqueRoutes.has(route)) {
-            uniqueRoutes.set(route, {
-                route,
-                company: currentCompany,
-                direction: currentDirection,
-                serviceType: getServiceType(entry)
-            });
-        }
-    }
+        const preferredValue = getRouteInfoScore(nextValue) > getRouteInfoScore(existingValue)
+            ? nextValue
+            : existingValue;
+        const fallbackValue = preferredValue === nextValue ? existingValue : nextValue;
+
+        uniqueRoutes.set(routeKey, {
+            ...preferredValue,
+            stopId: preferredValue.stopId || fallbackValue.stopId,
+            direction: preferredValue.direction || fallbackValue.direction,
+            serviceType: preferredValue.serviceType || fallbackValue.serviceType,
+            destination: preferredValue.destination || fallbackValue.destination
+        });
+    };
+
+    routeEntries.forEach(collectRoute);
+    fallbackEntries.forEach(collectRoute);
 
     return [...uniqueRoutes.values()].sort((left, right) => {
-        return left.route.localeCompare(right.route, "en", { numeric: true, sensitivity: "base" });
+        const leftCompanyOrder = COMPANY_ORDER[left.company] ?? COMPANY_ORDER.unknown;
+        const rightCompanyOrder = COMPANY_ORDER[right.company] ?? COMPANY_ORDER.unknown;
+        if (leftCompanyOrder !== rightCompanyOrder) {
+            return leftCompanyOrder - rightCompanyOrder;
+        }
+
+        const routeCompare = left.route.localeCompare(right.route, "en", { numeric: true, sensitivity: "base" });
+        if (routeCompare !== 0) {
+            return routeCompare;
+        }
+
+        const directionOrder = { outbound: 0, inbound: 1, unknown: 2 };
+        const leftDirectionOrder = directionOrder[left.direction || "unknown"] ?? 2;
+        const rightDirectionOrder = directionOrder[right.direction || "unknown"] ?? 2;
+        if (leftDirectionOrder !== rightDirectionOrder) {
+            return leftDirectionOrder - rightDirectionOrder;
+        }
+
+        return String(left.destination || "").localeCompare(String(right.destination || ""), "zh-HK");
     });
+}
+
+function formatDistanceInMeters(distanceMeters) {
+    return `${Math.max(0, Math.round(distanceMeters))}米`;
+}
+
+// route-stop 的 seq 已經跟目前方向一致，所以較大的 seq 可視為「往前」，反之則是「往後」。
+function getNearbyStopDirectionLabel(currentStop, nearbyStop, currentDirection) {
+    const currentSeq = Number(currentStop?.seq) || 0;
+    const nearbySeq = Number(nearbyStop?.seq) || 0;
+    if (!currentSeq || !nearbySeq || currentSeq === nearbySeq) {
+        return "";
+    }
+
+    if (currentDirection === "inbound" || currentDirection === "outbound") {
+        return nearbySeq > currentSeq ? "往前" : "往後";
+    }
+
+    return nearbySeq > currentSeq ? "往前" : "往後";
+}
+
+function getNearbyStopsForStopInfo(currentStop, selectedContext) {
+    const company = getItemCompany(selectedContext?.variant);
+    const stopMap = getStopMapForCompany(company);
+    const currentStopInfo = stopMap.get(normalizeStopId(currentStop?.stopId));
+    const currentCoordinates = getStopCoordinates(currentStopInfo);
+    if (!currentCoordinates) {
+        return [];
+    }
+
+    return (selectedContext?.variantData?.routeStopsWithEta || [])
+        .map((stop) => {
+            if (normalizeStopId(stop?.stopId) === normalizeStopId(currentStop?.stopId) && Number(stop?.seq) === Number(currentStop?.seq)) {
+                return null;
+            }
+
+            const stopInfo = stopMap.get(normalizeStopId(stop?.stopId));
+            const stopCoordinates = getStopCoordinates(stopInfo);
+            if (!stopCoordinates) {
+                return null;
+            }
+
+            const distanceMeters = Math.round(getDistanceInKm(
+                currentCoordinates.latitude,
+                currentCoordinates.longitude,
+                stopCoordinates.latitude,
+                stopCoordinates.longitude
+            ) * 1000);
+
+            if (distanceMeters > NEARBY_STOP_THRESHOLD_METERS) {
+                return null;
+            }
+
+            return {
+                stop,
+                stopName: getStopDisplayName(stop, company),
+                distanceMeters,
+                directionLabel: getNearbyStopDirectionLabel(currentStop, stop, getItemDirection(selectedContext.variant))
+            };
+        })
+        .filter(Boolean)
+        .sort((left, right) => {
+            if (left.distanceMeters !== right.distanceMeters) {
+                return left.distanceMeters - right.distanceMeters;
+            }
+
+            return Number(left.stop.seq) - Number(right.stop.seq);
+        });
+}
+
+async function getStopInfoRoutesForStop(stop, currentVariant, fallbackEntries = []) {
+    const company = getItemCompany(currentVariant);
+
+    try {
+        const stopEtaEntries = await getStopAllEta(company, stop.stopId);
+        return buildStopInfoRouteList(stopEtaEntries, currentVariant, fallbackEntries);
+    } catch (error) {
+        console.warn(`載入站點停靠車號失敗: ${normalizeStopId(stop?.stopId)}`, error);
+        return buildStopInfoRouteList([], currentVariant, fallbackEntries);
+    }
+}
+
+function renderStopInfoRouteButtons(routeInfos, stopId) {
+    if (!routeInfos.length) {
+        return '<p class="stop-info-modal-empty">目前沒有可顯示的車號</p>';
+    }
+
+    return `
+        <div class="stop-info-route-list">
+            ${routeInfos.map((routeInfo) => {
+                const encodedCompany = encodeURIComponent(routeInfo.company);
+                const encodedRoute = encodeURIComponent(routeInfo.route);
+                const encodedStopId = encodeURIComponent(stopId);
+                const encodedServiceType = encodeURIComponent(routeInfo.serviceType || "");
+
+                return `
+                    <button
+                        type="button"
+                        class="stop-info-route-btn"
+                        onclick="selectRouteFromStopInfo('${encodedCompany}', '${encodedRoute}', '${encodedStopId}', '${encodedServiceType}')"
+                    >
+                        ${renderCompanyChip(routeInfo.company)}
+                        <span class="stop-info-route-code">${escapeHtml(routeInfo.route)}</span>
+                    </button>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
+
+function renderStopInfoSection(title, contentHtml) {
+    return `
+        <section class="stop-info-section">
+            <div class="stop-info-section-header">
+                <h3 class="stop-info-section-title">${escapeHtml(title)}</h3>
+            </div>
+            ${contentHtml}
+        </section>
+    `;
 }
 
 function findVariantForAutoSelect(variants, autoSelectTarget = {}) {
@@ -2381,6 +3001,7 @@ function findVariantForAutoSelect(variants, autoSelectTarget = {}) {
     const normalizedRoute = normalizeRouteCode(autoSelectTarget.route);
     const normalizedDirection = normalizeDirection(autoSelectTarget.direction);
     const preferredServiceType = String(autoSelectTarget.serviceType || "").trim();
+    const preferredDestination = String(autoSelectTarget.destination || "").trim();
 
     return variants
         .filter((variant) => {
@@ -2389,6 +3010,12 @@ function findVariantForAutoSelect(variants, autoSelectTarget = {}) {
                 && (!normalizedDirection || getItemDirection(variant) === normalizedDirection);
         })
         .sort((left, right) => {
+            const leftDestinationMatch = preferredDestination && getEntryDestinationLabel(left) === preferredDestination ? 0 : 1;
+            const rightDestinationMatch = preferredDestination && getEntryDestinationLabel(right) === preferredDestination ? 0 : 1;
+            if (leftDestinationMatch !== rightDestinationMatch) {
+                return leftDestinationMatch - rightDestinationMatch;
+            }
+
             const leftPreferred = preferredServiceType && getServiceType(left) === preferredServiceType ? 0 : 1;
             const rightPreferred = preferredServiceType && getServiceType(right) === preferredServiceType ? 0 : 1;
 
@@ -2446,13 +3073,14 @@ async function autoSelectVariantAfterSearch(autoSelectTarget = null) {
     return true;
 }
 
-function selectRouteFromStopInfo(encodedRoute, encodedStopId, encodedServiceType = "") {
+function selectRouteFromStopInfo(encodedCompany, encodedRoute, encodedStopId, encodedServiceType = "") {
     const selectedContext = getSelectedVariantContext();
     const routeInput = document.getElementById("routeInput");
     if (!selectedContext || !routeInput) {
         return;
     }
 
+    const company = getCompanyConfig(decodeActionValue(encodedCompany)).code;
     const route = normalizeRouteCode(decodeActionValue(encodedRoute));
     const stopId = normalizeStopId(decodeActionValue(encodedStopId));
     const serviceType = String(decodeActionValue(encodedServiceType) || "").trim();
@@ -2466,7 +3094,7 @@ function selectRouteFromStopInfo(encodedRoute, encodedStopId, encodedServiceType
 
     void searchETA({
         autoSelectTarget: {
-            company: getItemCompany(selectedContext.variant),
+            company,
             route,
             direction: getItemDirection(selectedContext.variant),
             serviceType,
@@ -2492,48 +3120,53 @@ async function showStopInfoModal(encodedStopKey) {
     const requestId = ++activeStopInfoModalRequestId;
 
     renderStopInfoModalState({
-        title: "此站停靠車號",
+        title: "此站及附近停靠車號",
         subtitle: `${stopName} • 正在載入...`,
-        bodyHtml: '<p class="stop-info-modal-empty is-loading">正在整理此站停靠的車號...</p>'
+        bodyHtml: '<p class="stop-info-modal-empty is-loading">正在整理此站及附近停靠的車號...</p>'
     });
     openStopInfoModal();
 
     try {
-        const stopEtaEntries = await getStopAllEta(company, stop.stopId);
+        const fallbackEntries = [selectedContext.variant];
+        const nearbyStops = getNearbyStopsForStopInfo(stop, selectedContext);
+        const [sameStopRoutes, nearbyStopGroups] = await Promise.all([
+            getStopInfoRoutesForStop(stop, selectedContext.variant, fallbackEntries),
+            Promise.all(nearbyStops.map(async (nearbyStop) => ({
+                ...nearbyStop,
+                routes: await getStopInfoRoutesForStop(nearbyStop.stop, selectedContext.variant, fallbackEntries)
+            })))
+        ]);
+
         if (requestId !== activeStopInfoModalRequestId) {
             return;
         }
 
-        const routes = buildStopInfoRouteList(stopEtaEntries, selectedContext.variant);
-        if (routes.length === 0) {
-            renderStopInfoModalState({
-                title: "此站停靠車號",
-                subtitle: `${stopName} • ${getDirectionLabel(getItemDirection(selectedContext.variant))}`,
-                bodyHtml: '<p class="stop-info-modal-empty">目前此站沒有其他路線停靠</p>'
-            });
-            return;
-        }
+        const nearbyStopsHtml = nearbyStopGroups.length > 0
+            ? nearbyStopGroups.map((nearbyStop) => {
+                const metaParts = [`(${formatDistanceInMeters(nearbyStop.distanceMeters)})`];
+                if (nearbyStop.directionLabel) {
+                    metaParts.push(nearbyStop.directionLabel);
+                }
 
-        const bodyHtml = `
-            <div class="stop-info-route-list">
-                ${routes.map((routeInfo) => {
-                    const encodedRoute = encodeURIComponent(routeInfo.route);
-                    const encodedStopId = encodeURIComponent(stop.stopId);
-                    const encodedServiceType = encodeURIComponent(routeInfo.serviceType || "");
+                return `
+                    <div class="stop-info-nearby-stop-card">
+                        <div class="stop-info-nearby-stop-header">
+                            <div class="stop-info-nearby-stop-name">${escapeHtml(nearbyStop.stopName)}</div>
+                            <div class="stop-info-nearby-stop-meta">${escapeHtml(metaParts.join(" • "))}</div>
+                        </div>
+                        ${renderStopInfoRouteButtons(nearbyStop.routes, nearbyStop.stop.stopId)}
+                    </div>
+                `;
+            }).join("")
+            : '<p class="stop-info-modal-empty">20米內沒有其他相鄰站點</p>';
 
-                    return `
-                        <button
-                            type="button"
-                            class="stop-info-route-btn"
-                            onclick="selectRouteFromStopInfo('${encodedRoute}', '${encodedStopId}', '${encodedServiceType}')"
-                        >${escapeHtml(routeInfo.route)}</button>
-                    `;
-                }).join("")}
-            </div>
-        `;
+        const bodyHtml = [
+            renderStopInfoSection("本站停靠車號", renderStopInfoRouteButtons(sameStopRoutes, stop.stopId)),
+            renderStopInfoSection(`附近站（${NEARBY_STOP_THRESHOLD_METERS}米）停靠車號`, nearbyStopsHtml)
+        ].join("");
 
         renderStopInfoModalState({
-            title: "此站停靠車號",
+            title: "此站及附近停靠車號",
             subtitle: `${stopName} • ${getDirectionLabel(getItemDirection(selectedContext.variant))}`,
             bodyHtml
         });
@@ -2544,10 +3177,1880 @@ async function showStopInfoModal(encodedStopKey) {
 
         console.warn("載入站點停靠車號失敗", error);
         renderStopInfoModalState({
-            title: "此站停靠車號",
+            title: "此站及附近停靠車號",
             subtitle: stopName,
             bodyHtml: '<p class="stop-info-modal-empty">暫時無法載入此站路線資料，請稍後再試。</p>'
         });
+    }
+}
+
+let officialRouteCompanyIndexPromise = null;
+
+function getSortedCompanyCodes(companyCodes = []) {
+    return [...new Set(companyCodes.map((company) => getCompanyConfig(company).code).filter(Boolean))]
+        .sort((left, right) => {
+            return (COMPANY_ORDER[left] ?? COMPANY_ORDER.unknown) - (COMPANY_ORDER[right] ?? COMPANY_ORDER.unknown);
+        });
+}
+
+async function getOfficialRouteCompanyIndex() {
+    if (!officialRouteCompanyIndexPromise) {
+        officialRouteCompanyIndexPromise = (async () => {
+            const officialStops = await getOfficialBusStopIndex();
+            const routeCompanyIndex = new Map();
+
+            for (const stopEntry of officialStops) {
+                const routeEntries = Array.isArray(stopEntry?.routes) ? stopEntry.routes : [];
+
+                for (const routeEntry of routeEntries) {
+                    const route = normalizeRouteCode(routeEntry?.route);
+                    if (!route) {
+                        continue;
+                    }
+
+                    if (!routeCompanyIndex.has(route)) {
+                        routeCompanyIndex.set(route, new Set());
+                    }
+
+                    const companyHints = getOfficialStopCompanyHints(
+                        routeEntry?.companyCode || stopEntry?.companyCode || ""
+                    );
+                    companyHints.forEach((company) => {
+                        routeCompanyIndex.get(route).add(company);
+                    });
+                }
+            }
+
+            return routeCompanyIndex;
+        })().catch((error) => {
+            officialRouteCompanyIndexPromise = null;
+            throw error;
+        });
+    }
+
+    return officialRouteCompanyIndexPromise;
+}
+
+async function getRouteSearchCompanyCandidates(route) {
+    const fallbackCompanies = getSortedCompanyCodes(Object.keys(COMPANY_CONFIGS));
+
+    try {
+        const routeCompanyIndex = await getOfficialRouteCompanyIndex();
+        const companyHints = [...(routeCompanyIndex.get(normalizeRouteCode(route)) || new Set())];
+        return companyHints.length > 0
+            ? getSortedCompanyCodes(companyHints)
+            : fallbackCompanies;
+    } catch (error) {
+        console.warn("官方路線公司索引載入失敗，改用完整公司清單搜尋", error);
+        return fallbackCompanies;
+    }
+}
+
+async function searchETA(options = {}) {
+    const { isAutoRefresh = false, autoSelectTarget = null } = options;
+
+    if (isAutoRefresh) {
+        if (currentRenderState) {
+            await refreshVariantSummaries();
+        }
+
+        if (currentRenderState?.selectedVariantKey) {
+            await loadSelectedVariantData(currentRenderState.selectedVariantKey, { isAutoRefresh: true });
+        }
+        return;
+    }
+
+    const routeInput = document.getElementById("routeInput");
+    const resultDiv = document.getElementById("result");
+    const statusDiv = document.getElementById("status");
+    const searchBtn = document.getElementById("searchBtn");
+    const route = String(routeInput?.value || "").trim().toUpperCase();
+    const searchId = ++activeSearchId;
+
+    if (!route) {
+        statusDiv.innerHTML = '<span style="color:red">請輸入路線號，例如 1A、24、104。</span>';
+        resultDiv.innerHTML = "";
+        resetCurrentRouteState();
+        return;
+    }
+
+    resetCurrentRouteState();
+    statusDiv.innerHTML = `正在分析路線 <strong>${escapeHtml(route)}</strong>...`;
+    resultDiv.innerHTML = '<div class="loading">正在整理方向與公司資料...</div>';
+    searchBtn.disabled = true;
+    searchBtn.textContent = "查詢中...";
+
+    try {
+        const companies = await getRouteSearchCompanyCandidates(route);
+        const restrictedCompanies = companies.filter((company) => isCompanyRestrictedInLocalFileMode(company));
+
+        const routeListResults = await Promise.allSettled(companies.map(async (company) => ({
+            company,
+            routeList: await getRouteList(company)
+        })));
+
+        if (searchId !== activeSearchId) {
+            return;
+        }
+
+        const availableRouteLists = routeListResults
+            .filter((result) => result.status === "fulfilled")
+            .map((result) => result.value);
+
+        if (availableRouteLists.length === 0) {
+            throw routeListResults.find((result) => result.status === "rejected")?.reason || new Error("路線清單暫時無法載入");
+        }
+
+        const matchingRoutes = availableRouteLists.flatMap(({ routeList }) => {
+            return routeList.filter((entry) => normalizeRouteCode(entry?.route) === route);
+        });
+
+        if (!matchingRoutes.length) {
+            resetCurrentRouteState();
+            const restrictedMessage = restrictedCompanies.length > 0
+                ? ` ${getLocalModeRestrictionNotice(restrictedCompanies)}`
+                : "";
+            renderStandaloneError(
+                resultDiv,
+                `目前不支援路線 ${route}`,
+                `目前找不到這條路線，請確認路線號是否正確。${restrictedMessage}`
+            );
+            statusDiv.innerHTML = "目前不支援此路線";
+            return;
+        }
+
+        const expandedMatchingRoutes = await expandRouteEntriesForSearch(matchingRoutes);
+        if (searchId !== activeSearchId) {
+            return;
+        }
+
+        const variants = chooseRouteVariants(expandedMatchingRoutes);
+        if (!variants.length) {
+            resetCurrentRouteState();
+            renderStandaloneError(
+                resultDiv,
+                `路線 ${route} 暫時無法查詢`,
+                "目前找不到可用方向資料，請稍後再試。"
+            );
+            statusDiv.innerHTML = "找不到方向資料";
+            return;
+        }
+
+        currentRenderState = createRenderState(route, variants);
+
+        for (const variant of variants) {
+            const bucket = ensureVariantDataBucket(getVariantKey(variant));
+            bucket.isSummaryLoading = true;
+        }
+
+        renderCurrentState();
+
+        statusDiv.innerHTML = `已找到 ${variants.length} 個可用方向，正在整理班次摘要...`;
+        await refreshVariantSummaries();
+
+        if (!currentRenderState || currentRenderState.route !== route || searchId !== activeSearchId) {
+            return;
+        }
+
+        const autoSelectSucceeded = autoSelectTarget
+            ? await autoSelectVariantAfterSearch(autoSelectTarget)
+            : false;
+
+        if (!currentRenderState || currentRenderState.route !== route || searchId !== activeSearchId) {
+            return;
+        }
+
+        console.log(`[BUS ${APP_VERSION}] route search`, {
+            route,
+            companies: [...new Set(expandedMatchingRoutes.map((entry) => getItemCompany(entry)))],
+            variantCount: variants.length
+        });
+
+        if (autoSelectTarget && autoSelectSucceeded) {
+            return;
+        }
+
+        const localModeNotice = restrictedCompanies.length > 0
+            ? `。${getLocalModeRestrictionNotice(restrictedCompanies)}`
+            : "";
+        statusDiv.innerHTML = `已找到 ${variants.length} 個可用方向，並已同步載入班次摘要${localModeNotice}`;
+    } catch (error) {
+        console.error("Bus route search failed", error);
+        const friendlyErrorMessage = getFriendlyRouteErrorMessage(error);
+        resetCurrentRouteState();
+        renderStandaloneError(resultDiv, "查詢失敗", friendlyErrorMessage);
+        statusDiv.innerHTML = "查詢失敗";
+    } finally {
+        if (searchId === activeSearchId) {
+            searchBtn.disabled = false;
+            searchBtn.textContent = "查詢";
+        }
+    }
+}
+
+// 下方這組函式用新需求覆寫前面的站點 Modal 邏輯：
+// 以目前站點座標為中心，搜尋 20 米內所有公司可用站點，再分成本站 / 附近站顯示。
+
+function buildStopInfoRouteList(routeEntries = [], fallbackEntries = []) {
+    const uniqueRoutes = new Map();
+
+    const collectRoute = (entry) => {
+        const company = getCompanyConfig(getItemCompany(entry)).code;
+        const route = normalizeRouteCode(entry?.route);
+        if (!company || !route) {
+            return;
+        }
+
+        const direction = getItemDirection(entry);
+        const destination = getEntryDestinationLabel(entry);
+        const routeKey = [company, route, direction || "unknown", destination || ""].join("|");
+        const nextValue = {
+            company,
+            route,
+            stopId: normalizeStopId(entry?.stop ?? entry?.stopId ?? ""),
+            direction,
+            serviceType: getServiceType(entry),
+            destination
+        };
+
+        const existingValue = uniqueRoutes.get(routeKey);
+        if (!existingValue) {
+            uniqueRoutes.set(routeKey, nextValue);
+            return;
+        }
+
+        uniqueRoutes.set(routeKey, {
+            ...existingValue,
+            stopId: existingValue.stopId || nextValue.stopId,
+            direction: existingValue.direction || nextValue.direction,
+            serviceType: existingValue.serviceType || nextValue.serviceType,
+            destination: existingValue.destination || nextValue.destination
+        });
+    };
+
+    routeEntries.forEach(collectRoute);
+    fallbackEntries.forEach(collectRoute);
+
+    return [...uniqueRoutes.values()].sort((left, right) => {
+        const leftCompanyOrder = COMPANY_ORDER[left.company] ?? COMPANY_ORDER.unknown;
+        const rightCompanyOrder = COMPANY_ORDER[right.company] ?? COMPANY_ORDER.unknown;
+        if (leftCompanyOrder !== rightCompanyOrder) {
+            return leftCompanyOrder - rightCompanyOrder;
+        }
+
+        const routeCompare = left.route.localeCompare(right.route, "en", { numeric: true, sensitivity: "base" });
+        if (routeCompare !== 0) {
+            return routeCompare;
+        }
+
+        const directionOrder = { outbound: 0, inbound: 1, unknown: 2 };
+        const leftDirectionOrder = directionOrder[left.direction || "unknown"] ?? 2;
+        const rightDirectionOrder = directionOrder[right.direction || "unknown"] ?? 2;
+        if (leftDirectionOrder !== rightDirectionOrder) {
+            return leftDirectionOrder - rightDirectionOrder;
+        }
+
+        return String(left.destination || "").localeCompare(String(right.destination || ""), "zh-HK");
+    });
+}
+
+function formatDistanceInMeters(distanceMeters) {
+    return `${Math.max(0, Math.round(distanceMeters))}米`;
+}
+
+// 先用目前畫面已有的 stop map / stop info 取座標；缺資料時才補打一個單站 API。
+async function getStopInfoModalCenterCoordinates(stop, company) {
+    const normalizedCompany = getCompanyConfig(company).code;
+    const normalizedStopId = normalizeStopId(stop?.stopId);
+    const stopMap = getStopMapForCompany(normalizedCompany);
+    const stopInfo = stopMap.get(normalizedStopId);
+    const existingCoordinates = getStopCoordinates(stopInfo || stop);
+    if (existingCoordinates) {
+        return existingCoordinates;
+    }
+
+    try {
+        const fetchedStopInfo = await getStopInfo(normalizedCompany, normalizedStopId);
+        const fetchedCoordinates = getStopCoordinates(fetchedStopInfo);
+        if (!fetchedCoordinates) {
+            return null;
+        }
+
+        if (currentRenderState) {
+            currentRenderState.stopMapsByCompany ||= {};
+            currentRenderState.stopMapsByCompany[normalizedCompany] = mergeStopMaps(
+                normalizedCompany,
+                stopMap,
+                new Map([[normalizedStopId, fetchedStopInfo]])
+            );
+        }
+        return fetchedCoordinates;
+    } catch (error) {
+        console.warn(`讀取站點座標失敗: ${normalizedCompany} ${normalizedStopId}`, error);
+        return null;
+    }
+}
+
+function createNearbyStopCandidate(company, stopIndexEntry, centerCoordinates, currentStop, currentCompany) {
+    const normalizedCompany = getCompanyConfig(company).code;
+    const normalizedStopId = normalizeStopId(stopIndexEntry?.stopId ?? stopIndexEntry?.stop);
+    const coordinates = getStopCoordinates(stopIndexEntry);
+    if (!normalizedStopId || !coordinates) {
+        return null;
+    }
+
+    const distanceMeters = getDistanceInKm(
+        centerCoordinates.latitude,
+        centerCoordinates.longitude,
+        coordinates.latitude,
+        coordinates.longitude
+    ) * 1000;
+
+    if (distanceMeters > NEARBY_STOP_THRESHOLD_METERS) {
+        return null;
+    }
+
+    const isCurrentStop = normalizedCompany === currentCompany && normalizedStopId === normalizeStopId(currentStop?.stopId);
+    return {
+        company: normalizedCompany,
+        stopId: normalizedStopId,
+        stopName: stopIndexEntry?.name_tc || stopIndexEntry?.name_en || `站點 ${normalizedStopId}`,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        distanceMeters,
+        isCurrentStop,
+        isExactStop: isCurrentStop || distanceMeters <= 1
+    };
+}
+
+// KMB / CTB 直接走完整 stop map；NLB 會從 route-stop 建 stop index；
+// GMB 官方沒有全站 stop list，因此附近站搜尋會優先使用目前工作階段已載入過的 GMB 站點。
+async function getNearbyStopCandidates(currentStop, selectedContext, centerCoordinates) {
+    const currentCompany = getCompanyConfig(getItemCompany(selectedContext?.variant)).code;
+    const currentStopId = normalizeStopId(currentStop?.stopId);
+    const currentStopName = getStopDisplayName(currentStop, currentCompany);
+    const candidatesByKey = new Map();
+    const companyCodes = Object.keys(COMPANY_CONFIGS).sort((left, right) => {
+        return (COMPANY_ORDER[left] ?? COMPANY_ORDER.unknown) - (COMPANY_ORDER[right] ?? COMPANY_ORDER.unknown);
+    });
+
+    const currentStopCandidate = createNearbyStopCandidate(
+        currentCompany,
+        {
+            stopId: currentStopId,
+            name_tc: currentStopName,
+            latitude: centerCoordinates.latitude,
+            longitude: centerCoordinates.longitude
+        },
+        centerCoordinates,
+        currentStop,
+        currentCompany
+    );
+    if (currentStopCandidate) {
+        currentStopCandidate.isCurrentStop = true;
+        currentStopCandidate.isExactStop = true;
+        candidatesByKey.set(`${currentCompany}|${currentStopId}`, currentStopCandidate);
+    }
+
+    const stopIndexResults = await Promise.allSettled(companyCodes.map((company) => getStopIndexByCompany(company)));
+
+    stopIndexResults.forEach((result, index) => {
+        if (result.status !== "fulfilled" || !(result.value instanceof Map)) {
+            return;
+        }
+
+        const company = companyCodes[index];
+        for (const stopIndexEntry of result.value.values()) {
+            const candidate = createNearbyStopCandidate(company, stopIndexEntry, centerCoordinates, currentStop, currentCompany);
+            if (!candidate) {
+                continue;
+            }
+
+            const candidateKey = `${candidate.company}|${candidate.stopId}`;
+            const existingCandidate = candidatesByKey.get(candidateKey);
+            if (!existingCandidate) {
+                candidatesByKey.set(candidateKey, candidate);
+                continue;
+            }
+
+            candidatesByKey.set(candidateKey, {
+                ...existingCandidate,
+                stopName: existingCandidate.stopName || candidate.stopName,
+                distanceMeters: Math.min(existingCandidate.distanceMeters, candidate.distanceMeters),
+                isCurrentStop: existingCandidate.isCurrentStop || candidate.isCurrentStop,
+                isExactStop: existingCandidate.isExactStop || candidate.isExactStop
+            });
+        }
+    });
+
+    return [...candidatesByKey.values()].sort((left, right) => {
+        const leftExactOrder = left.isExactStop ? 0 : 1;
+        const rightExactOrder = right.isExactStop ? 0 : 1;
+        if (leftExactOrder !== rightExactOrder) {
+            return leftExactOrder - rightExactOrder;
+        }
+
+        if (left.distanceMeters !== right.distanceMeters) {
+            return left.distanceMeters - right.distanceMeters;
+        }
+
+        const leftCompanyOrder = COMPANY_ORDER[left.company] ?? COMPANY_ORDER.unknown;
+        const rightCompanyOrder = COMPANY_ORDER[right.company] ?? COMPANY_ORDER.unknown;
+        if (leftCompanyOrder !== rightCompanyOrder) {
+            return leftCompanyOrder - rightCompanyOrder;
+        }
+
+        return left.stopName.localeCompare(right.stopName, "zh-HK");
+    });
+}
+
+function getDestinationFromRouteEntry(routeEntry, direction) {
+    const normalizedDirection = normalizeDirection(direction);
+    if (normalizedDirection === "inbound") {
+        return String(routeEntry?.orig_tc || routeEntry?.orig_en || routeEntry?.dest_tc || routeEntry?.dest_en || "").trim();
+    }
+
+    return String(routeEntry?.dest_tc || routeEntry?.dest_en || routeEntry?.orig_tc || routeEntry?.orig_en || "").trim();
+}
+
+async function enrichStopInfoEntriesWithRouteMetadata(entries = []) {
+    const nextEntries = await Promise.all(entries.map(async (entry) => {
+        if (getEntryDestinationLabel(entry)) {
+            return entry;
+        }
+
+        const company = getCompanyConfig(getItemCompany(entry)).code;
+        const route = normalizeRouteCode(entry?.route);
+        if (!route) {
+            return entry;
+        }
+
+        if (company === "GMB" && entry?.routeId && entry?.routeSeq) {
+            try {
+                const routeMetadataMap = await getGmbRouteMetadata(entry.routeId);
+                const routeMetadata = routeMetadataMap.get(String(entry.routeSeq || "").trim()) || {};
+                const destination = String(routeMetadata.destinationTc || routeMetadata.destinationEn || "").trim();
+                return destination ? { ...entry, destination } : entry;
+            } catch (error) {
+                return entry;
+            }
+        }
+
+        try {
+            const routeList = await getRouteList(company);
+            const direction = getItemDirection(entry);
+            const matchingRoute = routeList.find((routeEntry) => {
+                return normalizeRouteCode(routeEntry?.route) === route
+                    && (!direction || !getItemDirection(routeEntry) || getItemDirection(routeEntry) === direction);
+            });
+            const destination = getDestinationFromRouteEntry(matchingRoute, direction);
+            return destination ? { ...entry, destination } : entry;
+        } catch (error) {
+            return entry;
+        }
+    }));
+
+    const missingDestinationEntries = nextEntries.filter((entry) => !getEntryDestinationLabel(entry));
+    if (missingDestinationEntries.length === 0) {
+        return nextEntries;
+    }
+
+    const destinationByRouteKey = new Map();
+    const uniqueMissingEntries = new Map();
+    for (const entry of missingDestinationEntries) {
+        const routeKey = [
+            getCompanyConfig(getItemCompany(entry)).code,
+            normalizeStopId(entry?.stop ?? entry?.stopId),
+            normalizeRouteCode(entry?.route),
+            getItemDirection(entry) || "unknown",
+            getServiceType(entry),
+            String(entry?.routeId || "").trim(),
+            String(entry?.routeSeq || "").trim(),
+            String(entry?.stopSeq ?? entry?.seq ?? "").trim()
+        ].join("|");
+
+        if (!uniqueMissingEntries.has(routeKey)) {
+            uniqueMissingEntries.set(routeKey, entry);
+        }
+    }
+
+    const fallbackResults = await Promise.all([...uniqueMissingEntries.entries()].map(async ([routeKey, entry]) => {
+        const company = getCompanyConfig(getItemCompany(entry)).code;
+        const route = normalizeRouteCode(entry?.route);
+        const stopId = normalizeStopId(entry?.stop ?? entry?.stopId);
+        if (!company || !route || !stopId) {
+            return null;
+        }
+
+        try {
+            const stopEtaEntries = await getStopEta(
+                company,
+                route,
+                getServiceType(entry),
+                stopId,
+                {
+                    routeId: String(entry?.routeId || "").trim(),
+                    routeSeq: String(entry?.routeSeq || "").trim(),
+                    stopSeq: String(entry?.stopSeq ?? entry?.seq ?? "").trim(),
+                    stopId,
+                    direction: getItemDirection(entry),
+                    serviceType: getServiceType(entry)
+                }
+            );
+
+            const matchedEntry = stopEtaEntries.find((stopEtaEntry) => {
+                return normalizeRouteCode(stopEtaEntry?.route) === route
+                    && (!getItemDirection(entry) || getItemDirection(stopEtaEntry) === getItemDirection(entry))
+                    && Boolean(getEntryDestinationLabel(stopEtaEntry));
+            });
+
+            if (!matchedEntry) {
+                return null;
+            }
+
+            return {
+                routeKey,
+                destination: getEntryDestinationLabel(matchedEntry)
+            };
+        } catch (error) {
+            return null;
+        }
+    }));
+
+    fallbackResults.forEach((result) => {
+        if (result?.routeKey && result.destination) {
+            destinationByRouteKey.set(result.routeKey, result.destination);
+        }
+    });
+
+    const directionFallbackByRoute = new Map();
+    const routeFallbackByCompanyRoute = new Map();
+    nextEntries.forEach((entry) => {
+        const destination = getEntryDestinationLabel(entry);
+        if (!destination) {
+            return;
+        }
+
+        const company = getCompanyConfig(getItemCompany(entry)).code;
+        const route = normalizeRouteCode(entry?.route);
+        const direction = getItemDirection(entry) || "unknown";
+        const directionKey = [company, route, direction].join("|");
+        const routeKey = [company, route].join("|");
+
+        if (!directionFallbackByRoute.has(directionKey)) {
+            directionFallbackByRoute.set(directionKey, destination);
+        }
+
+        if (!routeFallbackByCompanyRoute.has(routeKey)) {
+            routeFallbackByCompanyRoute.set(routeKey, destination);
+        }
+    });
+
+    return nextEntries.map((entry) => {
+        if (getEntryDestinationLabel(entry)) {
+            return entry;
+        }
+
+        const routeKey = [
+            getCompanyConfig(getItemCompany(entry)).code,
+            normalizeStopId(entry?.stop ?? entry?.stopId),
+            normalizeRouteCode(entry?.route),
+            getItemDirection(entry) || "unknown",
+            getServiceType(entry),
+            String(entry?.routeId || "").trim(),
+            String(entry?.routeSeq || "").trim(),
+            String(entry?.stopSeq ?? entry?.seq ?? "").trim()
+        ].join("|");
+        const company = getCompanyConfig(getItemCompany(entry)).code;
+        const route = normalizeRouteCode(entry?.route);
+        const direction = getItemDirection(entry) || "unknown";
+        const fallbackDestination = destinationByRouteKey.get(routeKey)
+            || directionFallbackByRoute.get([company, route, direction].join("|"))
+            || routeFallbackByCompanyRoute.get([company, route].join("|"))
+            || "";
+        return fallbackDestination ? { ...entry, destination: fallbackDestination } : entry;
+    });
+}
+
+function getStopInfoFallbackEntriesForCandidate(candidate, selectedContext) {
+    if (!candidate?.isCurrentStop || !selectedContext?.variant) {
+        return [];
+    }
+
+    return [{
+        company: getItemCompany(selectedContext.variant),
+        route: normalizeRouteCode(selectedContext.variant.route),
+        stop: candidate.stopId,
+        direction: getItemDirection(selectedContext.variant),
+        service_type: getServiceType(selectedContext.variant),
+        dest_tc: selectedContext.variant.dest_tc || "",
+        dest_en: selectedContext.variant.dest_en || ""
+    }];
+}
+
+async function getStopInfoRoutesForCandidate(candidate, selectedContext) {
+    const normalizedCompany = getCompanyConfig(candidate?.company).code;
+    const normalizedStopId = normalizeStopId(candidate?.stopId);
+    const fallbackEntries = getStopInfoFallbackEntriesForCandidate(candidate, selectedContext);
+    const [stopEtaResult, stopRouteResult] = await Promise.allSettled([
+        getStopAllEta(normalizedCompany, normalizedStopId),
+        getStopRouteList(normalizedCompany, normalizedStopId)
+    ]);
+
+    const stopEtaEntries = stopEtaResult.status === "fulfilled" ? stopEtaResult.value : [];
+    const stopRouteEntries = stopRouteResult.status === "fulfilled" ? stopRouteResult.value : [];
+
+    if (stopEtaResult.status !== "fulfilled" && stopRouteResult.status !== "fulfilled") {
+        console.warn(`載入站點車號失敗: ${normalizedCompany} ${normalizedStopId}`, stopEtaResult.reason || stopRouteResult.reason);
+    }
+
+    const enrichedEntries = await enrichStopInfoEntriesWithRouteMetadata([...stopEtaEntries, ...stopRouteEntries]);
+    return buildStopInfoRouteList(enrichedEntries, fallbackEntries);
+}
+
+function renderStopInfoRouteButtons(routeInfos) {
+    if (!routeInfos.length) {
+        return '<p class="stop-info-modal-empty">目前沒有可顯示的車號</p>';
+    }
+
+    return `
+        <div class="stop-info-route-list">
+            ${routeInfos.map((routeInfo) => {
+                const encodedCompany = encodeURIComponent(routeInfo.company);
+                const encodedRoute = encodeURIComponent(routeInfo.route);
+                const encodedStopId = encodeURIComponent(routeInfo.stopId || "");
+                const encodedDirection = encodeURIComponent(routeInfo.direction || "");
+                const encodedDestination = encodeURIComponent(routeInfo.destination || "");
+                const encodedServiceType = encodeURIComponent(routeInfo.serviceType || "");
+                const destinationText = routeInfo.destination ? `前往 ${routeInfo.destination}` : "終點資料暫缺";
+
+                return `
+                    <button
+                        type="button"
+                        class="stop-info-route-btn"
+                        onclick="selectRouteFromStopInfo('${encodedCompany}', '${encodedRoute}', '${encodedStopId}', '${encodedDirection}', '${encodedDestination}', '${encodedServiceType}')"
+                    >
+                        <span class="stop-info-route-main">
+                            ${renderCompanyChip(routeInfo.company)}
+                            <span class="stop-info-route-code">${escapeHtml(routeInfo.route)}</span>
+                        </span>
+                        <span class="stop-info-route-destination">${escapeHtml(destinationText)}</span>
+                    </button>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
+
+function selectRouteFromStopInfo(encodedCompany, encodedRoute, encodedStopId, encodedDirection, encodedDestination, encodedServiceType = "") {
+    const routeInput = document.getElementById("routeInput");
+    if (!routeInput) {
+        return;
+    }
+
+    const company = getCompanyConfig(decodeActionValue(encodedCompany)).code;
+    const route = normalizeRouteCode(decodeActionValue(encodedRoute));
+    const stopId = normalizeStopId(decodeActionValue(encodedStopId));
+    const direction = normalizeDirection(decodeActionValue(encodedDirection));
+    const destination = String(decodeActionValue(encodedDestination) || "").trim();
+    const serviceType = String(decodeActionValue(encodedServiceType) || "").trim();
+    if (!route) {
+        return;
+    }
+
+    closeStopInfoModal();
+    routeInput.value = route;
+    routeInput.focus();
+
+    void searchETA({
+        autoSelectTarget: {
+            company,
+            route,
+            direction,
+            destination,
+            serviceType,
+            stopId
+        }
+    });
+}
+
+async function showStopInfoModal(encodedStopKey) {
+    const selectedContext = getSelectedVariantContext();
+    if (!selectedContext) {
+        return;
+    }
+
+    const stopKey = decodeActionValue(encodedStopKey);
+    const stop = getSelectedVariantStopByKey(stopKey);
+    if (!stop) {
+        return;
+    }
+
+    const company = getItemCompany(selectedContext.variant);
+    const stopName = getStopDisplayName(stop, company);
+    const requestId = ++activeStopInfoModalRequestId;
+
+    renderStopInfoModalState({
+        title: "此站及附近停靠車號",
+        subtitle: `${stopName} • 正在整理附近站點...`,
+        bodyHtml: '<p class="stop-info-modal-empty is-loading">正在整理此站及 20 米內停靠的車號...</p>'
+    });
+    openStopInfoModal();
+
+    try {
+        const centerCoordinates = await getStopInfoModalCenterCoordinates(stop, company);
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        if (!centerCoordinates) {
+            renderStopInfoModalState({
+                title: "此站及附近停靠車號",
+                subtitle: stopName,
+                bodyHtml: '<p class="stop-info-modal-empty">暫時未能取得此站座標，稍後再試一次。</p>'
+            });
+            return;
+        }
+
+        const candidates = await getNearbyStopCandidates(stop, selectedContext, centerCoordinates);
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        const candidateResults = await Promise.all(candidates.map(async (candidate) => ({
+            ...candidate,
+            routes: await getStopInfoRoutesForCandidate(candidate, selectedContext)
+        })));
+
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        const sameStopRoutes = buildStopInfoRouteList(
+            candidateResults.filter((candidate) => candidate.isExactStop).flatMap((candidate) => candidate.routes)
+        );
+
+        const nearbyStopGroups = candidateResults
+            .filter((candidate) => !candidate.isExactStop && candidate.routes.length > 0)
+            .sort((left, right) => {
+                if (left.distanceMeters !== right.distanceMeters) {
+                    return left.distanceMeters - right.distanceMeters;
+                }
+
+                return left.stopName.localeCompare(right.stopName, "zh-HK");
+            });
+
+        const nearbyStopsHtml = nearbyStopGroups.length > 0
+            ? nearbyStopGroups.map((nearbyStop) => {
+                return `
+                    <div class="stop-info-nearby-stop-card">
+                        <div class="stop-info-nearby-stop-header">
+                            <div class="stop-info-nearby-stop-name">${escapeHtml(nearbyStop.stopName)}</div>
+                            <div class="stop-info-nearby-stop-meta">${escapeHtml(formatDistanceInMeters(nearbyStop.distanceMeters))}</div>
+                        </div>
+                        ${renderStopInfoRouteButtons(nearbyStop.routes)}
+                    </div>
+                `;
+            }).join("")
+            : `<p class="stop-info-modal-empty">目前 ${NEARBY_STOP_THRESHOLD_METERS} 米內沒有其他站點車號</p>`;
+
+        const bodyHtml = [
+            renderStopInfoSection("本站停靠車號、前往的終點", renderStopInfoRouteButtons(sameStopRoutes)),
+            renderStopInfoSection(`附近站（${NEARBY_STOP_THRESHOLD_METERS}米）停靠車號`, nearbyStopsHtml)
+        ].join("");
+
+        renderStopInfoModalState({
+            title: "此站及附近停靠車號",
+            subtitle: `${stopName} • 以本站座標為中心搜尋 ${NEARBY_STOP_THRESHOLD_METERS} 米`,
+            bodyHtml
+        });
+    } catch (error) {
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        console.warn("載入站點資訊 Modal 失敗", error);
+        renderStopInfoModalState({
+            title: "此站及附近停靠車號",
+            subtitle: stopName,
+            bodyHtml: '<p class="stop-info-modal-empty">暫時無法載入此站附近的車號資料，請稍後再試。</p>'
+        });
+    }
+}
+
+// 最終版路線整理器：
+// 1. 以「公司 + 路線號」去重，避免同一路線因為 stop-eta / stop-route / route list 不同來源而重複。
+// 2. 以「有終點資料」優先，再偏好目前查詢方向，最後才看 ETA / 班次等資訊。
+// 這個版本放在檔案較後面，會覆蓋前面舊的同名函式。
+function getStopInfoRouteInfoScore(routeInfo = {}, preferredDirection = "") {
+    let score = 0;
+
+    if (getEntryDestinationLabel(routeInfo)) {
+        score += 100;
+    }
+
+    if (preferredDirection && getItemDirection(routeInfo) === preferredDirection) {
+        score += 20;
+    }
+
+    if (hasUsableEta(routeInfo)) {
+        score += 10;
+    }
+
+    if (getServiceType(routeInfo) === "1") {
+        score += 5;
+    }
+
+    if (normalizeStopId(routeInfo?.stop ?? routeInfo?.stopId)) {
+        score += 2;
+    }
+
+    return score;
+}
+
+function buildStopInfoRouteList(routeEntries = [], fallbackEntries = []) {
+    const selectedVariant = currentRenderState?.selectedVariantKey
+        ? findVariantByKey(currentRenderState.selectedVariantKey)
+        : null;
+    const preferredDirection = getItemDirection(selectedVariant);
+    const uniqueRoutes = new Map();
+
+    const collectRoute = (entry) => {
+        const company = getCompanyConfig(getItemCompany(entry)).code;
+        const route = normalizeRouteCode(entry?.route);
+        if (!company || !route) {
+            return;
+        }
+
+        const nextValue = {
+            company,
+            route,
+            stopId: normalizeStopId(entry?.stop ?? entry?.stopId ?? ""),
+            direction: getItemDirection(entry),
+            serviceType: getServiceType(entry),
+            destination: getEntryDestinationLabel(entry),
+            eta: entry?.eta || ""
+        };
+
+        const routeKey = `${company}|${route}`;
+        const existingValue = uniqueRoutes.get(routeKey);
+        if (!existingValue) {
+            uniqueRoutes.set(routeKey, nextValue);
+            return;
+        }
+
+        const nextScore = getStopInfoRouteInfoScore(nextValue, preferredDirection);
+        const existingScore = getStopInfoRouteInfoScore(existingValue, preferredDirection);
+        const preferredValue = nextScore > existingScore ? nextValue : existingValue;
+        const fallbackValue = preferredValue === nextValue ? existingValue : nextValue;
+
+        uniqueRoutes.set(routeKey, {
+            ...preferredValue,
+            stopId: preferredValue.stopId || fallbackValue.stopId,
+            direction: preferredValue.direction || fallbackValue.direction,
+            serviceType: preferredValue.serviceType || fallbackValue.serviceType,
+            destination: preferredValue.destination || fallbackValue.destination,
+            eta: preferredValue.eta || fallbackValue.eta || ""
+        });
+    };
+
+    routeEntries.forEach(collectRoute);
+    fallbackEntries.forEach(collectRoute);
+
+    return [...uniqueRoutes.values()].sort((left, right) => {
+        const leftCompanyOrder = COMPANY_ORDER[left.company] ?? COMPANY_ORDER.unknown;
+        const rightCompanyOrder = COMPANY_ORDER[right.company] ?? COMPANY_ORDER.unknown;
+        if (leftCompanyOrder !== rightCompanyOrder) {
+            return leftCompanyOrder - rightCompanyOrder;
+        }
+
+        return left.route.localeCompare(right.route, "en", { numeric: true, sensitivity: "base" });
+    });
+}
+
+function sanitizeOfficialStopName(value) {
+    const cleanedValue = String(value || "")
+        .replace(/<br\s*\/?>/ig, " / ")
+        .replace(/&nbsp;/ig, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    if (!cleanedValue) {
+        return "";
+    }
+
+    const parts = cleanedValue.split("/").map((part) => part.trim()).filter(Boolean);
+    return parts.length > 0 ? parts[parts.length - 1] : cleanedValue;
+}
+
+function normalizeStopInfoNameForMatch(value) {
+    return sanitizeOfficialStopName(value)
+        .replace(/[()（）,，、./／\-\s]/g, "")
+        .toLowerCase();
+}
+
+function stopInfoNamesLikelyMatch(left, right) {
+    const normalizedLeft = normalizeStopInfoNameForMatch(left);
+    const normalizedRight = normalizeStopInfoNameForMatch(right);
+    if (!normalizedLeft || !normalizedRight) {
+        return false;
+    }
+
+    return normalizedLeft === normalizedRight
+        || normalizedLeft.includes(normalizedRight)
+        || normalizedRight.includes(normalizedLeft);
+}
+
+function getOfficialStopCompanyHints(companyCode, preferredCompany = "") {
+    const companyPartMap = {
+        KMB: "KMB",
+        CTB: "CTB",
+        NLB: "NLB",
+        GMB: "GMB",
+        NWFB: "CTB"
+    };
+    const normalizedPreferredCompany = getCompanyConfig(preferredCompany).code;
+    const companyHints = [...new Set(
+        String(companyCode || "")
+            .toUpperCase()
+            .split("+")
+            .map((companyPart) => companyPartMap[String(companyPart || "").trim()] || "")
+            .filter((companyPart) => companyPart && COMPANY_CONFIGS[companyPart])
+    )];
+
+    if (normalizedPreferredCompany && companyHints.includes(normalizedPreferredCompany)) {
+        return [
+            normalizedPreferredCompany,
+            ...companyHints.filter((companyPart) => companyPart !== normalizedPreferredCompany)
+        ];
+    }
+
+    return companyHints;
+}
+
+function getOfficialStopCompanyLabels(companyCode) {
+    return String(companyCode || "")
+        .toUpperCase()
+        .split("+")
+        .map((companyPart) => String(companyPart || "").trim())
+        .filter(Boolean);
+}
+
+function renderStopInfoCompanyBadges(companyCode) {
+    const companyLabels = getOfficialStopCompanyLabels(companyCode);
+    if (companyLabels.length === 0) {
+        return "";
+    }
+
+    return `
+        <span class="stop-info-route-company-group">
+            ${companyLabels.map((companyLabel) => {
+                if (COMPANY_CONFIGS[companyLabel]) {
+                    return renderCompanyChip(companyLabel);
+                }
+
+                return `<span class="inline-chip company-chip is-neutral">${escapeHtml(companyLabel)}</span>`;
+            }).join("")}
+        </span>
+    `;
+}
+
+function getRouteInfoDestinationMatchScore(routeInfo = {}, normalizedDestination = "") {
+    if (!normalizedDestination) {
+        return 0;
+    }
+
+    const normalizedRouteDestination = normalizeTerminusLabel(routeInfo?.destination || "");
+    if (!normalizedRouteDestination) {
+        return 0;
+    }
+
+    if (normalizedRouteDestination === normalizedDestination) {
+        return 3;
+    }
+
+    if (normalizedRouteDestination.includes(normalizedDestination) || normalizedDestination.includes(normalizedRouteDestination)) {
+        return 2;
+    }
+
+    return 0;
+}
+
+function buildStopInfoRouteListFromOfficial(routeEntries = [], { preferredCompany = "" } = {}) {
+    const normalizedPreferredCompany = getCompanyConfig(preferredCompany).code;
+    const uniqueRoutes = new Map();
+
+    for (const routeEntry of routeEntries) {
+        const companyDisplayCode = String(routeEntry?.companyCode || routeEntry?.company || "").trim().toUpperCase();
+        const companyHints = getOfficialStopCompanyHints(companyDisplayCode, normalizedPreferredCompany);
+        const route = normalizeRouteCode(routeEntry?.route);
+        const destination = String(routeEntry?.destination || routeEntry?.dest_tc || routeEntry?.dest_en || "").trim();
+        const direction = normalizeDirection(routeEntry?.direction);
+
+        if (!companyDisplayCode || !route || companyHints.length === 0) {
+            continue;
+        }
+
+        const routeKey = [companyDisplayCode, route, destination || direction || "unknown"].join("|");
+        const nextValue = {
+            company: companyHints[0],
+            companyDisplayCode,
+            companyHints,
+            route,
+            direction,
+            destination,
+            serviceType: "1",
+            stopId: ""
+        };
+        const existingValue = uniqueRoutes.get(routeKey);
+        if (!existingValue) {
+            uniqueRoutes.set(routeKey, nextValue);
+            continue;
+        }
+
+        const preferredValue = existingValue.destination || !nextValue.destination
+            ? existingValue
+            : nextValue;
+        const fallbackValue = preferredValue === existingValue ? nextValue : existingValue;
+
+        uniqueRoutes.set(routeKey, {
+            ...preferredValue,
+            companyHints: preferredValue.companyHints.length > 0 ? preferredValue.companyHints : fallbackValue.companyHints,
+            destination: preferredValue.destination || fallbackValue.destination,
+            direction: preferredValue.direction || fallbackValue.direction
+        });
+    }
+
+    return [...uniqueRoutes.values()].sort((left, right) => {
+        const leftCompanyOrder = COMPANY_ORDER[left.companyHints[0]] ?? COMPANY_ORDER.unknown;
+        const rightCompanyOrder = COMPANY_ORDER[right.companyHints[0]] ?? COMPANY_ORDER.unknown;
+        if (leftCompanyOrder !== rightCompanyOrder) {
+            return leftCompanyOrder - rightCompanyOrder;
+        }
+
+        if (left.route !== right.route) {
+            return left.route.localeCompare(right.route, "en", { numeric: true, sensitivity: "base" });
+        }
+
+        return left.destination.localeCompare(right.destination, "zh-HK");
+    });
+}
+
+async function getOfficialBusStopIndex() {
+    if (!officialBusStopIndexPromise) {
+        officialBusStopIndexPromise = fetch(`${OFFICIAL_BUS_STOP_INDEX_URL}?v=${encodeURIComponent(APP_VERSION)}`)
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`官方巴士站索引載入失敗 (${response.status})`);
+                }
+
+                return response.json();
+            })
+            .then((payload) => Array.isArray(payload?.stops) ? payload.stops : [])
+            .catch((error) => {
+                officialBusStopIndexPromise = null;
+                throw error;
+            });
+    }
+
+    return officialBusStopIndexPromise;
+}
+
+function loadOfficialBusStopIndexFromScriptTag() {
+    if (Array.isArray(window.__OFFICIAL_BUS_STOP_INDEX__?.stops)) {
+        return Promise.resolve(window.__OFFICIAL_BUS_STOP_INDEX__.stops);
+    }
+
+    if (!officialBusStopIndexScriptPromise) {
+        officialBusStopIndexScriptPromise = new Promise((resolve, reject) => {
+            const handleResolve = () => {
+                if (Array.isArray(window.__OFFICIAL_BUS_STOP_INDEX__?.stops)) {
+                    resolve(window.__OFFICIAL_BUS_STOP_INDEX__.stops);
+                    return;
+                }
+
+                reject(new Error("官方巴士站索引腳本已載入，但未找到可用資料"));
+            };
+            const handleReject = () => {
+                reject(new Error("官方巴士站索引腳本載入失敗"));
+            };
+            const existingScript = document.querySelector('script[data-official-stop-index="true"]');
+
+            if (existingScript) {
+                if (existingScript.dataset.loaded === "true") {
+                    handleResolve();
+                    return;
+                }
+
+                existingScript.addEventListener("load", handleResolve, { once: true });
+                existingScript.addEventListener("error", handleReject, { once: true });
+                return;
+            }
+
+            const script = document.createElement("script");
+            script.src = `${OFFICIAL_BUS_STOP_INDEX_SCRIPT_URL}?v=${encodeURIComponent(APP_VERSION)}`;
+            script.async = true;
+            script.defer = true;
+            script.dataset.officialStopIndex = "true";
+            script.onload = () => {
+                script.dataset.loaded = "true";
+                handleResolve();
+            };
+            script.onerror = handleReject;
+
+            (document.head || document.body || document.documentElement).appendChild(script);
+        }).catch((error) => {
+            officialBusStopIndexScriptPromise = null;
+            throw error;
+        });
+    }
+
+    return officialBusStopIndexScriptPromise;
+}
+
+async function getOfficialBusStopIndex() {
+    if (Array.isArray(window.__OFFICIAL_BUS_STOP_INDEX__?.stops)) {
+        return window.__OFFICIAL_BUS_STOP_INDEX__.stops;
+    }
+
+    if (!officialBusStopIndexPromise) {
+        officialBusStopIndexPromise = (async () => {
+            if (isLocalFileOrigin()) {
+                return loadOfficialBusStopIndexFromScriptTag();
+            }
+
+            try {
+                const response = await fetch(`${OFFICIAL_BUS_STOP_INDEX_URL}?v=${encodeURIComponent(APP_VERSION)}`);
+                if (!response.ok) {
+                    throw new Error(`官方巴士站索引載入失敗 (${response.status})`);
+                }
+
+                const payload = await response.json();
+                return Array.isArray(payload?.stops) ? payload.stops : [];
+            } catch (error) {
+                return loadOfficialBusStopIndexFromScriptTag();
+            }
+        })().catch((error) => {
+            officialBusStopIndexPromise = null;
+            throw error;
+        });
+    }
+
+    return officialBusStopIndexPromise;
+}
+
+async function getOfficialNearbyStopCandidates(centerCoordinates, currentStopName) {
+    const officialStops = await getOfficialBusStopIndex();
+    const candidates = officialStops
+        .map((stopEntry) => {
+            const distanceMeters = Math.round(getDistanceInKm(
+                centerCoordinates.latitude,
+                centerCoordinates.longitude,
+                Number(stopEntry.latitude),
+                Number(stopEntry.longitude)
+            ) * 1000);
+
+            if (distanceMeters > NEARBY_STOP_THRESHOLD_METERS) {
+                return null;
+            }
+
+            const stopName = sanitizeOfficialStopName(stopEntry.nameTc || stopEntry.nameEn || "");
+            const isExactStop = distanceMeters <= SAME_STOP_THRESHOLD_METERS
+                || stopInfoNamesLikelyMatch(currentStopName, stopName);
+
+            return {
+                companyCode: String(stopEntry.companyCode || "").trim().toUpperCase(),
+                stopId: String(stopEntry.stopId || "").trim(),
+                stopName,
+                distanceMeters,
+                isExactStop,
+                routes: Array.isArray(stopEntry.routes) ? stopEntry.routes : []
+            };
+        })
+        .filter(Boolean)
+        .sort((left, right) => {
+            if (left.distanceMeters !== right.distanceMeters) {
+                return left.distanceMeters - right.distanceMeters;
+            }
+
+            const leftCompanyOrder = COMPANY_ORDER[left.companyCode] ?? COMPANY_ORDER.unknown;
+            const rightCompanyOrder = COMPANY_ORDER[right.companyCode] ?? COMPANY_ORDER.unknown;
+            if (leftCompanyOrder !== rightCompanyOrder) {
+                return leftCompanyOrder - rightCompanyOrder;
+            }
+
+            return left.stopName.localeCompare(right.stopName, "zh-HK");
+        });
+
+    if (candidates.length > 0 && !candidates.some((candidate) => candidate.isExactStop)) {
+        const closestDistance = candidates[0].distanceMeters;
+        candidates.forEach((candidate) => {
+            if (candidate.distanceMeters === closestDistance) {
+                candidate.isExactStop = true;
+            }
+        });
+    }
+
+    return candidates;
+}
+
+function buildCurrentVariantOfficialFallback(selectedContext) {
+    if (!selectedContext?.variant) {
+        return [];
+    }
+
+    return [{
+        companyCode: getItemCompany(selectedContext.variant),
+        route: normalizeRouteCode(selectedContext.variant.route),
+        direction: getItemDirection(selectedContext.variant),
+        destination: getEntryDestinationLabel(selectedContext.variant)
+    }];
+}
+
+function renderStopInfoRouteButtons(routeInfos) {
+    if (!routeInfos.length) {
+        return '<p class="stop-info-modal-empty">目前此站沒有可顯示的車號資料</p>';
+    }
+
+    return `
+        <div class="stop-info-route-list">
+            ${routeInfos.map((routeInfo) => {
+                const encodedCompanyValue = encodeURIComponent(JSON.stringify(routeInfo.companyHints || [routeInfo.company]));
+                const encodedRoute = encodeURIComponent(routeInfo.route);
+                const encodedStopId = encodeURIComponent(routeInfo.stopId || "");
+                const encodedDirection = encodeURIComponent(routeInfo.direction || "");
+                const encodedDestination = encodeURIComponent(routeInfo.destination || "");
+                const encodedServiceType = encodeURIComponent(routeInfo.serviceType || "");
+                const destinationText = routeInfo.destination ? `前往 ${routeInfo.destination}` : "前往資料暫缺";
+
+                return `
+                    <button
+                        type="button"
+                        class="stop-info-route-btn"
+                        onclick="selectRouteFromStopInfo('${encodedCompanyValue}', '${encodedRoute}', '${encodedStopId}', '${encodedDirection}', '${encodedDestination}', '${encodedServiceType}')"
+                    >
+                        <span class="stop-info-route-main">
+                            ${renderStopInfoCompanyBadges(routeInfo.companyDisplayCode || routeInfo.company)}
+                            <span class="stop-info-route-code">${escapeHtml(routeInfo.route)}</span>
+                        </span>
+                        <span class="stop-info-route-destination">${escapeHtml(destinationText)}</span>
+                    </button>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
+
+function selectRouteFromStopInfo(encodedCompanyValue, encodedRoute, encodedStopId, encodedDirection, encodedDestination, encodedServiceType = "") {
+    const routeInput = document.getElementById("routeInput");
+    if (!routeInput) {
+        return;
+    }
+
+    const decodedCompanyValue = decodeActionValue(encodedCompanyValue);
+    let companyHints = [];
+    if (decodedCompanyValue) {
+        try {
+            const parsedValue = JSON.parse(decodedCompanyValue);
+            if (Array.isArray(parsedValue)) {
+                companyHints = parsedValue
+                    .map((company) => getCompanyConfig(company).code)
+                    .filter((company, index, array) => company && array.indexOf(company) === index);
+            }
+        } catch (error) {
+            companyHints = getOfficialStopCompanyHints(decodedCompanyValue);
+        }
+    }
+
+    const route = normalizeRouteCode(decodeActionValue(encodedRoute));
+    const stopId = normalizeStopId(decodeActionValue(encodedStopId));
+    const direction = normalizeDirection(decodeActionValue(encodedDirection));
+    const destination = String(decodeActionValue(encodedDestination) || "").trim();
+    const serviceType = String(decodeActionValue(encodedServiceType) || "").trim();
+    if (!route) {
+        return;
+    }
+
+    closeStopInfoModal();
+    routeInput.value = route;
+    routeInput.focus();
+
+    void searchETA({
+        autoSelectTarget: {
+            company: companyHints[0] || "",
+            companyHints,
+            route,
+            direction,
+            destination,
+            serviceType,
+            stopId
+        }
+    });
+}
+
+function findVariantForAutoSelect(variants, autoSelectTarget = {}) {
+    const normalizedRoute = normalizeRouteCode(autoSelectTarget.route);
+    const normalizedDirection = normalizeDirection(autoSelectTarget.direction);
+    const preferredServiceType = String(autoSelectTarget.serviceType || "").trim();
+    const normalizedDestination = normalizeTerminusLabel(autoSelectTarget.destination);
+    const companyHints = [...new Set(
+        (Array.isArray(autoSelectTarget.companyHints) ? autoSelectTarget.companyHints : [])
+            .map((company) => getCompanyConfig(company).code)
+            .filter(Boolean)
+    )];
+    const normalizedCompanyHints = companyHints.length > 0
+        ? companyHints
+        : (autoSelectTarget.company ? [getCompanyConfig(autoSelectTarget.company).code] : []);
+
+    return variants
+        .filter((variant) => {
+            const variantCompany = getItemCompany(variant);
+            if (normalizedCompanyHints.length > 0 && !normalizedCompanyHints.includes(variantCompany)) {
+                return false;
+            }
+
+            if (normalizeRouteCode(variant.route) !== normalizedRoute) {
+                return false;
+            }
+
+            if (normalizedDirection && getItemDirection(variant) !== normalizedDirection) {
+                return false;
+            }
+
+            if (!normalizedDestination) {
+                return true;
+            }
+
+            const variantDestination = normalizeTerminusLabel(getEntryDestinationLabel(variant));
+            const variantOrigin = normalizeTerminusLabel(variant?.orig_tc || variant?.orig_en || "");
+            return variantDestination === normalizedDestination
+                || variantDestination.includes(normalizedDestination)
+                || normalizedDestination.includes(variantDestination)
+                || variantOrigin === normalizedDestination;
+        })
+        .sort((left, right) => {
+            const leftCompanyIndex = normalizedCompanyHints.length > 0
+                ? normalizedCompanyHints.indexOf(getItemCompany(left))
+                : 0;
+            const rightCompanyIndex = normalizedCompanyHints.length > 0
+                ? normalizedCompanyHints.indexOf(getItemCompany(right))
+                : 0;
+            const normalizedLeftCompanyIndex = leftCompanyIndex >= 0 ? leftCompanyIndex : 999;
+            const normalizedRightCompanyIndex = rightCompanyIndex >= 0 ? rightCompanyIndex : 999;
+            if (normalizedLeftCompanyIndex !== normalizedRightCompanyIndex) {
+                return normalizedLeftCompanyIndex - normalizedRightCompanyIndex;
+            }
+
+            const leftDestinationScore = getRouteInfoDestinationMatchScore({
+                destination: getEntryDestinationLabel(left)
+            }, normalizedDestination);
+            const rightDestinationScore = getRouteInfoDestinationMatchScore({
+                destination: getEntryDestinationLabel(right)
+            }, normalizedDestination);
+            if (leftDestinationScore !== rightDestinationScore) {
+                return rightDestinationScore - leftDestinationScore;
+            }
+
+            const leftPreferred = preferredServiceType && getServiceType(left) === preferredServiceType ? 0 : 1;
+            const rightPreferred = preferredServiceType && getServiceType(right) === preferredServiceType ? 0 : 1;
+            if (leftPreferred !== rightPreferred) {
+                return leftPreferred - rightPreferred;
+            }
+
+            return compareVariantsBase(left, right);
+        })[0] || null;
+}
+
+async function showStopInfoModal(encodedStopKey) {
+    const selectedContext = getSelectedVariantContext();
+    if (!selectedContext) {
+        return;
+    }
+
+    const stopKey = decodeActionValue(encodedStopKey);
+    const stop = getSelectedVariantStopByKey(stopKey);
+    if (!stop) {
+        return;
+    }
+
+    const company = getItemCompany(selectedContext.variant);
+    const stopName = getStopDisplayName(stop, company);
+    const requestId = ++activeStopInfoModalRequestId;
+
+    renderStopInfoModalState({
+        title: "此站及附近停靠車號",
+        subtitle: `${stopName} • 正在整理官方站位資料...`,
+        bodyHtml: '<p class="stop-info-modal-empty is-loading">正在以本站座標為中心整理 20 米內各公司站位與車號...</p>'
+    });
+    openStopInfoModal();
+
+    try {
+        const centerCoordinates = await getStopInfoModalCenterCoordinates(stop, company);
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        if (!centerCoordinates) {
+            renderStopInfoModalState({
+                title: "此站及附近停靠車號",
+                subtitle: stopName,
+                bodyHtml: '<p class="stop-info-modal-empty">暫時無法取得本站座標，未能整理附近站點資料。</p>'
+            });
+            return;
+        }
+
+        const candidates = await getOfficialNearbyStopCandidates(centerCoordinates, stopName);
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        const sameStopRouteInfos = buildStopInfoRouteListFromOfficial(
+            [
+                ...candidates.filter((candidate) => candidate.isExactStop).flatMap((candidate) => candidate.routes),
+                ...buildCurrentVariantOfficialFallback(selectedContext)
+            ],
+            {
+                preferredCompany: getItemCompany(selectedContext.variant)
+            }
+        );
+
+        const nearbyStopGroups = candidates
+            .filter((candidate) => !candidate.isExactStop)
+            .map((candidate) => ({
+                ...candidate,
+                routeInfos: buildStopInfoRouteListFromOfficial(candidate.routes, {
+                    preferredCompany: getItemCompany(selectedContext.variant)
+                })
+            }))
+            .filter((candidate) => candidate.routeInfos.length > 0)
+            .sort((left, right) => {
+                if (left.distanceMeters !== right.distanceMeters) {
+                    return left.distanceMeters - right.distanceMeters;
+                }
+
+                return left.stopName.localeCompare(right.stopName, "zh-HK");
+            });
+
+        const nearbyStopsHtml = nearbyStopGroups.length > 0
+            ? nearbyStopGroups.map((nearbyStop) => {
+                return `
+                    <div class="stop-info-nearby-stop-card">
+                        <div class="stop-info-nearby-stop-header">
+                            <div class="stop-info-nearby-stop-name">${escapeHtml(nearbyStop.stopName)}</div>
+                            <div class="stop-info-nearby-stop-meta">${escapeHtml(formatDistanceInMeters(nearbyStop.distanceMeters))}</div>
+                        </div>
+                        ${renderStopInfoRouteButtons(nearbyStop.routeInfos)}
+                    </div>
+                `;
+            }).join("")
+            : `<p class="stop-info-modal-empty">目前 ${NEARBY_STOP_THRESHOLD_METERS} 米內沒有其他站點車號</p>`;
+
+        const bodyHtml = [
+            renderStopInfoSection("本站停靠車號、前往的終點", renderStopInfoRouteButtons(sameStopRouteInfos)),
+            renderStopInfoSection(`附近站（${NEARBY_STOP_THRESHOLD_METERS}米）停靠車號`, nearbyStopsHtml)
+        ].join("");
+
+        renderStopInfoModalState({
+            title: "此站及附近停靠車號",
+            subtitle: `${stopName} • 以本站座標為中心搜尋 ${NEARBY_STOP_THRESHOLD_METERS} 米`,
+            bodyHtml
+        });
+    } catch (error) {
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        console.warn("載入站點資訊 Modal 失敗", error);
+        renderStopInfoModalState({
+            title: "此站及附近停靠車號",
+            subtitle: stopName,
+            bodyHtml: '<p class="stop-info-modal-empty">暫時無法載入本站及附近站點資料，請稍後再試。</p>'
+        });
+    }
+}
+
+let officialRouteCompanyIndexTailPromise = null;
+
+async function getRouteSearchCompanyCandidatesTail(route) {
+    const fallbackCompanies = getSortedCompanyCodes(Object.keys(COMPANY_CONFIGS));
+
+    try {
+        if (!officialRouteCompanyIndexTailPromise) {
+            officialRouteCompanyIndexTailPromise = (async () => {
+                const officialStops = await getOfficialBusStopIndex();
+                const routeCompanyIndex = new Map();
+
+                for (const stopEntry of officialStops) {
+                    const routeEntries = Array.isArray(stopEntry?.routes) ? stopEntry.routes : [];
+
+                    for (const routeEntry of routeEntries) {
+                        const routeCode = normalizeRouteCode(routeEntry?.route);
+                        if (!routeCode) {
+                            continue;
+                        }
+
+                        if (!routeCompanyIndex.has(routeCode)) {
+                            routeCompanyIndex.set(routeCode, new Set());
+                        }
+
+                        const companyHints = getOfficialStopCompanyHints(
+                            routeEntry?.companyCode || stopEntry?.companyCode || ""
+                        );
+                        companyHints.forEach((company) => {
+                            routeCompanyIndex.get(routeCode).add(company);
+                        });
+                    }
+                }
+
+                return routeCompanyIndex;
+            })().catch((error) => {
+                officialRouteCompanyIndexTailPromise = null;
+                throw error;
+            });
+        }
+
+        const routeCompanyIndex = await officialRouteCompanyIndexTailPromise;
+        const companyHints = [...(routeCompanyIndex.get(normalizeRouteCode(route)) || new Set())];
+        return companyHints.length > 0
+            ? getSortedCompanyCodes(companyHints)
+            : fallbackCompanies;
+    } catch (error) {
+        console.warn("官方路線公司索引載入失敗，改用完整公司清單搜尋", error);
+        return fallbackCompanies;
+    }
+}
+
+async function searchETA(options = {}) {
+    const { isAutoRefresh = false, autoSelectTarget = null } = options;
+
+    if (isAutoRefresh) {
+        if (currentRenderState) {
+            await refreshVariantSummaries();
+        }
+
+        if (currentRenderState?.selectedVariantKey) {
+            await loadSelectedVariantData(currentRenderState.selectedVariantKey, { isAutoRefresh: true });
+        }
+        return;
+    }
+
+    const routeInput = document.getElementById("routeInput");
+    const resultDiv = document.getElementById("result");
+    const statusDiv = document.getElementById("status");
+    const searchBtn = document.getElementById("searchBtn");
+    const route = String(routeInput?.value || "").trim().toUpperCase();
+    const searchId = ++activeSearchId;
+
+    if (!route) {
+        statusDiv.innerHTML = '<span style="color:red">請輸入路線號，例如 1A、24、104。</span>';
+        resultDiv.innerHTML = "";
+        resetCurrentRouteState();
+        return;
+    }
+
+    resetCurrentRouteState();
+    statusDiv.innerHTML = `正在分析路線 <strong>${escapeHtml(route)}</strong>...`;
+    resultDiv.innerHTML = '<div class="loading">正在整理方向與公司資料...</div>';
+    searchBtn.disabled = true;
+    searchBtn.textContent = "查詢中...";
+
+    try {
+        const companies = await getRouteSearchCompanyCandidatesTail(route);
+        const restrictedCompanies = companies.filter((company) => isCompanyRestrictedInLocalFileMode(company));
+
+        const routeListResults = await Promise.allSettled(companies.map(async (company) => ({
+            company,
+            routeList: await getRouteList(company)
+        })));
+
+        if (searchId !== activeSearchId) {
+            return;
+        }
+
+        const availableRouteLists = routeListResults
+            .filter((result) => result.status === "fulfilled")
+            .map((result) => result.value);
+
+        if (availableRouteLists.length === 0) {
+            throw routeListResults.find((result) => result.status === "rejected")?.reason || new Error("路線清單暫時無法載入");
+        }
+
+        const matchingRoutes = availableRouteLists.flatMap(({ routeList }) => {
+            return routeList.filter((entry) => normalizeRouteCode(entry?.route) === route);
+        });
+
+        if (!matchingRoutes.length) {
+            resetCurrentRouteState();
+            const restrictedMessage = restrictedCompanies.length > 0
+                ? ` ${getLocalModeRestrictionNotice(restrictedCompanies)}`
+                : "";
+            renderStandaloneError(
+                resultDiv,
+                `目前不支援路線 ${route}`,
+                `目前找不到這條路線，請確認路線號是否正確。${restrictedMessage}`
+            );
+            statusDiv.innerHTML = "目前不支援此路線";
+            return;
+        }
+
+        const expandedMatchingRoutes = await expandRouteEntriesForSearch(matchingRoutes);
+        if (searchId !== activeSearchId) {
+            return;
+        }
+
+        const variants = chooseRouteVariants(expandedMatchingRoutes);
+        if (!variants.length) {
+            resetCurrentRouteState();
+            renderStandaloneError(
+                resultDiv,
+                `路線 ${route} 暫時無法查詢`,
+                "目前找不到可用方向資料，請稍後再試。"
+            );
+            statusDiv.innerHTML = "找不到方向資料";
+            return;
+        }
+
+        currentRenderState = createRenderState(route, variants);
+
+        for (const variant of variants) {
+            const bucket = ensureVariantDataBucket(getVariantKey(variant));
+            bucket.isSummaryLoading = true;
+        }
+
+        renderCurrentState();
+
+        statusDiv.innerHTML = `已找到 ${variants.length} 個可用方向，正在整理班次摘要...`;
+        await refreshVariantSummaries();
+
+        if (!currentRenderState || currentRenderState.route !== route || searchId !== activeSearchId) {
+            return;
+        }
+
+        const autoSelectSucceeded = autoSelectTarget
+            ? await autoSelectVariantAfterSearch(autoSelectTarget)
+            : false;
+
+        if (!currentRenderState || currentRenderState.route !== route || searchId !== activeSearchId) {
+            return;
+        }
+
+        console.log(`[BUS ${APP_VERSION}] route search`, {
+            route,
+            companies: [...new Set(expandedMatchingRoutes.map((entry) => getItemCompany(entry)))],
+            variantCount: variants.length
+        });
+
+        if (autoSelectTarget && autoSelectSucceeded) {
+            return;
+        }
+
+        const localModeNotice = restrictedCompanies.length > 0
+            ? `。${getLocalModeRestrictionNotice(restrictedCompanies)}`
+            : "";
+        statusDiv.innerHTML = `已找到 ${variants.length} 個可用方向，並已同步載入班次摘要${localModeNotice}`;
+    } catch (error) {
+        console.error("Bus route search failed", error);
+        const friendlyErrorMessage = getFriendlyRouteErrorMessage(error);
+        resetCurrentRouteState();
+        renderStandaloneError(resultDiv, "查詢失敗", friendlyErrorMessage);
+        statusDiv.innerHTML = "查詢失敗";
+    } finally {
+        if (searchId === activeSearchId) {
+            searchBtn.disabled = false;
+            searchBtn.textContent = "查詢";
+        }
+    }
+}
+
+let officialRouteCompanyIndexForSearchPromise = null;
+
+async function getRouteSearchCompanyCandidatesFinal(route) {
+    const fallbackCompanies = getSortedCompanyCodes(Object.keys(COMPANY_CONFIGS));
+
+    try {
+        if (!officialRouteCompanyIndexForSearchPromise) {
+            officialRouteCompanyIndexForSearchPromise = (async () => {
+                const officialStops = await getOfficialBusStopIndex();
+                const routeCompanyIndex = new Map();
+
+                for (const stopEntry of officialStops) {
+                    const routeEntries = Array.isArray(stopEntry?.routes) ? stopEntry.routes : [];
+
+                    for (const routeEntry of routeEntries) {
+                        const routeCode = normalizeRouteCode(routeEntry?.route);
+                        if (!routeCode) {
+                            continue;
+                        }
+
+                        if (!routeCompanyIndex.has(routeCode)) {
+                            routeCompanyIndex.set(routeCode, new Set());
+                        }
+
+                        const companyHints = getOfficialStopCompanyHints(
+                            routeEntry?.companyCode || stopEntry?.companyCode || ""
+                        );
+                        companyHints.forEach((company) => {
+                            routeCompanyIndex.get(routeCode).add(company);
+                        });
+                    }
+                }
+
+                return routeCompanyIndex;
+            })().catch((error) => {
+                officialRouteCompanyIndexForSearchPromise = null;
+                throw error;
+            });
+        }
+
+        const routeCompanyIndex = await officialRouteCompanyIndexForSearchPromise;
+        const companyHints = [...(routeCompanyIndex.get(normalizeRouteCode(route)) || new Set())];
+        return companyHints.length > 0
+            ? getSortedCompanyCodes(companyHints)
+            : fallbackCompanies;
+    } catch (error) {
+        console.warn("官方路線公司索引載入失敗，改用完整公司清單搜尋", error);
+        return fallbackCompanies;
+    }
+}
+
+async function searchETA(options = {}) {
+    const { isAutoRefresh = false, autoSelectTarget = null } = options;
+
+    if (isAutoRefresh) {
+        if (currentRenderState) {
+            await refreshVariantSummaries();
+        }
+
+        if (currentRenderState?.selectedVariantKey) {
+            await loadSelectedVariantData(currentRenderState.selectedVariantKey, { isAutoRefresh: true });
+        }
+        return;
+    }
+
+    const routeInput = document.getElementById("routeInput");
+    const resultDiv = document.getElementById("result");
+    const statusDiv = document.getElementById("status");
+    const searchBtn = document.getElementById("searchBtn");
+    const route = String(routeInput?.value || "").trim().toUpperCase();
+    const searchId = ++activeSearchId;
+
+    if (!route) {
+        statusDiv.innerHTML = '<span style="color:red">請輸入路線號，例如 1A、24、104。</span>';
+        resultDiv.innerHTML = "";
+        resetCurrentRouteState();
+        return;
+    }
+
+    resetCurrentRouteState();
+    statusDiv.innerHTML = `正在分析路線 <strong>${escapeHtml(route)}</strong>...`;
+    resultDiv.innerHTML = '<div class="loading">正在整理方向與公司資料...</div>';
+    searchBtn.disabled = true;
+    searchBtn.textContent = "查詢中...";
+
+    try {
+        const companies = await getRouteSearchCompanyCandidatesFinal(route);
+        const restrictedCompanies = companies.filter((company) => isCompanyRestrictedInLocalFileMode(company));
+
+        const routeListResults = await Promise.allSettled(companies.map(async (company) => ({
+            company,
+            routeList: await getRouteList(company)
+        })));
+
+        if (searchId !== activeSearchId) {
+            return;
+        }
+
+        const availableRouteLists = routeListResults
+            .filter((result) => result.status === "fulfilled")
+            .map((result) => result.value);
+
+        if (availableRouteLists.length === 0) {
+            throw routeListResults.find((result) => result.status === "rejected")?.reason || new Error("路線清單暫時無法載入");
+        }
+
+        const matchingRoutes = availableRouteLists.flatMap(({ routeList }) => {
+            return routeList.filter((entry) => normalizeRouteCode(entry?.route) === route);
+        });
+
+        if (!matchingRoutes.length) {
+            resetCurrentRouteState();
+            const restrictedMessage = restrictedCompanies.length > 0
+                ? ` ${getLocalModeRestrictionNotice(restrictedCompanies)}`
+                : "";
+            renderStandaloneError(
+                resultDiv,
+                `目前不支援路線 ${route}`,
+                `目前找不到這條路線，請確認路線號是否正確。${restrictedMessage}`
+            );
+            statusDiv.innerHTML = "目前不支援此路線";
+            return;
+        }
+
+        const expandedMatchingRoutes = await expandRouteEntriesForSearch(matchingRoutes);
+        if (searchId !== activeSearchId) {
+            return;
+        }
+
+        const variants = chooseRouteVariants(expandedMatchingRoutes);
+        if (!variants.length) {
+            resetCurrentRouteState();
+            renderStandaloneError(
+                resultDiv,
+                `路線 ${route} 暫時無法查詢`,
+                "目前找不到可用方向資料，請稍後再試。"
+            );
+            statusDiv.innerHTML = "找不到方向資料";
+            return;
+        }
+
+        currentRenderState = createRenderState(route, variants);
+
+        for (const variant of variants) {
+            const bucket = ensureVariantDataBucket(getVariantKey(variant));
+            bucket.isSummaryLoading = true;
+        }
+
+        renderCurrentState();
+
+        statusDiv.innerHTML = `已找到 ${variants.length} 個可用方向，正在整理班次摘要...`;
+        await refreshVariantSummaries();
+
+        if (!currentRenderState || currentRenderState.route !== route || searchId !== activeSearchId) {
+            return;
+        }
+
+        const autoSelectSucceeded = autoSelectTarget
+            ? await autoSelectVariantAfterSearch(autoSelectTarget)
+            : false;
+
+        if (!currentRenderState || currentRenderState.route !== route || searchId !== activeSearchId) {
+            return;
+        }
+
+        console.log(`[BUS ${APP_VERSION}] route search`, {
+            route,
+            companies: [...new Set(expandedMatchingRoutes.map((entry) => getItemCompany(entry)))],
+            variantCount: variants.length
+        });
+
+        if (autoSelectTarget && autoSelectSucceeded) {
+            return;
+        }
+
+        const localModeNotice = restrictedCompanies.length > 0
+            ? `。${getLocalModeRestrictionNotice(restrictedCompanies)}`
+            : "";
+        statusDiv.innerHTML = `已找到 ${variants.length} 個可用方向，並已同步載入班次摘要${localModeNotice}`;
+    } catch (error) {
+        console.error("Bus route search failed", error);
+        const friendlyErrorMessage = getFriendlyRouteErrorMessage(error);
+        resetCurrentRouteState();
+        renderStandaloneError(resultDiv, "查詢失敗", friendlyErrorMessage);
+        statusDiv.innerHTML = "查詢失敗";
+    } finally {
+        if (searchId === activeSearchId) {
+            searchBtn.disabled = false;
+            searchBtn.textContent = "查詢";
+        }
     }
 }
 
@@ -3271,3 +5774,549 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("beforeunload", () => {
     stopLiveUpdates();
 });
+
+// Final stop-info modal rewrite:
+// Use the official static stop index as the single source of truth for
+// "which routes stop here / nearby", and only use the normal route search
+// flow after the user clicks a route card.
+
+function formatDistanceInMeters(distanceMeters) {
+    return `${Math.max(0, Math.round(Number(distanceMeters) || 0))}米`;
+}
+
+function renderStopInfoSection(title, contentHtml) {
+    return `
+        <section class="stop-info-section">
+            <h3 class="stop-info-section-title">${escapeHtml(title)}</h3>
+            ${contentHtml}
+        </section>
+    `;
+}
+
+function stopInfoBuildCurrentRouteFallback(selectedContext, stop) {
+    if (!selectedContext?.variant) {
+        return [];
+    }
+
+    return [{
+        companyCode: getItemCompany(selectedContext.variant),
+        route: normalizeRouteCode(selectedContext.variant.route),
+        direction: getItemDirection(selectedContext.variant),
+        destination: getEntryDestinationLabel(selectedContext.variant),
+        serviceType: getServiceType(selectedContext.variant),
+        stopId: normalizeStopId(stop?.stopId)
+    }];
+}
+
+function stopInfoGetRouteEntryScore(routeInfo = {}, preferredCompany = "") {
+    let score = 0;
+
+    if (routeInfo.destination) {
+        score += 20;
+    }
+
+    if (routeInfo.stopId) {
+        score += 10;
+    }
+
+    if (routeInfo.direction) {
+        score += 5;
+    }
+
+    if (preferredCompany && (routeInfo.companyHints || []).includes(preferredCompany)) {
+        score += 1;
+    }
+
+    return score;
+}
+
+function buildStopInfoRouteListFromOfficial(routeEntries = [], { preferredCompany = "" } = {}) {
+    const normalizedPreferredCompany = getCompanyConfig(preferredCompany).code;
+    const uniqueRoutes = new Map();
+
+    for (const routeEntry of routeEntries) {
+        const companyDisplayCode = String(routeEntry?.companyCode || routeEntry?.company || "").trim().toUpperCase();
+        const companyHints = getOfficialStopCompanyHints(companyDisplayCode, normalizedPreferredCompany);
+        const route = normalizeRouteCode(routeEntry?.route);
+        const direction = normalizeDirection(routeEntry?.direction);
+        const destination = String(
+            routeEntry?.destination
+            || routeEntry?.dest_tc
+            || routeEntry?.dest_en
+            || ""
+        ).trim();
+        const stopId = normalizeStopId(routeEntry?.stopId || routeEntry?.stop || "");
+        const serviceType = String(routeEntry?.serviceType || routeEntry?.service_type || "1").trim() || "1";
+
+        if (!companyDisplayCode || !route || companyHints.length === 0) {
+            continue;
+        }
+
+        const routeKey = [
+            companyDisplayCode,
+            route,
+            direction || "unknown",
+            normalizeTerminusLabel(destination) || "unknown"
+        ].join("|");
+
+        const nextValue = {
+            company: companyHints[0],
+            companyDisplayCode,
+            companyHints,
+            route,
+            direction,
+            destination,
+            serviceType,
+            stopId
+        };
+        const existingValue = uniqueRoutes.get(routeKey);
+
+        if (!existingValue) {
+            uniqueRoutes.set(routeKey, nextValue);
+            continue;
+        }
+
+        const nextScore = stopInfoGetRouteEntryScore(nextValue, normalizedPreferredCompany);
+        const existingScore = stopInfoGetRouteEntryScore(existingValue, normalizedPreferredCompany);
+        const preferredValue = nextScore > existingScore ? nextValue : existingValue;
+        const fallbackValue = preferredValue === nextValue ? existingValue : nextValue;
+
+        uniqueRoutes.set(routeKey, {
+            ...preferredValue,
+            companyHints: preferredValue.companyHints.length > 0 ? preferredValue.companyHints : fallbackValue.companyHints,
+            destination: preferredValue.destination || fallbackValue.destination,
+            direction: preferredValue.direction || fallbackValue.direction,
+            stopId: preferredValue.stopId || fallbackValue.stopId
+        });
+    }
+
+    return [...uniqueRoutes.values()].sort((left, right) => {
+        const leftCompanyOrder = COMPANY_ORDER[left.companyHints[0]] ?? COMPANY_ORDER.unknown;
+        const rightCompanyOrder = COMPANY_ORDER[right.companyHints[0]] ?? COMPANY_ORDER.unknown;
+        if (leftCompanyOrder !== rightCompanyOrder) {
+            return leftCompanyOrder - rightCompanyOrder;
+        }
+
+        if (left.route !== right.route) {
+            return left.route.localeCompare(right.route, "en", { numeric: true, sensitivity: "base" });
+        }
+
+        const leftDirectionOrder = left.direction === "outbound" ? 0 : left.direction === "inbound" ? 1 : 2;
+        const rightDirectionOrder = right.direction === "outbound" ? 0 : right.direction === "inbound" ? 1 : 2;
+        if (leftDirectionOrder !== rightDirectionOrder) {
+            return leftDirectionOrder - rightDirectionOrder;
+        }
+
+        return left.destination.localeCompare(right.destination, "zh-HK");
+    });
+}
+
+function loadOfficialBusStopIndexFromScriptTag() {
+    if (Array.isArray(window.__OFFICIAL_BUS_STOP_INDEX__?.stops)) {
+        return Promise.resolve(window.__OFFICIAL_BUS_STOP_INDEX__.stops);
+    }
+
+    if (!officialBusStopIndexScriptPromise) {
+        officialBusStopIndexScriptPromise = new Promise((resolve, reject) => {
+            const resolveFromWindow = () => {
+                if (Array.isArray(window.__OFFICIAL_BUS_STOP_INDEX__?.stops)) {
+                    resolve(window.__OFFICIAL_BUS_STOP_INDEX__.stops);
+                    return;
+                }
+
+                reject(new Error("官方巴士站索引腳本已載入，但沒有可用資料"));
+            };
+            const rejectLoad = () => {
+                reject(new Error("官方巴士站索引腳本載入失敗"));
+            };
+            const existingScript = document.querySelector('script[data-official-stop-index="true"]');
+
+            if (existingScript) {
+                if (Array.isArray(window.__OFFICIAL_BUS_STOP_INDEX__?.stops)) {
+                    resolveFromWindow();
+                    return;
+                }
+
+                existingScript.addEventListener("load", resolveFromWindow, { once: true });
+                existingScript.addEventListener("error", rejectLoad, { once: true });
+                window.setTimeout(resolveFromWindow, 0);
+                return;
+            }
+
+            const script = document.createElement("script");
+            script.src = `${OFFICIAL_BUS_STOP_INDEX_SCRIPT_URL}?v=${encodeURIComponent(APP_VERSION)}`;
+            script.async = true;
+            script.defer = true;
+            script.dataset.officialStopIndex = "true";
+            script.onload = resolveFromWindow;
+            script.onerror = rejectLoad;
+            (document.head || document.body || document.documentElement).appendChild(script);
+        }).catch((error) => {
+            officialBusStopIndexScriptPromise = null;
+            throw error;
+        });
+    }
+
+    return officialBusStopIndexScriptPromise;
+}
+
+async function getOfficialBusStopIndex() {
+    if (Array.isArray(window.__OFFICIAL_BUS_STOP_INDEX__?.stops)) {
+        return window.__OFFICIAL_BUS_STOP_INDEX__.stops;
+    }
+
+    if (!officialBusStopIndexPromise) {
+        officialBusStopIndexPromise = loadOfficialBusStopIndexFromScriptTag().catch((error) => {
+            officialBusStopIndexPromise = null;
+            throw error;
+        });
+    }
+
+    return officialBusStopIndexPromise;
+}
+
+async function getOfficialNearbyStopCandidates(centerCoordinates, currentStopName) {
+    const officialStops = await getOfficialBusStopIndex();
+    const candidates = officialStops
+        .map((stopEntry) => {
+            const latitude = Number(stopEntry?.latitude);
+            const longitude = Number(stopEntry?.longitude);
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+                return null;
+            }
+
+            const distanceMeters = Math.round(getDistanceInKm(
+                centerCoordinates.latitude,
+                centerCoordinates.longitude,
+                latitude,
+                longitude
+            ) * 1000);
+
+            if (distanceMeters > NEARBY_STOP_THRESHOLD_METERS) {
+                return null;
+            }
+
+            const stopName = sanitizeOfficialStopName(stopEntry?.nameTc || stopEntry?.nameEn || "");
+            const isExactStop = distanceMeters <= SAME_STOP_THRESHOLD_METERS
+                || stopInfoNamesLikelyMatch(currentStopName, stopName);
+
+            return {
+                companyCode: String(stopEntry?.companyCode || "").trim().toUpperCase(),
+                stopId: normalizeStopId(stopEntry?.stopId),
+                stopName,
+                distanceMeters,
+                isExactStop,
+                routes: (Array.isArray(stopEntry?.routes) ? stopEntry.routes : []).map((routeEntry) => ({
+                    ...routeEntry,
+                    companyCode: String(routeEntry?.companyCode || stopEntry?.companyCode || "").trim().toUpperCase(),
+                    stopId: normalizeStopId(stopEntry?.stopId),
+                    stopName
+                }))
+            };
+        })
+        .filter(Boolean)
+        .sort((left, right) => {
+            if (left.distanceMeters !== right.distanceMeters) {
+                return left.distanceMeters - right.distanceMeters;
+            }
+
+            const leftCompanyOrder = COMPANY_ORDER[left.companyCode] ?? COMPANY_ORDER.unknown;
+            const rightCompanyOrder = COMPANY_ORDER[right.companyCode] ?? COMPANY_ORDER.unknown;
+            if (leftCompanyOrder !== rightCompanyOrder) {
+                return leftCompanyOrder - rightCompanyOrder;
+            }
+
+            return left.stopName.localeCompare(right.stopName, "zh-HK");
+        });
+
+    if (candidates.length > 0 && !candidates.some((candidate) => candidate.isExactStop)) {
+        const closestDistance = candidates[0].distanceMeters;
+        candidates.forEach((candidate) => {
+            if (candidate.distanceMeters === closestDistance) {
+                candidate.isExactStop = true;
+            }
+        });
+    }
+
+    return candidates;
+}
+
+function renderStopInfoRouteButtons(routeInfos) {
+    if (!routeInfos.length) {
+        return '<p class="stop-info-modal-empty">目前沒有可顯示的車號資料</p>';
+    }
+
+    return `
+        <div class="stop-info-route-list">
+            ${routeInfos.map((routeInfo) => {
+                const encodedCompanyValue = encodeURIComponent(JSON.stringify(routeInfo.companyHints || [routeInfo.company]));
+                const encodedRoute = encodeURIComponent(routeInfo.route);
+                const encodedStopId = encodeURIComponent(routeInfo.stopId || "");
+                const encodedDirection = encodeURIComponent(routeInfo.direction || "");
+                const encodedDestination = encodeURIComponent(routeInfo.destination || "");
+                const encodedServiceType = encodeURIComponent(routeInfo.serviceType || "");
+                const destinationText = routeInfo.destination ? `前往 ${routeInfo.destination}` : "前往資料暫缺";
+
+                return `
+                    <button
+                        type="button"
+                        class="stop-info-route-btn"
+                        onclick="selectRouteFromStopInfo('${encodedCompanyValue}', '${encodedRoute}', '${encodedStopId}', '${encodedDirection}', '${encodedDestination}', '${encodedServiceType}')"
+                    >
+                        <span class="stop-info-route-main">
+                            ${renderStopInfoCompanyBadges(routeInfo.companyDisplayCode || routeInfo.company)}
+                            <span class="stop-info-route-code">${escapeHtml(routeInfo.route)}</span>
+                        </span>
+                        <span class="stop-info-route-destination">${escapeHtml(destinationText)}</span>
+                    </button>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
+
+function selectRouteFromStopInfo(encodedCompanyValue, encodedRoute, encodedStopId, encodedDirection, encodedDestination, encodedServiceType = "") {
+    const routeInput = document.getElementById("routeInput");
+    if (!routeInput) {
+        return;
+    }
+
+    let companyHints = [];
+    try {
+        const parsedValue = JSON.parse(decodeActionValue(encodedCompanyValue));
+        if (Array.isArray(parsedValue)) {
+            companyHints = [...new Set(
+                parsedValue
+                    .map((company) => getCompanyConfig(company).code)
+                    .filter(Boolean)
+            )];
+        }
+    } catch (error) {
+        companyHints = getOfficialStopCompanyHints(decodeActionValue(encodedCompanyValue));
+    }
+
+    const route = normalizeRouteCode(decodeActionValue(encodedRoute));
+    const stopId = normalizeStopId(decodeActionValue(encodedStopId));
+    const direction = normalizeDirection(decodeActionValue(encodedDirection));
+    const destination = String(decodeActionValue(encodedDestination) || "").trim();
+    const serviceType = String(decodeActionValue(encodedServiceType) || "").trim();
+    if (!route) {
+        return;
+    }
+
+    closeStopInfoModal();
+    routeInput.value = route;
+    routeInput.focus();
+
+    void searchETA({
+        autoSelectTarget: {
+            company: companyHints[0] || "",
+            companyHints,
+            route,
+            direction,
+            destination,
+            serviceType,
+            stopId
+        }
+    });
+}
+
+function getStopInfoVariantMatchScore(variant, autoSelectTarget = {}) {
+    const normalizedDirection = normalizeDirection(autoSelectTarget.direction);
+    const normalizedDestination = normalizeTerminusLabel(autoSelectTarget.destination);
+    const preferredServiceType = String(autoSelectTarget.serviceType || "").trim();
+    const companyHints = [...new Set(
+        (Array.isArray(autoSelectTarget.companyHints) ? autoSelectTarget.companyHints : [])
+            .map((company) => getCompanyConfig(company).code)
+            .filter(Boolean)
+    )];
+
+    let score = 0;
+    const variantCompany = getItemCompany(variant);
+    const companyIndex = companyHints.indexOf(variantCompany);
+    if (companyIndex >= 0) {
+        score += 100 - companyIndex * 10;
+    }
+
+    if (normalizedDirection && getItemDirection(variant) === normalizedDirection) {
+        score += 40;
+    }
+
+    const destinationScore = getRouteInfoDestinationMatchScore(
+        { destination: getEntryDestinationLabel(variant) },
+        normalizedDestination
+    );
+    score += destinationScore * 10;
+
+    if (preferredServiceType && getServiceType(variant) === preferredServiceType) {
+        score += 5;
+    }
+
+    return score;
+}
+
+function findVariantForAutoSelect(variants, autoSelectTarget = {}) {
+    const normalizedRoute = normalizeRouteCode(autoSelectTarget.route);
+    const companyHints = [...new Set(
+        (Array.isArray(autoSelectTarget.companyHints) ? autoSelectTarget.companyHints : [])
+            .map((company) => getCompanyConfig(company).code)
+            .filter(Boolean)
+    )];
+    const normalizedCompanyHints = companyHints.length > 0
+        ? companyHints
+        : (autoSelectTarget.company ? [getCompanyConfig(autoSelectTarget.company).code] : []);
+
+    return variants
+        .filter((variant) => {
+            if (normalizeRouteCode(variant.route) !== normalizedRoute) {
+                return false;
+            }
+
+            if (normalizedCompanyHints.length > 0 && !normalizedCompanyHints.includes(getItemCompany(variant))) {
+                return false;
+            }
+
+            return true;
+        })
+        .sort((left, right) => {
+            const scoreDiff = getStopInfoVariantMatchScore(right, autoSelectTarget)
+                - getStopInfoVariantMatchScore(left, autoSelectTarget);
+            if (scoreDiff !== 0) {
+                return scoreDiff;
+            }
+
+            return compareVariantsBase(left, right);
+        })[0] || null;
+}
+
+async function autoSelectVariantAfterSearch(autoSelectTarget = null) {
+    if (!currentRenderState || !autoSelectTarget) {
+        return false;
+    }
+
+    const matchedVariant = findVariantForAutoSelect(currentRenderState.variants, autoSelectTarget);
+    if (!matchedVariant) {
+        return false;
+    }
+
+    const matchedVariantKey = getVariantKey(matchedVariant);
+    await loadSelectedVariantData(matchedVariantKey, {
+        isAutoRefresh: false,
+        requestFreshLocation: false
+    });
+
+    if (!currentRenderState || currentRenderState.selectedVariantKey !== matchedVariantKey) {
+        return false;
+    }
+
+    if (autoSelectTarget.stopId) {
+        openStopPanelByStopId(autoSelectTarget.stopId, matchedVariantKey);
+    }
+
+    return true;
+}
+
+async function showStopInfoModal(encodedStopKey) {
+    const selectedContext = getSelectedVariantContext();
+    if (!selectedContext) {
+        return;
+    }
+
+    const stopKey = decodeActionValue(encodedStopKey);
+    const stop = getSelectedVariantStopByKey(stopKey);
+    if (!stop) {
+        return;
+    }
+
+    const company = getItemCompany(selectedContext.variant);
+    const stopName = getStopDisplayName(stop, company);
+    const requestId = ++activeStopInfoModalRequestId;
+
+    renderStopInfoModalState({
+        title: "此站及附近停靠車號",
+        subtitle: `${stopName} • 正在整理官方站位資料...`,
+        bodyHtml: `<p class="stop-info-modal-empty is-loading">正在以本站座標為中心整理 ${NEARBY_STOP_THRESHOLD_METERS} 米內各公司站位與車號...</p>`
+    });
+    openStopInfoModal();
+
+    try {
+        const centerCoordinates = await getStopInfoModalCenterCoordinates(stop, company);
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        if (!centerCoordinates) {
+            renderStopInfoModalState({
+                title: "此站及附近停靠車號",
+                subtitle: stopName,
+                bodyHtml: '<p class="stop-info-modal-empty">暫時無法取得本站座標，未能整理附近站點資料。</p>'
+            });
+            return;
+        }
+
+        const candidates = await getOfficialNearbyStopCandidates(centerCoordinates, stopName);
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        const preferredCompany = getItemCompany(selectedContext.variant);
+        const sameStopRouteInfos = buildStopInfoRouteListFromOfficial(
+            [
+                ...candidates
+                    .filter((candidate) => candidate.isExactStop)
+                    .flatMap((candidate) => candidate.routes),
+                ...stopInfoBuildCurrentRouteFallback(selectedContext, stop)
+            ],
+            { preferredCompany }
+        );
+
+        const nearbyStopGroups = candidates
+            .filter((candidate) => !candidate.isExactStop)
+            .map((candidate) => ({
+                ...candidate,
+                routeInfos: buildStopInfoRouteListFromOfficial(candidate.routes, { preferredCompany })
+            }))
+            .filter((candidate) => candidate.routeInfos.length > 0)
+            .sort((left, right) => {
+                if (left.distanceMeters !== right.distanceMeters) {
+                    return left.distanceMeters - right.distanceMeters;
+                }
+
+                return left.stopName.localeCompare(right.stopName, "zh-HK");
+            });
+
+        const nearbyStopsHtml = nearbyStopGroups.length > 0
+            ? nearbyStopGroups.map((nearbyStop) => `
+                <div class="stop-info-nearby-stop-card">
+                    <div class="stop-info-nearby-stop-header">
+                        <div class="stop-info-nearby-stop-name">${escapeHtml(nearbyStop.stopName)}</div>
+                        <div class="stop-info-nearby-stop-meta">${escapeHtml(formatDistanceInMeters(nearbyStop.distanceMeters))}</div>
+                    </div>
+                    ${renderStopInfoRouteButtons(nearbyStop.routeInfos)}
+                </div>
+            `).join("")
+            : `<p class="stop-info-modal-empty">附近 ${NEARBY_STOP_THRESHOLD_METERS} 米內沒有其他可顯示的站點車號。</p>`;
+
+        const bodyHtml = [
+            renderStopInfoSection("本站停靠車號、前往的終點", renderStopInfoRouteButtons(sameStopRouteInfos)),
+            renderStopInfoSection(`附近站（${NEARBY_STOP_THRESHOLD_METERS}米）停靠車號`, nearbyStopsHtml)
+        ].join("");
+
+        renderStopInfoModalState({
+            title: "此站及附近停靠車號",
+            subtitle: `${stopName} • 以本站座標為中心搜尋 ${NEARBY_STOP_THRESHOLD_METERS} 米`,
+            bodyHtml
+        });
+    } catch (error) {
+        if (requestId !== activeStopInfoModalRequestId) {
+            return;
+        }
+
+        console.warn("載入站點資訊 Modal 失敗", error);
+        renderStopInfoModalState({
+            title: "此站及附近停靠車號",
+            subtitle: stopName,
+            bodyHtml: '<p class="stop-info-modal-empty">暫時無法載入本站及附近站點資料，請稍後再試。</p>'
+        });
+    }
+}

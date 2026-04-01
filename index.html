@@ -3,24 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="香港巴士及小巴實時到站查詢工具。支援九巴(KMB)、城巴(CTB)、新大嶼山巴士(NLB)及綠色小巴(GMB)。提供 GPS 定位、自動更新、最接近站點展開等功能。">
-    <meta name="keywords" content="香港巴士, 到站查詢, KMB, CTB, NLB, GMB, 九龍巴士, 城巴, 小巴, ETA, 實時到站">
+    <meta name="description" content="香港巴士到站查詢網站，支援 KMB、CTB、NLB、GMB，並提供 GPS、常用路線與站點資訊功能。">
+    <meta name="keywords" content="香港巴士, KMB, CTB, NLB, GMB, 到站時間, ETA, 巴士查詢">
     <meta name="theme-color" content="#c8102e">
-    <title>香港巴士到站查詢 | 實時 ETA</title>
+    <title>香港巴士到站查詢 | OpenTransport</title>
 
-    <!-- PWA -->
-    <link rel="manifest" href="manifest.json">
+    <script>
+        if (window.location.protocol !== "file:") {
+            document.write('<link rel="manifest" href="manifest.json?v=20260401-0020">');
+        }
+    </script>
     <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3098/3098090.png" type="image/png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="香港巴士到站">
 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260401-0020">
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <h1>🚌 到站查詢</h1>
+            <h1>OpenTransport 巴士查詢</h1>
         </header>
 
         <section class="quick-routes" aria-label="常用路線">
@@ -28,30 +31,34 @@
                 <p class="quick-routes-title">常用路線</p>
                 <p id="favoriteRoutesNotice" class="quick-routes-feedback" aria-live="polite"></p>
             </div>
-            <!-- 這個容器會由 script.js 依 localStorage 內容動態產生收藏路線。 -->
             <div id="favoriteRoutesList" class="quick-routes-list"></div>
         </section>
 
         <div class="search-box">
             <div class="input-group">
-                <input type="text" id="routeInput" placeholder="輸入路線號，例如 1A、2、104" value="1A" onkeyup="if(event.key === 'Enter') searchETA()">
+                <input
+                    type="text"
+                    id="routeInput"
+                    placeholder="輸入路線號，例如 1A、24、104"
+                    value="1A"
+                    onkeyup="if (event.key === 'Enter') searchETA()"
+                >
             </div>
-            <button onclick="searchETA()" id="searchBtn">🔍 查詢</button>
+            <button onclick="searchETA()" id="searchBtn">查詢</button>
         </div>
 
         <div id="status" class="status"></div>
         <div id="result" class="result"></div>
     </div>
 
-    <!-- 分享按鈕 -->
     <div style="text-align:center; margin:20px 0;">
         <button onclick="shareApp()" style="padding:10px 20px; font-size:1em; background:#c8102e; color:white; border:none; border-radius:12px; cursor:pointer;">
-            📤 分享這個網站給朋友
+            分享網站
         </button>
     </div>
 
     <footer class="footer">
-        <p>香港巴士到站查詢 • 使用政府開放資料 • GitHub Learning Project</p>
+        <p>OpenTransport 香港巴士到站查詢</p>
         <p>版本: <span id="app-version"></span></p>
     </footer>
 
@@ -67,35 +74,36 @@
         <div class="stop-info-modal-dialog">
             <div class="stop-info-modal-header">
                 <div class="stop-info-modal-heading">
-                    <h2 id="stopInfoModalTitle">此站停靠車號</h2>
+                    <h2 id="stopInfoModalTitle">此站及附近停靠車號</h2>
                     <p id="stopInfoModalSubtitle" class="stop-info-modal-subtitle" hidden></p>
                 </div>
                 <button type="button" class="stop-info-modal-close" aria-label="關閉站點資訊" onclick="closeStopInfoModal()">×</button>
             </div>
             <div id="stopInfoModalBody" class="stop-info-modal-body">
-                <p class="stop-info-modal-empty">正在整理此站停靠的車號...</p>
+                <p class="stop-info-modal-empty">正在整理此站及附近停靠的車號...</p>
             </div>
         </div>
     </div>
 
-    <script src="script.js?v=20260329-0245"></script>
+    <script src="official-bus-stop-index.js?v=20260401-0020" data-official-stop-index="true"></script>
+    <script src="script.js?v=20260401-0020"></script>
+    <script src="stable-overrides.js?v=20260401-0020"></script>
     <script>
-        // 顯示版本
-        document.getElementById('app-version').textContent = "2026-03-29";
+        document.getElementById("app-version").textContent = "2026-04-01 00:20";
 
-        // 分享功能
         function shareApp() {
             if (navigator.share) {
                 navigator.share({
-                    title: '香港巴士到站查詢',
-                    text: '實時查詢九巴、城巴、新大嶼山巴士及綠色小巴到站時間！支援 GPS 定位，超方便！',
+                    title: "OpenTransport 香港巴士到站查詢",
+                    text: "支援 KMB、CTB、NLB、GMB 的香港巴士到站查詢。",
                     url: window.location.href
                 });
-            } else {
-                navigator.clipboard.writeText(window.location.href).then(() => {
-                    alert('連結已複製到剪貼簿！快分享給朋友吧～');
-                });
+                return;
             }
+
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert("已把網站連結複製到剪貼板。");
+            });
         }
     </script>
 </body>
