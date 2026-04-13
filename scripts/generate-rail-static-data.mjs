@@ -1,9 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 
 const HEAVY_RAIL_SOURCE_URL = "https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv";
 const LIGHT_RAIL_SOURCE_URL = "https://opendata.mtr.com.hk/data/light_rail_routes_and_stops.csv";
+const STATION_POINT_SOURCE_URL = "https://open.hkmapservice.gov.hk/OpenData/directDownload?productName=iGeoCom&sheetName=iGeoCom&productFormat=CSV";
+const COORDINATE_TRANSFORM_URL = "https://www.geodetic.gov.hk/transform/v2/";
 
 const HEAVY_RAIL_LINE_META = {
     AEL: { zh: "機場快綫", en: "Airport Express", order: 80 },
@@ -21,6 +24,16 @@ const HEAVY_RAIL_LINE_META = {
 
 function sanitizeText(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeName(value) {
+    return sanitizeText(value)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "");
+}
+
+function roundCoordinate(value) {
+    return Number(Number(value).toFixed(6));
 }
 
 function parseCsv(csvText) {
@@ -93,6 +106,71 @@ async function fetchText(url) {
         throw new Error(`Failed to fetch ${url} (${response.status})`);
     }
     return response.text();
+}
+
+async function fetchBuffer(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch ${url} (${response.status})`);
+    }
+    return Buffer.from(await response.arrayBuffer());
+}
+
+function extractFirstZipEntry(zipBuffer) {
+    const endSignature = 0x06054b50;
+    let endOffset = -1;
+    for (let index = zipBuffer.length - 22; index >= 0; index -= 1) {
+        if (zipBuffer.readUInt32LE(index) === endSignature) {
+            endOffset = index;
+            break;
+        }
+    }
+
+    if (endOffset < 0) {
+        throw new Error("ZIP end of central directory not found.");
+    }
+
+    const totalEntries = zipBuffer.readUInt16LE(endOffset + 10);
+    const centralDirectoryOffset = zipBuffer.readUInt32LE(endOffset + 16);
+    if (totalEntries < 1) {
+        throw new Error("ZIP archive does not contain entries.");
+    }
+
+    const centralSignature = zipBuffer.readUInt32LE(centralDirectoryOffset);
+    if (centralSignature !== 0x02014b50) {
+        throw new Error("ZIP central directory header is invalid.");
+    }
+
+    const compressionMethod = zipBuffer.readUInt16LE(centralDirectoryOffset + 10);
+    const compressedSize = zipBuffer.readUInt32LE(centralDirectoryOffset + 20);
+    const fileNameLength = zipBuffer.readUInt16LE(centralDirectoryOffset + 28);
+    const extraLength = zipBuffer.readUInt16LE(centralDirectoryOffset + 30);
+    const commentLength = zipBuffer.readUInt16LE(centralDirectoryOffset + 32);
+    const localHeaderOffset = zipBuffer.readUInt32LE(centralDirectoryOffset + 42);
+
+    if (fileNameLength < 1 || extraLength < 0 || commentLength < 0) {
+        throw new Error("ZIP entry metadata is invalid.");
+    }
+
+    const localSignature = zipBuffer.readUInt32LE(localHeaderOffset);
+    if (localSignature !== 0x04034b50) {
+        throw new Error("ZIP local file header is invalid.");
+    }
+
+    const localFileNameLength = zipBuffer.readUInt16LE(localHeaderOffset + 26);
+    const localExtraLength = zipBuffer.readUInt16LE(localHeaderOffset + 28);
+    const dataOffset = localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+    const compressedData = zipBuffer.subarray(dataOffset, dataOffset + compressedSize);
+
+    if (compressionMethod === 0) {
+        return compressedData;
+    }
+
+    if (compressionMethod === 8) {
+        return zlib.inflateRawSync(compressedData);
+    }
+
+    throw new Error(`ZIP compression method ${compressionMethod} is not supported.`);
 }
 
 function getHeavyRailLineMeta(lineCode) {
@@ -336,20 +414,130 @@ function buildLightRailIndex(rows) {
     };
 }
 
+function extractHeavyRailStationPoints(rows) {
+    const stationPointMap = new Map();
+
+    for (const row of rows) {
+        if (sanitizeText(row.CLASS) !== "TRS" || sanitizeText(row.TYPE) !== "RSN") {
+            continue;
+        }
+
+        const englishName = sanitizeText(row.ENGLISHNAME);
+        const chineseName = sanitizeText(row.CHINESENAME);
+        const match = englishName.match(/^(?:Mass Transit Railway|MTR) (.+?) Station$/);
+        const easting = Number.parseFloat(row.EASTING);
+        const northing = Number.parseFloat(row.NORTHING);
+
+        if (!match || !Number.isFinite(easting) || !Number.isFinite(northing)) {
+            continue;
+        }
+
+        const stationNameEn = sanitizeText(match[1]);
+        stationPointMap.set(normalizeName(stationNameEn), {
+            stationNameEn,
+            stationNameZh: chineseName.replace(/^香港鐵路/, "").replace(/站$/, ""),
+            easting,
+            northing
+        });
+    }
+
+    return stationPointMap;
+}
+
+async function transformGridToWgs84(easting, northing) {
+    const query = new URLSearchParams({
+        inSys: "hkgrid",
+        outSys: "wgsgeog",
+        e: String(easting),
+        n: String(northing)
+    });
+
+    const response = await fetch(`${COORDINATE_TRANSFORM_URL}?${query.toString()}`);
+    if (!response.ok) {
+        throw new Error(`Failed to transform coordinates (${response.status})`);
+    }
+
+    const payload = await response.json();
+    if (!Number.isFinite(payload?.wgsLat) || !Number.isFinite(payload?.wgsLong)) {
+        throw new Error("Invalid coordinate transform response.");
+    }
+
+    return {
+        latitude: roundCoordinate(payload.wgsLat),
+        longitude: roundCoordinate(payload.wgsLong)
+    };
+}
+
+async function buildHeavyRailLocationMap(heavyRailIndex, stationPointRows) {
+    const stationPointMap = extractHeavyRailStationPoints(stationPointRows);
+    const stationEntries = Object.values(heavyRailIndex.stationIndex);
+    const outputMap = new Map();
+
+    for (const stationEntry of stationEntries) {
+        const stationPoint = stationPointMap.get(normalizeName(stationEntry.nameEn));
+        if (!stationPoint) {
+            continue;
+        }
+
+        const transformed = await transformGridToWgs84(stationPoint.easting, stationPoint.northing);
+        outputMap.set(stationEntry.stationCode, {
+            latitude: transformed.latitude,
+            longitude: transformed.longitude,
+            easting: Math.round(stationPoint.easting),
+            northing: Math.round(stationPoint.northing),
+            source: "LandsD iGeoCom TRS/RSN + Coordinates Transformation API"
+        });
+    }
+
+    return outputMap;
+}
+
+function enrichHeavyRailIndexWithLocations(heavyRailIndex, locationMap) {
+    for (const lineEntry of heavyRailIndex.lines) {
+        for (const stationEntry of lineEntry.stations) {
+            const location = locationMap.get(stationEntry.stationCode);
+            if (location) {
+                stationEntry.location = location;
+            }
+        }
+    }
+
+    for (const stationEntry of Object.values(heavyRailIndex.stationIndex)) {
+        const location = locationMap.get(stationEntry.stationCode);
+        if (location) {
+            stationEntry.location = location;
+        }
+    }
+
+    heavyRailIndex.stationLocationCount = locationMap.size;
+    return heavyRailIndex;
+}
+
 async function main() {
-    const [heavyRailCsv, lightRailCsv] = await Promise.all([
+    const [heavyRailCsv, lightRailCsv, stationPointZip] = await Promise.all([
         fetchText(HEAVY_RAIL_SOURCE_URL),
-        fetchText(LIGHT_RAIL_SOURCE_URL)
+        fetchText(LIGHT_RAIL_SOURCE_URL),
+        fetchBuffer(STATION_POINT_SOURCE_URL)
     ]);
+
+    const heavyRailIndex = buildHeavyRailIndex(parseCsv(heavyRailCsv));
+    const lightRailIndex = buildLightRailIndex(parseCsv(lightRailCsv));
+    const stationPointCsv = extractFirstZipEntry(stationPointZip).toString("utf8");
+    const stationPointRows = parseCsv(stationPointCsv);
+    const stationLocationMap = await buildHeavyRailLocationMap(heavyRailIndex, stationPointRows);
+
+    enrichHeavyRailIndexWithLocations(heavyRailIndex, stationLocationMap);
 
     const outputPayload = {
         generatedAt: new Date().toISOString(),
         sources: {
             heavyRailCsv: HEAVY_RAIL_SOURCE_URL,
-            lightRailCsv: LIGHT_RAIL_SOURCE_URL
+            lightRailCsv: LIGHT_RAIL_SOURCE_URL,
+            heavyRailStationPoints: STATION_POINT_SOURCE_URL,
+            coordinateTransformApi: COORDINATE_TRANSFORM_URL
         },
-        heavyRail: buildHeavyRailIndex(parseCsv(heavyRailCsv)),
-        lightRail: buildLightRailIndex(parseCsv(lightRailCsv))
+        heavyRail: heavyRailIndex,
+        lightRail: lightRailIndex
     };
 
     const currentFilePath = fileURLToPath(import.meta.url);
@@ -369,6 +557,7 @@ async function main() {
                 outputScriptPath,
                 heavyRailLineCount: outputPayload.heavyRail.lineCount,
                 heavyRailStationCount: outputPayload.heavyRail.stationCount,
+                heavyRailStationLocationCount: outputPayload.heavyRail.stationLocationCount,
                 lightRailRouteCount: outputPayload.lightRail.routeCount,
                 lightRailStopCount: outputPayload.lightRail.stopCount
             },
