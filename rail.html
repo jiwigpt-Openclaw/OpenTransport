@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="bozisoda.com 港鐵與輕鐵即時資訊頁面。">
+    <meta name="theme-color" content="#f2f7fc">
+    <title>bozisoda.com | 港鐵 / 輕鐵即時資訊</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="rail.css?v=20260413-2">
+</head>
+<body>
+    <main class="rail-shell">
+        <section class="rail-page">
+            <div class="rail-topbar">
+                <a class="rail-home-link" href="index.html">← 返回 bozisoda.com 衣食住行入口</a>
+            </div>
+
+            <header class="rail-header">
+                <p class="rail-kicker">rail beta</p>
+                <h1 class="rail-title">港鐵 / 輕鐵即時資訊</h1>
+                <p class="rail-subtitle">港鐵 tab 已接入官方即時到站，輕鐵會在下一階段加入。</p>
+            </header>
+
+            <section class="rail-tabbar" aria-label="鐵路類型切換">
+                <button type="button" class="rail-tab is-active" data-tab-trigger="mtr" aria-pressed="true">港鐵</button>
+                <button type="button" class="rail-tab" data-tab-trigger="lightRail" aria-pressed="false">輕鐵</button>
+            </section>
+
+            <section id="railStatus" class="rail-status rail-status-info" aria-live="polite"></section>
+            <section id="railContent" class="rail-content" aria-live="polite"></section>
+        </section>
+    </main>
+
+    <script src="official-rail-index.js?v=20260413-1"></script>
+    <script src="rail.js?v=20260413-2"></script>
+</body>
+</html>
