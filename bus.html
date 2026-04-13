@@ -5,14 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="香港巴士到站查詢網站，支援 KMB、CTB、NLB、GMB，並提供 GPS、常用路線與站點資訊功能。">
     <meta name="keywords" content="香港巴士, KMB, CTB, NLB, GMB, 到站時間, ETA, 巴士查詢">
-    <meta name="theme-color" content="#c8102e">
-    <title>香港巴士到站查詢 | OpenTransport</title>
+    <meta name="theme-color" content="#f2f7fc">
+    <title>bozisoda.com | 巴士查詢</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <script>
         if (window.location.protocol !== "file:") {
             const manifestLink = document.createElement("link");
             manifestLink.rel = "manifest";
-            manifestLink.href = "manifest.json?v=20260401-1605";
+            manifestLink.href = "bus-manifest.json?v=20260413-2";
             document.head.appendChild(manifestLink);
         }
     </script>
@@ -21,12 +24,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="香港巴士到站">
 
-    <link rel="stylesheet" href="style.css?v=20260401-1605">
+    <link rel="stylesheet" href="style.css?v=20260413-4">
 </head>
 <body>
     <div class="container">
+        <div class="page-topbar">
+            <a class="page-home-link" href="index.html">← 返回 bozisoda.com 衣食住行入口</a>
+        </div>
         <header class="header">
-            <h1>OpenTransport 巴士查詢</h1>
+            <h1>巴士查詢</h1>
+            <p class="subtitle">bozisoda.com / 行 / 巴士</p>
         </header>
 
         <section class="quick-routes" aria-label="常用路線">
@@ -54,14 +61,14 @@
         <div id="result" class="result"></div>
     </div>
 
-    <div style="text-align:center; margin:20px 0;">
-        <button onclick="shareApp()" style="padding:10px 20px; font-size:1em; background:#c8102e; color:white; border:none; border-radius:12px; cursor:pointer;">
+    <div class="share-app-wrap">
+        <button onclick="shareApp()" class="share-app-btn">
             分享網站
         </button>
     </div>
 
     <footer class="footer">
-        <p>OpenTransport 香港巴士到站查詢</p>
+        <p>香港巴士到站查詢</p>
         <p>版本: <span id="app-version"></span></p>
     </footer>
 
@@ -91,13 +98,14 @@
     <script src="official-bus-stop-index.js?v=20260401-1605" data-official-stop-index="true"></script>
     <script src="script.js?v=20260401-1605"></script>
     <script src="stable-overrides.js?v=20260401-1605"></script>
+    <script src="pwa-register.js?v=20260413-1"></script>
     <script>
-        document.getElementById("app-version").textContent = "2026-04-01 16:05";
+        document.getElementById("app-version").textContent = "2026-04-13 16:40";
 
         function shareApp() {
             if (navigator.share) {
                 navigator.share({
-                    title: "OpenTransport 香港巴士到站查詢",
+                    title: "香港巴士到站查詢",
                     text: "支援 KMB、CTB、NLB、GMB 的香港巴士到站查詢。",
                     url: window.location.href
                 });

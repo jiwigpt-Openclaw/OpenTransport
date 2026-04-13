@@ -6,46 +6,90 @@
     <meta name="description" content="bozisoda.com 衣食住行入口頁。">
     <meta name="theme-color" content="#f3ecdf">
     <title>bozisoda.com | 衣食住行</title>
-    <link rel="stylesheet" href="home.css?v=20260413-2">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        if (window.location.protocol !== "file:") {
+            const manifestLink = document.createElement("link");
+            manifestLink.rel = "manifest";
+            manifestLink.href = "manifest.json?v=20260413-3";
+            document.head.appendChild(manifestLink);
+        }
+    </script>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3098/3098090.png" type="image/png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="bozisoda.com">
+    <link rel="stylesheet" href="home.css?v=20260413-4">
 </head>
 <body>
     <main class="home-shell">
-        <header class="hero">
-            <p class="hero-site">bozisoda.com</p>
-            <h1 class="hero-title">衣食住行</h1>
-            <p class="hero-subtitle">入口頁建設中</p>
-        </header>
+        <section class="landing-panel">
+            <header class="hero">
+                <p class="hero-site">bozisoda.com</p>
+                <h1 class="hero-title">衣食住行</h1>
+                <p class="hero-subtitle">生活入口</p>
+                <p class="hero-status">目前開放：行 / 巴士</p>
+            </header>
 
-        <section class="bubble-stage" aria-label="主分類入口">
-            <div class="bubble-cluster">
-                <button type="button" class="bubble-card bubble-clothing" data-category="clothing" aria-pressed="false">
-                    <span class="bubble-orb" aria-hidden="true">
-                        <span class="bubble-icon">👕</span>
-                    </span>
-                    <span class="bubble-label">衣</span>
-                </button>
+            <section class="bubble-stage" aria-label="主分類入口">
+                <div class="bubble-field">
+                    <button type="button" class="bubble-card bubble-clothing" data-category="clothing" aria-pressed="false">
+                        <span class="bubble-orb" aria-hidden="true">
+                            <span class="bubble-core">
+                                <svg class="bubble-icon" viewBox="0 0 64 64" aria-hidden="true">
+                                    <path d="M28 16.5c0-2.8 1.8-5 4-5s4 2.2 4 5"></path>
+                                    <path d="M24 20c2 3 4.8 4.5 8 4.5s6-1.5 8-4.5l8 6.5-5.7 8.1-4.3-3.2V49H25.9V31.4l-4.2 3.2-5.7-8.1L24 20Z"></path>
+                                </svg>
+                            </span>
+                        </span>
+                        <span class="bubble-nameplate">衣</span>
+                    </button>
 
-                <button type="button" class="bubble-card bubble-food" data-category="food" aria-pressed="false">
-                    <span class="bubble-orb" aria-hidden="true">
-                        <span class="bubble-icon">🍕</span>
-                    </span>
-                    <span class="bubble-label">食</span>
-                </button>
+                    <button type="button" class="bubble-card bubble-food" data-category="food" aria-pressed="false">
+                        <span class="bubble-orb" aria-hidden="true">
+                            <span class="bubble-core">
+                                <svg class="bubble-icon" viewBox="0 0 64 64" aria-hidden="true">
+                                    <path d="M18 34h28"></path>
+                                    <path d="M20 34c1.4 8 6.6 12.5 12 12.5S42.6 42 44 34"></path>
+                                    <path d="M24 18c-2 3-2 6.1 0 9.2"></path>
+                                    <path d="M32 16c-2 3.2-2 6.4 0 9.6"></path>
+                                    <path d="M40 18c-2 3-2 6.1 0 9.2"></path>
+                                </svg>
+                            </span>
+                        </span>
+                        <span class="bubble-nameplate">食</span>
+                    </button>
 
-                <button type="button" class="bubble-card bubble-home" data-category="home" aria-pressed="false">
-                    <span class="bubble-orb" aria-hidden="true">
-                        <span class="bubble-icon">🏢</span>
-                    </span>
-                    <span class="bubble-label">住</span>
-                </button>
+                    <button type="button" class="bubble-card bubble-home" data-category="home" aria-pressed="false">
+                        <span class="bubble-orb" aria-hidden="true">
+                            <span class="bubble-core">
+                                <svg class="bubble-icon" viewBox="0 0 64 64" aria-hidden="true">
+                                    <path d="M18 28.5 32 17l14 11.5V47a2 2 0 0 1-2 2H20a2 2 0 0 1-2-2V28.5Z"></path>
+                                    <path d="M27 49V35.5h10V49"></path>
+                                </svg>
+                            </span>
+                        </span>
+                        <span class="bubble-nameplate">住</span>
+                    </button>
 
-                <button type="button" class="bubble-card bubble-travel" data-category="travel" aria-pressed="false">
-                    <span class="bubble-orb" aria-hidden="true">
-                        <span class="bubble-icon">🚌</span>
-                    </span>
-                    <span class="bubble-label">行</span>
-                </button>
-            </div>
+                    <button type="button" class="bubble-card bubble-travel" data-category="travel" aria-pressed="false">
+                        <span class="bubble-orb" aria-hidden="true">
+                            <span class="bubble-core">
+                                <svg class="bubble-icon" viewBox="0 0 64 64" aria-hidden="true">
+                                    <circle cx="20" cy="44" r="3.5"></circle>
+                                    <circle cx="45" cy="20" r="3.5"></circle>
+                                    <path d="M20 40v-8c0-6.6 5.4-12 12-12h9"></path>
+                                    <path d="M28 36h12a4 4 0 0 0 0-8H28a4 4 0 0 0 0 8Z"></path>
+                                </svg>
+                            </span>
+                        </span>
+                        <span class="bubble-nameplate">行</span>
+                    </button>
+                </div>
+            </section>
         </section>
 
         <section
@@ -54,7 +98,13 @@
             aria-label="二級入口"
             aria-hidden="true"
         ></section>
+
+        <section class="launch-panel" aria-label="已開放功能">
+            <p class="launch-label">OpenTransport 已開放</p>
+            <a class="launch-link" href="bus.html">直接進入巴士查詢</a>
+        </section>
     </main>
-    <script src="home.js?v=20260413-1"></script>
+    <script src="home.js?v=20260413-2"></script>
+    <script src="pwa-register.js?v=20260413-1"></script>
 </body>
 </html>
