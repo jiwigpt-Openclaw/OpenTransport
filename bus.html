@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="香港巴士到站查詢網站，支援 KMB、CTB、NLB、GMB，並提供 GPS、常用路線與站點資訊功能。">
+    <meta name="keywords" content="香港巴士, KMB, CTB, NLB, GMB, 到站時間, ETA, 巴士查詢">
+    <meta name="theme-color" content="#c8102e">
+    <title>香港巴士到站查詢 | OpenTransport</title>
+
+    <script>
+        if (window.location.protocol !== "file:") {
+            const manifestLink = document.createElement("link");
+            manifestLink.rel = "manifest";
+            manifestLink.href = "manifest.json?v=20260401-1605";
+            document.head.appendChild(manifestLink);
+        }
+    </script>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3098/3098090.png" type="image/png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="香港巴士到站">
+
+    <link rel="stylesheet" href="style.css?v=20260401-1605">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>OpenTransport 巴士查詢</h1>
+        </header>
+
+        <section class="quick-routes" aria-label="常用路線">
+            <div class="quick-routes-header">
+                <p class="quick-routes-title">常用路線</p>
+                <p id="favoriteRoutesNotice" class="quick-routes-feedback" aria-live="polite"></p>
+            </div>
+            <div id="favoriteRoutesList" class="quick-routes-list"></div>
+        </section>
+
+        <div class="search-box">
+            <div class="input-group">
+                <input
+                    type="text"
+                    id="routeInput"
+                    placeholder="輸入路線號，例如 1A、24、104"
+                    value="1A"
+                    onkeyup="if (event.key === 'Enter') searchETA()"
+                >
+            </div>
+            <button onclick="searchETA()" id="searchBtn">查詢</button>
+        </div>
+
+        <div id="status" class="status"></div>
+        <div id="result" class="result"></div>
+    </div>
+
+    <div style="text-align:center; margin:20px 0;">
+        <button onclick="shareApp()" style="padding:10px 20px; font-size:1em; background:#c8102e; color:white; border:none; border-radius:12px; cursor:pointer;">
+            分享網站
+        </button>
+    </div>
+
+    <footer class="footer">
+        <p>OpenTransport 香港巴士到站查詢</p>
+        <p>版本: <span id="app-version"></span></p>
+    </footer>
+
+    <div
+        id="stopInfoModal"
+        class="stop-info-modal"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stopInfoModalTitle"
+        onclick="handleStopInfoModalBackdrop(event)"
+    >
+        <div class="stop-info-modal-dialog">
+            <div class="stop-info-modal-header">
+                <div class="stop-info-modal-heading">
+                    <h2 id="stopInfoModalTitle">此站及附近停靠車號</h2>
+                    <p id="stopInfoModalSubtitle" class="stop-info-modal-subtitle" hidden></p>
+                </div>
+                <button type="button" class="stop-info-modal-close" aria-label="關閉站點資訊" onclick="closeStopInfoModal()">×</button>
+            </div>
+            <div id="stopInfoModalBody" class="stop-info-modal-body">
+                <p class="stop-info-modal-empty">正在整理此站及附近停靠的車號...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="official-bus-stop-index.js?v=20260401-1605" data-official-stop-index="true"></script>
+    <script src="script.js?v=20260401-1605"></script>
+    <script src="stable-overrides.js?v=20260401-1605"></script>
+    <script>
+        document.getElementById("app-version").textContent = "2026-04-01 16:05";
+
+        function shareApp() {
+            if (navigator.share) {
+                navigator.share({
+                    title: "OpenTransport 香港巴士到站查詢",
+                    text: "支援 KMB、CTB、NLB、GMB 的香港巴士到站查詢。",
+                    url: window.location.href
+                });
+                return;
+            }
+
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert("已把網站連結複製到剪貼板。");
+            });
+        }
+    </script>
+</body>
+</html>
