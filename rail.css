@@ -846,6 +846,211 @@ body::after {
     color: color-mix(in srgb, var(--rail-line-color) 72%, var(--rail-ink));
 }
 
+.rail-schematic-panel {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    background: linear-gradient(180deg, rgba(250, 252, 255, 0.86) 0%, rgba(243, 247, 252, 0.72) 100%);
+    box-shadow: var(--rail-soft-shadow);
+}
+
+.rail-schematic-frame {
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.84);
+    background:
+        radial-gradient(circle at 18% 16%, rgba(218, 231, 244, 0.72), transparent 34%),
+        radial-gradient(circle at 82% 18%, rgba(224, 236, 247, 0.68), transparent 30%),
+        linear-gradient(180deg, rgba(252, 253, 255, 0.98) 0%, rgba(245, 249, 253, 0.96) 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 16px 26px rgba(37, 64, 93, 0.08);
+}
+
+.rail-schematic-viewport {
+    position: relative;
+    overflow: hidden;
+    height: min(72vh, 760px);
+    border-radius: 22px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    overscroll-behavior: contain;
+    cursor: grab;
+}
+
+.rail-schematic-viewport.is-dragging {
+    cursor: grabbing;
+}
+
+.rail-schematic-scene {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+}
+
+.rail-schematic-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.rail-schematic-line-layer {
+    pointer-events: none;
+}
+
+.rail-schematic-station-layer {
+    pointer-events: auto;
+}
+
+.rail-schematic-station {
+    cursor: pointer;
+    outline: none;
+}
+
+.rail-schematic-station-visual {
+    pointer-events: none;
+}
+
+.rail-schematic-line {
+    --rail-line-color: #5A7694;
+}
+
+.rail-schematic-segment {
+    fill: none;
+    stroke: var(--rail-line-color);
+    stroke-width: 10;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.96;
+    transition: opacity 0.18s ease, stroke-width 0.18s ease, filter 0.18s ease;
+}
+
+.rail-schematic-segment.is-on-route {
+    stroke-width: 11;
+    opacity: 1;
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--rail-line-color) 26%, white));
+}
+
+.rail-schematic-segment.is-dimmed {
+    opacity: 0.15;
+}
+
+.rail-schematic-station-dot {
+    fill: #fff;
+    stroke: rgba(25, 42, 62, 0.9);
+    stroke-width: 2.6;
+    pointer-events: none;
+    transition: opacity 0.18s ease, fill 0.18s ease, stroke 0.18s ease, filter 0.18s ease;
+}
+
+.rail-schematic-station-hit {
+    fill: rgba(255, 255, 255, 0.001);
+    stroke: none;
+    pointer-events: all;
+}
+
+.rail-schematic-station-halo {
+    fill: rgba(37, 64, 93, 0.08);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, fill 0.18s ease, filter 0.18s ease;
+}
+
+.rail-schematic-station.is-interchange .rail-schematic-station-dot {
+    fill: rgba(248, 251, 255, 0.98);
+    stroke-width: 3.4;
+}
+
+.rail-schematic-station-label {
+    fill: var(--rail-ink);
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    paint-order: stroke;
+    stroke: rgba(249, 251, 254, 0.94);
+    stroke-width: 8px;
+    stroke-linejoin: round;
+    dominant-baseline: central;
+    pointer-events: none;
+    transition: opacity 0.18s ease, fill 0.18s ease;
+}
+
+.rail-schematic-station:hover .rail-schematic-station-halo,
+.rail-schematic-station:focus-visible .rail-schematic-station-halo {
+    opacity: 1;
+    fill: rgba(46, 84, 126, 0.16);
+    filter: drop-shadow(0 0 6px rgba(58, 88, 124, 0.18));
+}
+
+.rail-schematic-station:hover .rail-schematic-station-dot,
+.rail-schematic-station:focus-visible .rail-schematic-station-dot {
+    filter: drop-shadow(0 0 4px rgba(41, 63, 90, 0.1));
+}
+
+.rail-schematic-station.is-on-route .rail-schematic-station-halo {
+    opacity: 1;
+    fill: rgba(58, 88, 124, 0.14);
+}
+
+.rail-schematic-station.is-on-route .rail-schematic-station-dot {
+    fill: rgba(240, 247, 255, 0.98);
+    stroke: rgba(34, 57, 82, 0.96);
+}
+
+.rail-schematic-station.is-transfer .rail-schematic-station-halo {
+    opacity: 1;
+    fill: rgba(36, 50, 69, 0.12);
+}
+
+.rail-schematic-station.is-transfer .rail-schematic-station-dot {
+    fill: rgba(238, 244, 250, 0.98);
+    stroke: rgba(26, 40, 58, 0.98);
+}
+
+.rail-schematic-station.is-origin .rail-schematic-station-halo {
+    opacity: 1;
+    fill: rgba(217, 88, 84, 0.18);
+}
+
+.rail-schematic-station.is-origin .rail-schematic-station-dot {
+    fill: #fff4f2;
+    stroke: #c44b4f;
+    stroke-width: 4;
+}
+
+.rail-schematic-station.is-origin .rail-schematic-station-label {
+    fill: #a83835;
+}
+
+.rail-schematic-station.is-destination .rail-schematic-station-halo {
+    opacity: 1;
+    fill: rgba(62, 118, 218, 0.16);
+}
+
+.rail-schematic-station.is-destination .rail-schematic-station-dot {
+    fill: #f4f9ff;
+    stroke: #2f71d3;
+    stroke-width: 4;
+}
+
+.rail-schematic-station.is-destination .rail-schematic-station-label {
+    fill: #25579d;
+}
+
+.rail-schematic-station.is-dimmed .rail-schematic-station-dot,
+.rail-schematic-station.is-dimmed .rail-schematic-station-label {
+    opacity: 0.26;
+}
+
+.rail-schematic-station.is-dimmed .rail-schematic-station-halo {
+    opacity: 0;
+}
+
 .rail-official-map-viewport {
     position: relative;
     overflow: hidden;
@@ -1817,6 +2022,10 @@ body::after {
     .rail-official-map-viewport {
         height: min(66vh, 680px);
     }
+
+    .rail-schematic-panel {
+        padding: 16px;
+    }
 }
 
 @media (min-width: 960px) {
@@ -1931,6 +2140,25 @@ body::after {
     .rail-route-map-legend-pill {
         padding: 5px 9px;
         font-size: 0.76rem;
+    }
+
+    .rail-schematic-panel {
+        padding: 12px;
+        border-radius: 20px;
+    }
+
+    .rail-schematic-frame {
+        border-radius: 18px;
+    }
+
+    .rail-schematic-viewport {
+        height: min(62vh, 520px);
+        border-radius: 18px;
+    }
+
+    .rail-schematic-station-label {
+        font-size: 15px;
+        stroke-width: 6px;
     }
 
     .rail-official-map-viewport {

@@ -20,6 +20,7 @@
         { id: "fewerStops", label: "較少站數", rideCost: 1, transferCost: 2 }
     ];
     const officialMtrMap = window.__OFFICIAL_MTR_MAP__ || null;
+    const customMtrSchematicLayout = window.__MTR_SCHEMATIC_LAYOUT__ || null;
     const statusElement = document.getElementById("railStatus");
     const contentElement = document.getElementById("railContent");
     const tabButtons = Array.from(document.querySelectorAll("[data-tab-trigger]"));
@@ -57,6 +58,7 @@
                 activeField: "destination",
                 activeViewId: "",
                 lastMapFocusKey: "",
+                lastSchematicFocusKey: "",
                 originStationCode: "",
                 destinationStationCode: "",
                 result: null,
@@ -71,13 +73,23 @@
                     maxScale: 2.8,
                     isInitialized: false,
                     hasUserAdjusted: false
+                },
+                schematicView: {
+                    scale: 1,
+                    x: 0,
+                    y: 0,
+                    minScale: 0.42,
+                    maxScale: 3.4,
+                    isInitialized: false,
+                    hasUserAdjusted: false
                 }
             },
             routing: {
                 runtime: null,
                 lineGroups: [],
                 transferStationCodes: [],
-                officialMap: null
+                officialMap: null,
+                customSchematic: null
             }
         },
         lightRail: { routeCode: "", stopId: "", routes: [], stopIndex: {} },
@@ -91,6 +103,19 @@
         pinchStartDistance: 0,
         pinchStartScale: 1,
         pinchContentPoint: null,
+        suppressClickUntil: 0,
+        hasDragged: false
+    };
+    const schematicGestureState = {
+        activePointers: new Map(),
+        mode: "idle",
+        dragStartPoint: null,
+        dragStartView: null,
+        pinchStartDistance: 0,
+        pinchStartScale: 1,
+        pinchContentPoint: null,
+        pressedStationCode: "",
+        pressedPointerId: null,
         suppressClickUntil: 0,
         hasDragged: false
     };
@@ -407,6 +432,78 @@
             stationHotspotLookup: Object.fromEntries(stationHotspots.map((station) => [station.stationCode, station])),
             routeBoxLookup
         };
+    }
+    function buildMtrSchematicRuntime(layoutData) {
+        if (!layoutData || !layoutData.viewBox || !layoutData.lines || !layoutData.stations) return null;
+
+        const stations = Object.fromEntries(
+            Object.entries(layoutData.stations).map(([stationCode, stationEntry]) => [
+                stationCode,
+                {
+                    stationCode,
+                    nameZh: stationEntry.nameZh || stationCode,
+                    nameEn: stationEntry.nameEn || stationCode,
+                    x: Number(stationEntry.x) || 0,
+                    y: Number(stationEntry.y) || 0,
+                    interchange: Boolean(stationEntry.interchange),
+                    lines: Array.isArray(stationEntry.lines) ? stationEntry.lines : [],
+                    label: {
+                        text: stationEntry.label?.text || stationEntry.nameZh || stationCode,
+                        anchor: stationEntry.label?.anchor || "start",
+                        dx: Number(stationEntry.label?.dx) || 0,
+                        dy: Number(stationEntry.label?.dy) || 0
+                    }
+                }
+            ])
+        );
+
+        const lines = (Array.isArray(layoutData.lines) ? layoutData.lines : []).map((lineEntry) => ({
+            lineCode: lineEntry.lineCode,
+            color: lineEntry.color || getMtrOfficialLineColor(lineEntry.lineCode),
+            lineNameZh: lineEntry.lineNameZh || lineEntry.lineCode,
+            lineNameEn: lineEntry.lineNameEn || lineEntry.lineCode,
+            branches: (Array.isArray(lineEntry.branches) ? lineEntry.branches : []).map((branchEntry) => ({
+                branchId: branchEntry.branchId,
+                labelZh: branchEntry.labelZh || branchEntry.branchId,
+                directionCodes: Array.isArray(branchEntry.directionCodes) ? branchEntry.directionCodes : [],
+                stationCodes: Array.isArray(branchEntry.stationCodes) ? branchEntry.stationCodes : [],
+                segments: (Array.isArray(branchEntry.segments) ? branchEntry.segments : []).map((segmentEntry) => ({
+                    segmentId: segmentEntry.segmentId,
+                    from: segmentEntry.from,
+                    to: segmentEntry.to,
+                    points: Array.isArray(segmentEntry.points) ? segmentEntry.points : []
+                }))
+            }))
+        }));
+
+        const stationList = Object.values(stations).sort((left, right) => {
+            if (left.y !== right.y) return left.y - right.y;
+            return left.x - right.x;
+        });
+
+        return {
+            generatedAt: layoutData.generatedAt || "",
+            version: layoutData.version || 1,
+            viewBox: {
+                minX: Number(layoutData.viewBox.minX) || 0,
+                minY: Number(layoutData.viewBox.minY) || 0,
+                width: Number(layoutData.viewBox.width) || 1600,
+                height: Number(layoutData.viewBox.height) || 1100
+            },
+            meta: layoutData.meta || {},
+            lines,
+            stations,
+            stationList
+        };
+    }
+    function pointsToSvgPath(points) {
+        if (!Array.isArray(points) || points.length === 0) return "";
+        return points
+            .map((point, index) => {
+                const [x = 0, y = 0] = Array.isArray(point) ? point : [point?.x || 0, point?.y || 0];
+                return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+            })
+            .join(" ");
     }
     function getMtrDirectionTerminusName(lineCode, directionKey) {
         const selectedLine = railState.mtr.lines.find((line) => line.lineCode === lineCode);
@@ -1288,6 +1385,7 @@
         const planner = railState.mtr.routePlanner;
         planner.isOpen = !planner.isOpen;
         planner.lastMapFocusKey = "";
+        planner.lastSchematicFocusKey = "";
         if (planner.isOpen) {
             maybeAutofillRoutePlannerOriginFromNearest(railState.mtr.nearest.nearestStation);
             planner.activeField = getRoutePlannerActiveField();
@@ -1425,6 +1523,146 @@
     }
     function buildOfficialMapRouteDivMarkup(route, className = "") {
         return `<div class="rail-official-map-route ${className} r${escapeHtml(String(route.routeIndex))}" style="left:${escapeHtml(String(route.x))}px;top:${escapeHtml(String(route.y))}px;width:${escapeHtml(String(route.width))}px;height:${escapeHtml(String(route.height))}px;background-position:${escapeHtml(String(route.x * -1))}px ${escapeHtml(String(route.y * -1))}px;"></div>`;
+    }
+    function getRouteSegmentState(activeResult, selectedOriginCode, selectedDestinationCode) {
+        const hasActiveRoute = activeResult?.status === "ready";
+        const routeStationSet = new Set(Array.isArray(activeResult?.stationCodes) ? activeResult.stationCodes : []);
+        const transferStationSet = new Set(Array.isArray(activeResult?.transferStations) ? activeResult.transferStations.map((station) => station.stationCode) : []);
+        const activeSegmentSet = new Set();
+        const activeLineSet = new Set();
+
+        if (hasActiveRoute) {
+            for (const leg of Array.isArray(activeResult?.legs) ? activeResult.legs : []) {
+                activeLineSet.add(leg.lineCode);
+                for (let index = 0; index < leg.stations.length - 1; index += 1) {
+                    const leftCode = leg.stations[index];
+                    const rightCode = leg.stations[index + 1];
+                    const pairKey = [leftCode, rightCode].sort().join("|");
+                    activeSegmentSet.add(`${leg.lineCode}:${pairKey}`);
+                }
+            }
+        }
+
+        return {
+            hasActiveRoute,
+            selectedOriginCode,
+            selectedDestinationCode,
+            routeStationSet,
+            transferStationSet,
+            activeSegmentSet,
+            activeLineSet
+        };
+    }
+    function buildCustomSchematicMarkup() {
+        const schematicRuntime = railState.mtr.routing.customSchematic;
+        if (!schematicRuntime) {
+            return `<section class="rail-empty-card"><h3 class="rail-empty-title">Custom schematic seed 未就緒</h3><p class="rail-empty-text">暫時未能載入自訂港鐵 schematic layout 資料。</p></section>`;
+        }
+        const planner = railState.mtr.routePlanner;
+        const activeView = getActiveRoutePlannerView();
+        const activeResult = activeView?.result || null;
+        const {
+            hasActiveRoute,
+            selectedOriginCode,
+            selectedDestinationCode,
+            routeStationSet,
+            transferStationSet,
+            activeSegmentSet
+        } = getRouteSegmentState(activeResult, planner.originStationCode, planner.destinationStationCode);
+        const hasSelections = Boolean(selectedOriginCode || selectedDestinationCode);
+
+        return `
+            <section class="rail-schematic-panel">
+                <div class="rail-route-map-panel-head">
+                    <div>
+                        <p class="rail-route-map-title">Custom SVG 港鐵地圖</p>
+                        <p class="rail-route-map-hint">目前選擇：${planner.activeField === "origin" ? "起點" : "終點"}${hasActiveRoute && activeView ? ` · ${escapeHtml(activeView.label)}` : ""}</p>
+                    </div>
+                    <div class="rail-route-map-legend">
+                        <span class="rail-route-map-legend-pill is-active">${planner.activeField === "origin" ? "正在選起點" : "正在選終點"}</span>
+                        <span class="rail-route-map-legend-pill">${escapeHtml(String(schematicRuntime.meta.lineCount || 0))} 條重鐵線</span>
+                        ${hasActiveRoute ? '<span class="rail-route-map-legend-pill">未命中路徑的綫路已淡化</span>' : hasSelections ? '<span class="rail-route-map-legend-pill">選好起終點後會高亮建議路線</span>' : '<span class="rail-route-map-legend-pill">單指拖曳、雙指縮放、點站選起終點</span>'}
+                    </div>
+                </div>
+                <div class="rail-schematic-frame">
+                    <div id="mtrSchematicViewport" class="rail-schematic-viewport">
+                        <div
+                            id="mtrSchematicScene"
+                            class="rail-schematic-scene"
+                            style="width:${escapeHtml(String(schematicRuntime.viewBox.width))}px;height:${escapeHtml(String(schematicRuntime.viewBox.height))}px;"
+                        >
+                            <svg
+                                class="rail-schematic-svg ${hasActiveRoute ? "has-active-route" : ""}"
+                                viewBox="${escapeHtml(String(schematicRuntime.viewBox.minX))} ${escapeHtml(String(schematicRuntime.viewBox.minY))} ${escapeHtml(String(schematicRuntime.viewBox.width))} ${escapeHtml(String(schematicRuntime.viewBox.height))}"
+                                width="${escapeHtml(String(schematicRuntime.viewBox.width))}"
+                                height="${escapeHtml(String(schematicRuntime.viewBox.height))}"
+                                role="img"
+                                aria-label="港鐵 custom schematic map"
+                            >
+                                <g class="rail-schematic-line-layer" aria-hidden="true">
+                                    ${schematicRuntime.lines.map((line) => `
+                                        <g
+                                            class="rail-schematic-line ${hasActiveRoute && !line.branches.some((branch) => branch.segments.some((segment) => activeSegmentSet.has(`${line.lineCode}:${[segment.from, segment.to].sort().join("|")}`))) ? "is-dimmed" : ""}"
+                                            data-line-code="${escapeHtml(line.lineCode)}"
+                                            style="--rail-line-color:${escapeHtml(line.color)}"
+                                        >
+                                            ${line.branches.map((branch) => `
+                                                <g class="rail-schematic-branch" data-branch-id="${escapeHtml(branch.branchId)}">
+                                                    ${branch.segments.map((segment) => `
+                                                        <path
+                                                            class="rail-schematic-segment ${hasActiveRoute && activeSegmentSet.has(`${line.lineCode}:${[segment.from, segment.to].sort().join("|")}`) ? "is-on-route" : hasActiveRoute ? "is-dimmed" : ""}"
+                                                            d="${escapeHtml(pointsToSvgPath(segment.points))}"
+                                                        />
+                                                    `).join("")}
+                                                </g>
+                                            `).join("")}
+                                        </g>
+                                    `).join("")}
+                                </g>
+                                <g class="rail-schematic-station-layer">
+                                    ${schematicRuntime.stationList.map((station) => `
+                                        <g
+                                            class="rail-schematic-station ${station.interchange ? "is-interchange" : ""} ${station.stationCode === selectedOriginCode ? "is-origin" : ""} ${station.stationCode === selectedDestinationCode ? "is-destination" : ""} ${transferStationSet.has(station.stationCode) ? "is-transfer" : ""} ${routeStationSet.has(station.stationCode) ? "is-on-route" : ""} ${hasActiveRoute && !routeStationSet.has(station.stationCode) && station.stationCode !== selectedOriginCode && station.stationCode !== selectedDestinationCode ? "is-dimmed" : ""}"
+                                            data-station-code="${escapeHtml(station.stationCode)}"
+                                            data-route-station="${escapeHtml(station.stationCode)}"
+                                            role="button"
+                                            tabindex="0"
+                                            aria-label="選擇 ${escapeHtml(station.nameZh)} 作為${planner.activeField === "origin" ? "起點" : "終點"}"
+                                        >
+                                            <circle
+                                                class="rail-schematic-station-hit"
+                                                cx="${escapeHtml(String(station.x))}"
+                                                cy="${escapeHtml(String(station.y))}"
+                                                r="${station.interchange ? "18" : "15"}"
+                                            />
+                                            <g class="rail-schematic-station-visual" aria-hidden="true">
+                                                <circle
+                                                    class="rail-schematic-station-halo"
+                                                    cx="${escapeHtml(String(station.x))}"
+                                                    cy="${escapeHtml(String(station.y))}"
+                                                    r="${station.interchange ? "13" : "10"}"
+                                                />
+                                                <circle
+                                                    class="rail-schematic-station-dot"
+                                                    cx="${escapeHtml(String(station.x))}"
+                                                    cy="${escapeHtml(String(station.y))}"
+                                                    r="${station.interchange ? "7" : "4.8"}"
+                                                />
+                                            </g>
+                                            <text
+                                                class="rail-schematic-station-label"
+                                                x="${escapeHtml(String(station.x + station.label.dx))}"
+                                                y="${escapeHtml(String(station.y + station.label.dy))}"
+                                                text-anchor="${escapeHtml(station.label.anchor)}"
+                                            >${escapeHtml(station.label.text)}</text>
+                                        </g>
+                                    `).join("")}
+                                </g>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </section>`;
     }
     function buildOfficialMapMarkup(activeField, activeResult, selectedOriginCode, selectedDestinationCode) {
         const mapRuntime = railState.mtr.routing.officialMap;
@@ -1772,9 +2010,7 @@
                     ${buildRoutePlannerStationToken("destination", destinationStation, activeField === "destination")}
                 </div>
 
-                <section class="rail-route-map-panel">
-                    ${buildOfficialMapMarkup(activeField, activeResult, selectedOriginCode, selectedDestinationCode)}
-                </section>
+                ${buildCustomSchematicMarkup()}
 
                 ${buildRoutePlannerResultMarkup()}
             </section>`;
@@ -1971,6 +2207,324 @@
 
         centerMapOnBounds(viewport, focusBounds, { scaleOverride: nextScale });
     }
+    function getSchematicViewportState() {
+        return railState.mtr.routePlanner.schematicView;
+    }
+    function getSchematicViewportMetrics(viewport, scale = getSchematicViewportState().scale) {
+        const schematicRuntime = railState.mtr.routing.customSchematic;
+        if (!(viewport instanceof HTMLElement) || !schematicRuntime) return null;
+        const mapWidth = schematicRuntime.viewBox.width;
+        const mapHeight = schematicRuntime.viewBox.height;
+        return {
+            viewportWidth: viewport.clientWidth,
+            viewportHeight: viewport.clientHeight,
+            mapWidth,
+            mapHeight,
+            scaledWidth: mapWidth * scale,
+            scaledHeight: mapHeight * scale
+        };
+    }
+    function clampSchematicScale(value) {
+        const schematicView = getSchematicViewportState();
+        return Math.min(schematicView.maxScale, Math.max(schematicView.minScale, value));
+    }
+    function clampSchematicOffset(viewport, x, y, scale = getSchematicViewportState().scale) {
+        const metrics = getSchematicViewportMetrics(viewport, scale);
+        if (!metrics) return { x, y };
+
+        const clampedX = metrics.scaledWidth <= metrics.viewportWidth
+            ? (metrics.viewportWidth - metrics.scaledWidth) / 2
+            : Math.min(0, Math.max(metrics.viewportWidth - metrics.scaledWidth, x));
+        const clampedY = metrics.scaledHeight <= metrics.viewportHeight
+            ? (metrics.viewportHeight - metrics.scaledHeight) / 2
+            : Math.min(0, Math.max(metrics.viewportHeight - metrics.scaledHeight, y));
+
+        return { x: clampedX, y: clampedY };
+    }
+    function getSchematicStation(stationCode) {
+        return railState.mtr.routing.customSchematic?.stations?.[String(stationCode || "").toUpperCase()] || null;
+    }
+    function getSchematicFocusBounds(stationCodes) {
+        const points = stationCodes.map((stationCode) => getSchematicStation(stationCode)).filter(Boolean);
+        if (points.length === 0) return null;
+
+        return {
+            points,
+            minX: Math.min(...points.map((point) => point.x)),
+            maxX: Math.max(...points.map((point) => point.x)),
+            minY: Math.min(...points.map((point) => point.y)),
+            maxY: Math.max(...points.map((point) => point.y))
+        };
+    }
+    function getDefaultSchematicBounds() {
+        return {
+            minX: 340,
+            maxX: 1880,
+            minY: 140,
+            maxY: 1120
+        };
+    }
+    function getDefaultSchematicScale(viewport) {
+        const metrics = getSchematicViewportMetrics(viewport, 1);
+        if (!metrics) return 1;
+
+        const bounds = getDefaultSchematicBounds();
+        const fitScale = Math.min(
+            (metrics.viewportWidth - 84) / Math.max(320, bounds.maxX - bounds.minX),
+            (metrics.viewportHeight - 92) / Math.max(260, bounds.maxY - bounds.minY)
+        );
+
+        return clampSchematicScale(fitScale);
+    }
+    function applySchematicTransform(viewport) {
+        const scene = document.getElementById("mtrSchematicScene");
+        if (!(viewport instanceof HTMLElement) || !(scene instanceof HTMLElement)) return;
+        const schematicView = getSchematicViewportState();
+        scene.style.transform = `translate3d(${schematicView.x}px, ${schematicView.y}px, 0) scale(${schematicView.scale})`;
+    }
+    function setSchematicView(viewport, nextScale, nextX, nextY, { markAdjusted = false } = {}) {
+        const schematicView = getSchematicViewportState();
+        const scale = clampSchematicScale(nextScale);
+        const offset = clampSchematicOffset(viewport, nextX, nextY, scale);
+        schematicView.scale = scale;
+        schematicView.x = offset.x;
+        schematicView.y = offset.y;
+        if (markAdjusted) schematicView.hasUserAdjusted = true;
+        applySchematicTransform(viewport);
+    }
+    function centerSchematicOnBounds(viewport, bounds, { scaleOverride = null, markAdjusted = false } = {}) {
+        if (!(viewport instanceof HTMLElement) || !bounds) return;
+        const metrics = getSchematicViewportMetrics(viewport, 1);
+        if (!metrics) return;
+
+        const scale = clampSchematicScale(scaleOverride ?? getSchematicViewportState().scale);
+        const paddingX = Math.min(140, Math.max(54, metrics.viewportWidth * 0.12));
+        const paddingY = Math.min(120, Math.max(54, metrics.viewportHeight * 0.14));
+        const centerX = (bounds.minX + bounds.maxX) / 2;
+        const centerY = (bounds.minY + bounds.maxY) / 2;
+        const targetX = metrics.viewportWidth / 2 - centerX * scale;
+        const targetY = metrics.viewportHeight / 2 - centerY * scale + paddingY * 0.04;
+
+        setSchematicView(viewport, scale, targetX, targetY, { markAdjusted });
+    }
+    function zoomSchematicAtPoint(viewport, nextScale, focusPoint, { markAdjusted = false } = {}) {
+        if (!(viewport instanceof HTMLElement) || !focusPoint) return;
+        const schematicView = getSchematicViewportState();
+        const scale = clampSchematicScale(nextScale);
+        const contentX = (focusPoint.x - schematicView.x) / schematicView.scale;
+        const contentY = (focusPoint.y - schematicView.y) / schematicView.scale;
+        const nextX = focusPoint.x - contentX * scale;
+        const nextY = focusPoint.y - contentY * scale;
+        setSchematicView(viewport, scale, nextX, nextY, { markAdjusted });
+    }
+    function initializeSchematicViewport(viewport, focusStationCodes = []) {
+        const schematicView = getSchematicViewportState();
+        if (!(viewport instanceof HTMLElement) || schematicView.isInitialized) {
+            applySchematicTransform(viewport);
+            return;
+        }
+
+        schematicView.isInitialized = true;
+        const defaultScale = getDefaultSchematicScale(viewport);
+        const focusBounds = getSchematicFocusBounds(focusStationCodes) || getDefaultSchematicBounds();
+        centerSchematicOnBounds(viewport, focusBounds, { scaleOverride: defaultScale });
+    }
+    function maybeFocusCustomSchematicViewport() {
+        if (railState.currentTab !== "mtr" || !railState.mtr.routePlanner.isOpen) return;
+
+        const viewport = document.getElementById("mtrSchematicViewport");
+        if (!(viewport instanceof HTMLElement)) return;
+
+        const activeView = getActiveRoutePlannerView();
+        const hasActiveRoute = activeView?.result?.status === "ready";
+        const focusStationCodes = Array.isArray(activeView?.result?.stationCodes) && activeView.result.stationCodes.length > 0
+            ? activeView.result.stationCodes
+            : [railState.mtr.routePlanner.originStationCode, railState.mtr.routePlanner.destinationStationCode].filter(Boolean);
+
+        initializeSchematicViewport(viewport, focusStationCodes);
+        if (getSchematicViewportState().hasUserAdjusted) return;
+        if (!hasActiveRoute && focusStationCodes.length <= 1) return;
+
+        const focusBounds = getSchematicFocusBounds(focusStationCodes) || getDefaultSchematicBounds();
+        const focusKey = `${activeView?.id || "idle"}:${focusStationCodes.join("|") || "default"}`;
+        if (railState.mtr.routePlanner.lastSchematicFocusKey === focusKey) return;
+        railState.mtr.routePlanner.lastSchematicFocusKey = focusKey;
+
+        const currentScale = getSchematicViewportState().scale;
+        const metrics = getSchematicViewportMetrics(viewport, currentScale);
+        if (!metrics) return;
+
+        const focusWidth = Math.max(180, focusBounds.maxX - focusBounds.minX);
+        const focusHeight = Math.max(160, focusBounds.maxY - focusBounds.minY);
+        const fitScale = clampSchematicScale(Math.min(
+            (metrics.viewportWidth - 120) / focusWidth,
+            (metrics.viewportHeight - 128) / focusHeight
+        ));
+        const nextScale = getSchematicViewportState().hasUserAdjusted
+            ? currentScale
+            : fitScale;
+
+        centerSchematicOnBounds(viewport, focusBounds, { scaleOverride: nextScale });
+    }
+    function bindCustomSchematicInteractions() {
+        const viewport = document.getElementById("mtrSchematicViewport");
+        if (!(viewport instanceof HTMLElement)) return;
+
+        schematicGestureState.activePointers.clear();
+        schematicGestureState.mode = "idle";
+        schematicGestureState.dragStartPoint = null;
+        schematicGestureState.dragStartView = null;
+        schematicGestureState.pinchStartDistance = 0;
+        schematicGestureState.pinchContentPoint = null;
+        schematicGestureState.pressedStationCode = "";
+        schematicGestureState.pressedPointerId = null;
+        schematicGestureState.hasDragged = false;
+
+        const updateDragCursor = () => {
+            viewport.classList.toggle("is-dragging", schematicGestureState.mode !== "idle");
+        };
+        const beginPinchFromActivePointers = () => {
+            if (schematicGestureState.activePointers.size < 2) return;
+            const [firstPoint, secondPoint] = Array.from(schematicGestureState.activePointers.values());
+            const schematicView = getSchematicViewportState();
+            const startMid = {
+                x: (firstPoint.x + secondPoint.x) / 2,
+                y: (firstPoint.y + secondPoint.y) / 2
+            };
+            schematicGestureState.mode = "pinch";
+            schematicGestureState.hasDragged = true;
+            schematicGestureState.dragStartPoint = null;
+            schematicGestureState.dragStartView = null;
+            schematicGestureState.pinchStartDistance = Math.max(1, Math.hypot(secondPoint.x - firstPoint.x, secondPoint.y - firstPoint.y));
+            schematicGestureState.pinchStartScale = schematicView.scale;
+            schematicGestureState.pinchContentPoint = {
+                x: (startMid.x - schematicView.x) / schematicView.scale,
+                y: (startMid.y - schematicView.y) / schematicView.scale
+            };
+            updateDragCursor();
+        };
+        const handlePointerDown = (event) => {
+            const point = getViewportLocalPoint(viewport, event.clientX, event.clientY);
+            schematicGestureState.activePointers.set(event.pointerId, point);
+            schematicGestureState.pressedStationCode = event.target instanceof Element
+                ? (event.target.closest("[data-route-station]")?.getAttribute("data-route-station") || "")
+                : "";
+            schematicGestureState.pressedPointerId = event.pointerId;
+            viewport.setPointerCapture(event.pointerId);
+
+            if (schematicGestureState.activePointers.size >= 2) {
+                beginPinchFromActivePointers();
+                return;
+            }
+
+            schematicGestureState.mode = "pan";
+            schematicGestureState.dragStartPoint = point;
+            schematicGestureState.dragStartView = { x: getSchematicViewportState().x, y: getSchematicViewportState().y };
+            schematicGestureState.hasDragged = false;
+            updateDragCursor();
+        };
+        const handlePointerMove = (event) => {
+            if (!schematicGestureState.activePointers.has(event.pointerId)) return;
+            const point = getViewportLocalPoint(viewport, event.clientX, event.clientY);
+            schematicGestureState.activePointers.set(event.pointerId, point);
+
+            if (schematicGestureState.activePointers.size >= 2) {
+                if (schematicGestureState.mode !== "pinch") beginPinchFromActivePointers();
+                const [firstPoint, secondPoint] = Array.from(schematicGestureState.activePointers.values());
+                const midPoint = {
+                    x: (firstPoint.x + secondPoint.x) / 2,
+                    y: (firstPoint.y + secondPoint.y) / 2
+                };
+                const currentDistance = Math.max(1, Math.hypot(secondPoint.x - firstPoint.x, secondPoint.y - firstPoint.y));
+                const nextScale = clampSchematicScale(schematicGestureState.pinchStartScale * (currentDistance / schematicGestureState.pinchStartDistance));
+                const contentPoint = schematicGestureState.pinchContentPoint || { x: 0, y: 0 };
+                const nextX = midPoint.x - contentPoint.x * nextScale;
+                const nextY = midPoint.y - contentPoint.y * nextScale;
+                setSchematicView(viewport, nextScale, nextX, nextY, { markAdjusted: true });
+                schematicGestureState.hasDragged = true;
+                return;
+            }
+
+            if (schematicGestureState.mode !== "pan" || !schematicGestureState.dragStartPoint || !schematicGestureState.dragStartView) return;
+            const deltaX = point.x - schematicGestureState.dragStartPoint.x;
+            const deltaY = point.y - schematicGestureState.dragStartPoint.y;
+            if (!schematicGestureState.hasDragged && Math.hypot(deltaX, deltaY) > 6) {
+                schematicGestureState.hasDragged = true;
+                schematicGestureState.pressedStationCode = "";
+            }
+            if (!schematicGestureState.hasDragged) return;
+
+            setSchematicView(
+                viewport,
+                getSchematicViewportState().scale,
+                schematicGestureState.dragStartView.x + deltaX,
+                schematicGestureState.dragStartView.y + deltaY,
+                { markAdjusted: true }
+            );
+        };
+        const endPointerInteraction = (event) => {
+            if (schematicGestureState.activePointers.has(event.pointerId)) {
+                schematicGestureState.activePointers.delete(event.pointerId);
+            }
+
+            if (viewport.hasPointerCapture(event.pointerId)) {
+                viewport.releasePointerCapture(event.pointerId);
+            }
+            if (schematicGestureState.activePointers.size >= 2) {
+                beginPinchFromActivePointers();
+                updateDragCursor();
+                return;
+            }
+            if (schematicGestureState.activePointers.size === 1) {
+                const remainingPoint = Array.from(schematicGestureState.activePointers.values())[0];
+                schematicGestureState.mode = "pan";
+                schematicGestureState.dragStartPoint = { x: remainingPoint.x, y: remainingPoint.y };
+                schematicGestureState.dragStartView = { x: getSchematicViewportState().x, y: getSchematicViewportState().y };
+                updateDragCursor();
+                return;
+            }
+
+            if (schematicGestureState.hasDragged) {
+                schematicGestureState.suppressClickUntil = Date.now() + 220;
+            }
+            if (!schematicGestureState.hasDragged && schematicGestureState.pressedPointerId === event.pointerId && schematicGestureState.pressedStationCode) {
+                const stationCode = schematicGestureState.pressedStationCode;
+                schematicGestureState.suppressClickUntil = Date.now() + 220;
+                schematicGestureState.pressedStationCode = "";
+                schematicGestureState.pressedPointerId = null;
+                selectRoutePlannerStation(stationCode);
+                renderCurrentTab();
+                bindCurrentTabEvents();
+                return;
+            }
+            schematicGestureState.mode = "idle";
+            schematicGestureState.dragStartPoint = null;
+            schematicGestureState.dragStartView = null;
+            schematicGestureState.pinchStartDistance = 0;
+            schematicGestureState.pinchContentPoint = null;
+            schematicGestureState.pressedStationCode = "";
+            schematicGestureState.pressedPointerId = null;
+            schematicGestureState.hasDragged = false;
+            updateDragCursor();
+        };
+        const handleWheel = (event) => {
+            event.preventDefault();
+            const localPoint = getViewportLocalPoint(viewport, event.clientX, event.clientY);
+            const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
+            zoomSchematicAtPoint(viewport, getSchematicViewportState().scale * zoomFactor, localPoint, { markAdjusted: true });
+            schematicGestureState.suppressClickUntil = Date.now() + 120;
+        };
+
+        viewport.addEventListener("pointerdown", handlePointerDown);
+        viewport.addEventListener("pointermove", handlePointerMove);
+        viewport.addEventListener("pointerup", endPointerInteraction);
+        viewport.addEventListener("pointercancel", endPointerInteraction);
+        viewport.addEventListener("pointerleave", endPointerInteraction);
+        viewport.addEventListener("wheel", handleWheel, { passive: false });
+
+        initializeSchematicViewport(viewport);
+        applySchematicTransform(viewport);
+    }
     function buildMtrManualControlsMarkup(stationOptions) {
         return `
             <section class="rail-mtr-block rail-mtr-control-block">
@@ -2098,8 +2652,8 @@
         }
         if (mtrRoutePlannerPanel instanceof HTMLElement) {
             mtrRoutePlannerPanel.addEventListener("click", (event) => {
-                const viewButton = event.target instanceof HTMLElement ? event.target.closest("[data-route-view]") : null;
-                if (viewButton instanceof HTMLElement) {
+                const viewButton = event.target instanceof Element ? event.target.closest("[data-route-view]") : null;
+                if (viewButton instanceof Element) {
                     const viewId = viewButton.getAttribute("data-route-view") || "";
                     setRoutePlannerView(viewId);
                     renderCurrentTab();
@@ -2107,8 +2661,8 @@
                     return;
                 }
 
-                const fieldButton = event.target instanceof HTMLElement ? event.target.closest("[data-route-field]") : null;
-                if (fieldButton instanceof HTMLElement) {
+                const fieldButton = event.target instanceof Element ? event.target.closest("[data-route-field]") : null;
+                if (fieldButton instanceof Element) {
                     const field = fieldButton.getAttribute("data-route-field") || "destination";
                     setRoutePlannerField(field);
                     renderCurrentTab();
@@ -2116,13 +2670,25 @@
                     return;
                 }
 
-                const stationButton = event.target instanceof HTMLElement ? event.target.closest("[data-route-station]") : null;
-                if (stationButton instanceof HTMLElement) {
+                const stationButton = event.target instanceof Element ? event.target.closest("[data-route-station]") : null;
+                if (stationButton instanceof Element) {
+                    if (Date.now() < schematicGestureState.suppressClickUntil) return;
                     const stationCode = stationButton.getAttribute("data-route-station") || "";
                     selectRoutePlannerStation(stationCode);
                     renderCurrentTab();
                     bindCurrentTabEvents();
                 }
+            });
+            mtrRoutePlannerPanel.addEventListener("keydown", (event) => {
+                if (!(event.target instanceof Element)) return;
+                const stationButton = event.target.closest("[data-route-station]");
+                if (!(stationButton instanceof Element)) return;
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                const stationCode = stationButton.getAttribute("data-route-station") || "";
+                selectRoutePlannerStation(stationCode);
+                renderCurrentTab();
+                bindCurrentTabEvents();
             });
         }
         if (lightRailRouteSelect instanceof HTMLSelectElement) {
@@ -2144,8 +2710,10 @@
         }
 
         bindOfficialMapInteractions();
+        bindCustomSchematicInteractions();
         requestAnimationFrame(() => {
             maybeFocusOfficialMapViewport();
+            maybeFocusCustomSchematicViewport();
         });
     }
     function maybeStartNearestMtrSummary() {
@@ -2163,6 +2731,7 @@
         railState.mtr.routing.lineGroups = railState.mtr.routing.runtime?.lineGroups || [];
         railState.mtr.routing.transferStationCodes = railState.mtr.routing.runtime?.transferStationCodes || [];
         railState.mtr.routing.officialMap = buildMtrOfficialMapRuntime(officialMtrMap);
+        railState.mtr.routing.customSchematic = buildMtrSchematicRuntime(customMtrSchematicLayout);
         railState.lightRail.routes = Array.isArray(railIndex.lightRail.routes) ? railIndex.lightRail.routes : [];
         railState.lightRail.stopIndex = railIndex.lightRail.stopIndex || {};
         railState.ui.isReady = true;
