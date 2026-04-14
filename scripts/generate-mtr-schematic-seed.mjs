@@ -105,15 +105,27 @@ const LABEL_OVERRIDES = {
     WCH: right(26),
     OCP: right(26),
     TUC: left(22),
-    SUN: left(22),
-    TSY: left(22),
-    AIR: left(22),
-    AWE: left(22),
-    DIS: left(22),
+    SUN: left(24),
+    TSY: left(26),
+    AIR: left(24),
+    AWE: left(-10),
+    DIS: left(24),
+    TWW: right(-10),
+    KSR: right(-10),
+    YUL: right(-10),
+    LOP: right(-10),
+    TIS: right(-10),
+    SIH: right(24),
     TSW: left(-12),
     TWH: left(-12),
     KWH: left(-12),
-    KWF: left(-12)
+    KWF: left(-12),
+    HOK: left(-24),
+    KOW: left(-20),
+    OLY: left(24),
+    NAC: left(28),
+    EXC: right(-24),
+    ADM: right(-24)
 };
 
 const SEGMENT_POINT_OVERRIDES = {
@@ -138,6 +150,38 @@ const SEGMENT_POINT_OVERRIDES = {
     "AEL:KOW-HOK": [[0.45, -0.06]],
     "TCL:TSY-LAK": [[0.48, -0.04]],
     "TCL:KOW-HOK": [[0.45, -0.06]]
+};
+
+const SEGMENT_POLYLINE_OVERRIDES = {
+    "TCL:TUC-SUN": [[182, 470], [220, 430], [258, 393]],
+    "TCL:SUN-TSY": [[258, 393], [286, 366], [313, 331]],
+    "TCL:TSY-LAK": [[313, 331], [345, 300], [379, 294]],
+    "TCL:LAK-NAC": [[379, 294], [392, 318], [424, 347]],
+    "TCL:NAC-OLY": [[424, 347], [424, 411]],
+    "TCL:OLY-KOW": [[424, 411], [424, 468]],
+    "TCL:KOW-HOK": [[424, 468], [452, 501], [486, 534], [515, 551]],
+
+    "AEL:AWE-AIR": [[191, 383], [168, 383], [156, 405], [156, 432]],
+    "AEL:AIR-TSY": [[156, 432], [194, 404], [252, 362], [317, 335]],
+    "AEL:TSY-KOW": [[317, 335], [354, 366], [396, 417], [418, 468]],
+    "AEL:KOW-HOK": [[418, 468], [446, 501], [486, 539], [515, 556]],
+
+    "DRL:SUN-DIS": [[262, 396], [279, 415], [297, 438]],
+
+    "TML:TUM-SIH": [[76, 210], [76, 150]],
+    "TML:SIH-TIS": [[76, 150], [76, 108], [98, 65]],
+    "TML:TIS-LOP": [[98, 65], [120, 85], [120, 108]],
+    "TML:LOP-YUL": [[120, 108], [120, 150]],
+    "TML:YUL-KSR": [[120, 150], [120, 193]],
+    "TML:KSR-TWW": [[120, 193], [132, 218], [147, 243]],
+    "TML:TWW-MEF": [[147, 243], [210, 255], [320, 276], [429, 294]],
+    "TML:MEF-NAC": [[429, 294], [429, 347]],
+
+    "EAL:TAW-KOT": [[715, 225], [715, 293]],
+    "EAL:KOT-MKK": [[715, 293], [716, 363]],
+    "EAL:MKK-HUH": [[716, 363], [716, 430], [697, 478]],
+    "EAL:HUH-EXC": [[697, 478], [694, 509], [666, 540], [632, 551]],
+    "EAL:EXC-ADM": [[632, 551], [606, 566], [575, 577]]
 };
 
 function middle(dy) {
@@ -282,8 +326,16 @@ function buildStationsFromOfficialMap(stationIndex, officialMap) {
             minY: 0,
             width: roundCoordinate((maxX - minX) * OFFICIAL_MAP_SCALE + OFFICIAL_MAP_PADDING_X * 2),
             height: roundCoordinate((maxY - minY) * OFFICIAL_MAP_SCALE + OFFICIAL_MAP_PADDING_Y * 2)
-        }
+        },
+        officialBounds: { minX, maxX, minY, maxY }
     };
+}
+
+function scaleOfficialPoint([x, y], officialBounds) {
+    return [
+        roundCoordinate(OFFICIAL_MAP_PADDING_X + (x - officialBounds.minX) * OFFICIAL_MAP_SCALE),
+        roundCoordinate(OFFICIAL_MAP_PADDING_Y + (y - officialBounds.minY) * OFFICIAL_MAP_SCALE)
+    ];
 }
 
 function buildIntermediatePoints(lineCode, fromCode, toCode, stations) {
@@ -306,10 +358,21 @@ function buildIntermediatePoints(lineCode, fromCode, toCode, stations) {
     });
 }
 
-function buildSegmentPoints(lineCode, fromCode, toCode, stations) {
+function buildSegmentPoints(lineCode, fromCode, toCode, stations, officialBounds) {
     const from = stations[fromCode];
     const to = stations[toCode];
     if (!from || !to) return [[0, 0], [0, 0]];
+
+    const directKey = `${lineCode}:${fromCode}-${toCode}`;
+    const reverseKey = `${lineCode}:${toCode}-${fromCode}`;
+    const directPolyline = SEGMENT_POLYLINE_OVERRIDES[directKey];
+    const reversePolyline = SEGMENT_POLYLINE_OVERRIDES[reverseKey];
+    if (Array.isArray(directPolyline)) {
+        return directPolyline.map((point) => scaleOfficialPoint(point, officialBounds));
+    }
+    if (Array.isArray(reversePolyline)) {
+        return [...reversePolyline].reverse().map((point) => scaleOfficialPoint(point, officialBounds));
+    }
 
     return [
         [from.x, from.y],
@@ -318,7 +381,7 @@ function buildSegmentPoints(lineCode, fromCode, toCode, stations) {
     ];
 }
 
-function buildLinesWithSegments(lines, stations) {
+function buildLinesWithSegments(lines, stations, officialBounds) {
     return lines.map((line) => ({
         ...line,
         branches: line.branches.map((branch) => ({
@@ -327,10 +390,74 @@ function buildLinesWithSegments(lines, stations) {
                 segmentId: `${branch.branchId}:${stationCode}-${branch.stationCodes[index + 1]}`,
                 from: stationCode,
                 to: branch.stationCodes[index + 1],
-                points: buildSegmentPoints(line.lineCode, stationCode, branch.stationCodes[index + 1], stations)
+                points: buildSegmentPoints(line.lineCode, stationCode, branch.stationCodes[index + 1], stations, officialBounds)
             }))
         }))
     }));
+}
+
+function buildWalkLinksAndLandmarks(stations) {
+    const austinStation = stations.AUS;
+    const kowloonStation = stations.KOW;
+    const tsimShaTsuiStation = stations.TST;
+    const eastTsimShaTsuiStation = stations.ETS;
+
+    if (!austinStation || !kowloonStation || !tsimShaTsuiStation || !eastTsimShaTsuiStation) {
+        throw new Error("Missing core stations for schematic walk links.");
+    }
+
+    const highSpeedRailLandmark = {
+        stationCode: "HSR",
+        nameZh: "高鐵",
+        nameEn: "High Speed Rail",
+        x: roundCoordinate((austinStation.x + kowloonStation.x) / 2 + 2),
+        y: roundCoordinate(Math.max(austinStation.y, kowloonStation.y) + 42),
+        selectable: true,
+        label: {
+            text: "高鐵",
+            anchor: "middle",
+            dx: 0,
+            dy: 0
+        }
+    };
+
+    const walkLinks = [
+        {
+            walkId: "TST|ETS",
+            linkKey: "ETS|TST",
+            from: "TST",
+            to: "ETS",
+            points: [
+                [tsimShaTsuiStation.x, tsimShaTsuiStation.y],
+                [eastTsimShaTsuiStation.x, eastTsimShaTsuiStation.y]
+            ]
+        },
+        {
+            walkId: "AUS|HSR",
+            linkKey: "AUS|HSR",
+            from: "AUS",
+            to: "HSR",
+            points: [
+                [austinStation.x, austinStation.y],
+                [highSpeedRailLandmark.x, highSpeedRailLandmark.y]
+            ]
+        },
+        {
+            walkId: "HSR|KOW",
+            linkKey: "HSR|KOW",
+            from: "HSR",
+            to: "KOW",
+            points: [
+                [highSpeedRailLandmark.x, highSpeedRailLandmark.y],
+                [kowloonStation.x, kowloonStation.y]
+            ]
+        }
+    ];
+
+    return {
+        landmarks: [highSpeedRailLandmark],
+        walkLinks
+    };
 }
 
 async function main() {
@@ -346,20 +473,25 @@ async function main() {
     }
 
     const lineDefinitions = buildLineBranches(heavyRail.lines, heavyRail.stationIndex);
-    const { stations, viewBox } = buildStationsFromOfficialMap(heavyRail.stationIndex, officialMap);
-    const lines = buildLinesWithSegments(lineDefinitions, stations);
+    const { stations, viewBox, officialBounds } = buildStationsFromOfficialMap(heavyRail.stationIndex, officialMap);
+    const lines = buildLinesWithSegments(lineDefinitions, stations, officialBounds);
+    const { landmarks, walkLinks } = buildWalkLinksAndLandmarks(stations);
 
     const layout = {
         generatedAt: new Date().toISOString(),
         source: "official-rail-index.json + official-mtr-map.js",
-        version: 3,
+        version: 4,
         viewBox,
         meta: {
             lineCount: lines.length,
             stationCount: Object.keys(stations).length,
-            branchCount: lines.reduce((total, line) => total + line.branches.length, 0)
+            branchCount: lines.reduce((total, line) => total + line.branches.length, 0),
+            walkLinkCount: walkLinks.length,
+            landmarkCount: landmarks.length
         },
         lines,
+        walkLinks,
+        landmarks,
         stations
     };
 

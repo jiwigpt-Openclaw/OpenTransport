@@ -1,7 +1,7 @@
 window.__MTR_SCHEMATIC_LAYOUT__ = {
-  "generatedAt": "2026-04-14T07:24:08.241Z",
+  "generatedAt": "2026-04-14T14:56:50.952Z",
   "source": "official-rail-index.json + official-mtr-map.js",
-  "version": 3,
+  "version": 4,
   "viewBox": {
     "minX": 0,
     "minY": 0,
@@ -11,7 +11,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
   "meta": {
     "lineCount": 10,
     "stationCount": 97,
-    "branchCount": 12
+    "branchCount": 12,
+    "walkLinkCount": 3,
+    "landmarkCount": 1
   },
   "lines": [
     {
@@ -913,6 +915,10 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   241.3
                 ],
                 [
+                  110,
+                  166.5
+                ],
+                [
                   149.2,
                   90
                 ]
@@ -926,6 +932,10 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 [
                   149.2,
                   90
+                ],
+                [
+                  188.3,
+                  125.6
                 ],
                 [
                   188.3,
@@ -973,6 +983,10 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   317.8
                 ],
                 [
+                  209.7,
+                  362.3
+                ],
+                [
                   236.4,
                   406.8
                 ]
@@ -988,8 +1002,16 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   406.8
                 ],
                 [
+                  348.5,
+                  428.2
+                ],
+                [
+                  544.3,
+                  465.6
+                ],
+                [
                   738.3,
-                  492.3
+                  497.6
                 ]
               ]
             },
@@ -1000,10 +1022,10 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   738.3,
-                  492.3
+                  497.6
                 ],
                 [
-                  733.9,
+                  738.3,
                   592
                 ]
               ]
@@ -1522,8 +1544,12 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   810.9
                 ],
                 [
-                  437.5,
-                  676.5
+                  366.3,
+                  739.7
+                ],
+                [
+                  434,
+                  673.8
                 ]
               ]
             },
@@ -1533,12 +1559,16 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "TSY",
               "points": [
                 [
-                  437.5,
-                  676.5
+                  434,
+                  673.8
                 ],
                 [
-                  535.4,
-                  567
+                  483.8,
+                  625.8
+                ],
+                [
+                  531.9,
+                  563.5
                 ]
               ]
             },
@@ -1548,16 +1578,16 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "LAK",
               "points": [
                 [
-                  535.4,
-                  567
+                  531.9,
+                  563.5
                 ],
                 [
-                  587.1,
-                  526.6
+                  588.8,
+                  508.3
                 ],
                 [
                   649.3,
-                  492.3
+                  497.6
                 ]
               ]
             },
@@ -1568,10 +1598,14 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   649.3,
-                  492.3
+                  497.6
                 ],
                 [
-                  733.9,
+                  672.5,
+                  540.3
+                ],
+                [
+                  729.4,
                   592
                 ]
               ]
@@ -1582,7 +1616,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "OLY",
               "points": [
                 [
-                  733.9,
+                  729.4,
                   592
                 ],
                 [
@@ -1601,7 +1635,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   705.9
                 ],
                 [
-                  724.1,
+                  729.4,
                   807.3
                 ]
               ]
@@ -1612,16 +1646,20 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "HOK",
               "points": [
                 [
-                  724.1,
+                  729.4,
                   807.3
                 ],
                 [
-                  808.5,
-                  865.8
+                  779.3,
+                  866.1
+                ],
+                [
+                  839.8,
+                  924.8
                 ],
                 [
                   891.4,
-                  959.5
+                  955.1
                 ]
               ]
             }
@@ -1660,6 +1698,14 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   656
                 ],
                 [
+                  273.8,
+                  656
+                ],
+                [
+                  252.4,
+                  695.2
+                ],
+                [
                   252.4,
                   743.3
                 ]
@@ -1675,8 +1721,16 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   743.3
                 ],
                 [
-                  535.4,
-                  567
+                  320,
+                  693.4
+                ],
+                [
+                  423.3,
+                  618.7
+                ],
+                [
+                  539,
+                  570.6
                 ]
               ]
             },
@@ -1686,15 +1740,19 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "KOW",
               "points": [
                 [
-                  535.4,
-                  567
+                  539,
+                  570.6
                 ],
                 [
-                  601.3,
-                  670.7
+                  604.8,
+                  625.8
                 ],
                 [
-                  724.1,
+                  679.6,
+                  716.6
+                ],
+                [
+                  718.8,
                   807.3
                 ]
               ]
@@ -1705,16 +1763,20 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "HOK",
               "points": [
                 [
-                  724.1,
+                  718.8,
                   807.3
                 ],
                 [
-                  808.5,
-                  865.8
+                  768.6,
+                  866.1
+                ],
+                [
+                  839.8,
+                  933.7
                 ],
                 [
                   891.4,
-                  959.5
+                  964
                 ]
               ]
             }
@@ -1746,8 +1808,12 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "DIS",
               "points": [
                 [
-                  437.5,
-                  676.5
+                  441.1,
+                  679.2
+                ],
+                [
+                  471.3,
+                  713
                 ],
                 [
                   503.4,
@@ -2000,12 +2066,12 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "KOT",
               "points": [
                 [
-                  1251.9,
+                  1247.4,
                   374.8
                 ],
                 [
                   1247.4,
-                  491.4
+                  495.8
                 ]
               ]
             },
@@ -2016,7 +2082,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1247.4,
-                  491.4
+                  495.8
                 ],
                 [
                   1249.2,
@@ -2034,8 +2100,12 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   620.4
                 ],
                 [
-                  1211.8,
-                  821.6
+                  1249.2,
+                  739.7
+                ],
+                [
+                  1215.4,
+                  825.1
                 ]
               ]
             },
@@ -2045,12 +2115,16 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "EXC",
               "points": [
                 [
-                  1211.8,
-                  821.6
+                  1215.4,
+                  825.1
                 ],
                 [
-                  1169.9,
-                  866.1
+                  1210,
+                  880.3
+                ],
+                [
+                  1160.2,
+                  935.5
                 ],
                 [
                   1099.7,
@@ -2068,12 +2142,12 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   955.1
                 ],
                 [
-                  1046,
-                  983.4
+                  1053.4,
+                  981.8
                 ],
                 [
                   998.2,
-                  997.4
+                  1001.4
                 ]
               ]
             }
@@ -2229,12 +2303,12 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "KOT",
               "points": [
                 [
-                  1251.9,
+                  1247.4,
                   374.8
                 ],
                 [
                   1247.4,
-                  491.4
+                  495.8
                 ]
               ]
             },
@@ -2245,7 +2319,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1247.4,
-                  491.4
+                  495.8
                 ],
                 [
                   1249.2,
@@ -2263,8 +2337,12 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   620.4
                 ],
                 [
-                  1211.8,
-                  821.6
+                  1249.2,
+                  739.7
+                ],
+                [
+                  1215.4,
+                  825.1
                 ]
               ]
             },
@@ -2274,12 +2352,16 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "EXC",
               "points": [
                 [
-                  1211.8,
-                  821.6
+                  1215.4,
+                  825.1
                 ],
                 [
-                  1169.9,
-                  866.1
+                  1210,
+                  880.3
+                ],
+                [
+                  1160.2,
+                  935.5
                 ],
                 [
                   1099.7,
@@ -2297,18 +2379,84 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   955.1
                 ],
                 [
-                  1046,
-                  983.4
+                  1053.4,
+                  981.8
                 ],
                 [
                   998.2,
-                  997.4
+                  1001.4
                 ]
               ]
             }
           ]
         }
       ]
+    }
+  ],
+  "walkLinks": [
+    {
+      "walkId": "TST|ETS",
+      "linkKey": "ETS|TST",
+      "from": "TST",
+      "to": "ETS",
+      "points": [
+        [
+          1065.9,
+          830.5
+        ],
+        [
+          1097.9,
+          862.5
+        ]
+      ]
+    },
+    {
+      "walkId": "AUS|HSR",
+      "linkKey": "AUS|HSR",
+      "from": "AUS",
+      "to": "HSR",
+      "points": [
+        [
+          930.6,
+          805.6
+        ],
+        [
+          829.4,
+          849.3
+        ]
+      ]
+    },
+    {
+      "walkId": "HSR|KOW",
+      "linkKey": "HSR|KOW",
+      "from": "HSR",
+      "to": "KOW",
+      "points": [
+        [
+          829.4,
+          849.3
+        ],
+        [
+          724.1,
+          807.3
+        ]
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "stationCode": "HSR",
+      "nameZh": "高鐵",
+      "nameEn": "High Speed Rail",
+      "x": 829.4,
+      "y": 849.3,
+      "selectable": true,
+      "label": {
+        "text": "高鐵",
+        "anchor": "middle",
+        "dx": 0,
+        "dy": 0
+      }
     }
   ],
   "stations": {
@@ -2329,7 +2477,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "金鐘",
         "anchor": "start",
         "dx": 18,
-        "dy": -22
+        "dy": -24
       }
     },
     "AIR": {
@@ -2346,7 +2494,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "機場",
         "anchor": "end",
         "dx": -18,
-        "dy": 22
+        "dy": 24
       }
     },
     "AUS": {
@@ -2380,7 +2528,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "博覽館",
         "anchor": "end",
         "dx": -18,
-        "dy": 22
+        "dy": -10
       }
     },
     "CAB": {
@@ -2535,7 +2683,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "迪士尼",
         "anchor": "end",
         "dx": -18,
-        "dy": 22
+        "dy": 24
       }
     },
     "ETS": {
@@ -2569,7 +2717,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "會展",
         "anchor": "start",
         "dx": 18,
-        "dy": -20
+        "dy": -24
       }
     },
     "FAN": {
@@ -2723,7 +2871,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "香港",
         "anchor": "end",
         "dx": -18,
-        "dy": -18
+        "dy": -24
       }
     },
     "HOM": {
@@ -2863,7 +3011,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "九龍",
         "anchor": "end",
         "dx": -18,
-        "dy": -18
+        "dy": -20
       }
     },
     "KSR": {
@@ -2880,7 +3028,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "錦上路",
         "anchor": "start",
         "dx": 18,
-        "dy": -8
+        "dy": -10
       }
     },
     "KWF": {
@@ -3068,7 +3216,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "朗屏",
         "anchor": "start",
         "dx": 18,
-        "dy": -8
+        "dy": -10
       }
     },
     "LOW": {
@@ -3173,7 +3321,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "南昌",
         "anchor": "end",
         "dx": -18,
-        "dy": 24
+        "dy": 28
       }
     },
     "NOP": {
@@ -3380,7 +3528,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "兆康",
         "anchor": "start",
         "dx": 18,
-        "dy": -8
+        "dy": 24
       }
     },
     "SKM": {
@@ -3483,7 +3631,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "欣澳",
         "anchor": "end",
         "dx": -18,
-        "dy": 22
+        "dy": 24
       }
     },
     "SUW": {
@@ -3638,7 +3786,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "天水圍",
         "anchor": "start",
         "dx": 18,
-        "dy": -8
+        "dy": -10
       }
     },
     "TKO": {
@@ -3741,7 +3889,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "青衣",
         "anchor": "end",
         "dx": -18,
-        "dy": 22
+        "dy": 26
       }
     },
     "TUC": {
@@ -3826,7 +3974,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "荃灣西",
         "anchor": "start",
         "dx": 18,
-        "dy": -8
+        "dy": -10
       }
     },
     "UNI": {
@@ -3981,7 +4129,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "元朗",
         "anchor": "start",
         "dx": 18,
-        "dy": -8
+        "dy": -10
       }
     }
   }
