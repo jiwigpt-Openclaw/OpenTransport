@@ -566,6 +566,7 @@ body::after {
 }
 
 .rail-nearest-line-card {
+    --rail-line-color: rgba(88, 116, 146, 0.82);
     display: grid;
     gap: 8px;
     padding: 12px;
@@ -573,6 +574,9 @@ body::after {
     border: 1px solid rgba(255, 255, 255, 0.78);
     background: rgba(255, 255, 255, 0.62);
     box-shadow: var(--rail-soft-shadow);
+    box-shadow:
+        inset 4px 0 0 var(--rail-line-color),
+        var(--rail-soft-shadow);
     container-type: inline-size;
     container-name: nearest-line;
 }
@@ -591,7 +595,7 @@ body::after {
 
 .rail-nearest-line-kicker {
     margin: 0 0 4px;
-    color: var(--rail-muted);
+    color: var(--rail-line-color);
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.14em;
@@ -656,6 +660,841 @@ body::after {
     gap: 12px;
     padding: 14px;
     border-radius: 20px;
+}
+
+.rail-route-shell {
+    display: grid;
+    gap: 10px;
+}
+
+.rail-planner-bubble {
+    appearance: none;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 13px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.84);
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(242, 247, 252, 0.82) 100%);
+    color: var(--rail-accent-strong);
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--rail-soft-shadow);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.rail-planner-bubble:hover,
+.rail-planner-bubble:focus-visible {
+    transform: translateY(-1px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 250, 254, 0.92) 100%);
+}
+
+.rail-planner-bubble.is-active {
+    border-color: rgba(37, 64, 93, 0.18);
+    background: linear-gradient(180deg, rgba(227, 237, 247, 0.96) 0%, rgba(244, 248, 252, 0.9) 100%);
+}
+
+.rail-planner-bubble-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 30% 30%, #ffffff 0%, #dce8f5 28%, #5a7694 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.84),
+        0 6px 14px rgba(64, 89, 118, 0.18);
+}
+
+.rail-planner-bubble-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.rail-planner-bubble-title {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--rail-ink);
+}
+
+.rail-planner-bubble-meta {
+    color: var(--rail-muted);
+    font-size: 0.86rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rail-route-panel {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.76);
+    background: rgba(255, 255, 255, 0.48);
+}
+
+.rail-route-panel-head,
+.rail-route-result-head {
+    display: grid;
+    gap: 10px;
+}
+
+.rail-route-panel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.rail-route-action-button {
+    min-width: 126px;
+}
+
+.rail-route-selector-row {
+    display: grid;
+    gap: 10px;
+}
+
+.rail-route-station-token {
+    appearance: none;
+    display: grid;
+    gap: 4px;
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.72);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--rail-soft-shadow);
+}
+
+.rail-route-station-token.is-active {
+    border-color: rgba(37, 64, 93, 0.22);
+    background: linear-gradient(180deg, rgba(227, 237, 247, 0.94) 0%, rgba(244, 248, 252, 0.9) 100%);
+}
+
+.rail-route-station-token-label {
+    color: var(--rail-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rail-route-station-token-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--rail-ink);
+}
+
+.rail-route-map-panel {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.78);
+    background: rgba(248, 251, 254, 0.7);
+}
+
+.rail-route-map-panel-head {
+    display: grid;
+    gap: 4px;
+}
+
+.rail-route-map-title {
+    margin: 0;
+    color: var(--rail-ink);
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.rail-route-map-hint {
+    margin: 0;
+    color: var(--rail-muted);
+    font-size: 0.86rem;
+}
+
+.rail-route-map-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.rail-route-map-legend-pill,
+.rail-route-map-line-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(37, 64, 93, 0.08);
+    color: var(--rail-accent);
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.rail-route-map-legend-pill.is-active {
+    background: rgba(37, 64, 93, 0.14);
+}
+
+.rail-route-map-line-chip {
+    background: color-mix(in srgb, var(--rail-line-color) 12%, white);
+    color: color-mix(in srgb, var(--rail-line-color) 72%, var(--rail-ink));
+}
+
+.rail-official-map-viewport {
+    position: relative;
+    overflow: auto;
+    height: min(64vh, 620px);
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.86);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), var(--rail-soft-shadow);
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+    scroll-behavior: smooth;
+}
+
+.rail-official-map-surface {
+    position: relative;
+    overflow: hidden;
+    background: #f8fbff url("./assets/mtr/lands_withSILKTE.svg") no-repeat left top;
+    background-size: 100% 100%;
+}
+
+.rail-official-map-lines,
+.rail-official-map-line,
+.rail-official-map-labels,
+.rail-official-map-hotspots {
+    position: absolute;
+    inset: 0;
+}
+
+.rail-official-map-lines {
+    pointer-events: none;
+}
+
+.rail-official-map-route {
+    position: absolute;
+    background-repeat: no-repeat;
+    background-position: left top;
+}
+
+.rail-official-map-lines-base {
+    opacity: 0.96;
+}
+
+.rail-official-map-lines-active {
+    z-index: 2;
+    filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 8px rgba(24, 36, 55, 0.16));
+}
+
+.rail-official-map-route.is-active {
+    opacity: 1;
+}
+
+.rail-official-map-labels {
+    z-index: 3;
+    pointer-events: none;
+    background: url("./assets/mtr/stations_withSILKTE.svg") no-repeat left top;
+    background-size: 100% 100%;
+}
+
+.rail-official-map-hotspots {
+    z-index: 4;
+}
+
+.rail-official-map-station {
+    appearance: none;
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    margin-left: -14px;
+    margin-top: -14px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.rail-official-map-station-ring,
+.rail-official-map-station-pulse {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    pointer-events: none;
+}
+
+.rail-official-map-station-ring {
+    border: 2px solid rgba(21, 40, 60, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.rail-official-map-station-pulse {
+    inset: -6px;
+    opacity: 0;
+    border: 2px solid rgba(37, 64, 93, 0.16);
+}
+
+.rail-official-map-station:hover .rail-official-map-station-ring,
+.rail-official-map-station:focus-visible .rail-official-map-station-ring {
+    transform: scale(1.08);
+    border-color: rgba(37, 64, 93, 0.4);
+    box-shadow: 0 0 0 6px rgba(37, 64, 93, 0.08);
+}
+
+.rail-official-map-station:focus-visible {
+    outline: none;
+}
+
+.rail-official-map-station.is-on-route .rail-official-map-station-ring {
+    border-color: rgba(28, 53, 80, 0.34);
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.rail-official-map-station.is-transfer .rail-official-map-station-ring {
+    background: rgba(24, 36, 55, 0.12);
+}
+
+.rail-official-map-station.is-nearest .rail-official-map-station-pulse,
+.rail-official-map-station.is-origin .rail-official-map-station-pulse,
+.rail-official-map-station.is-destination .rail-official-map-station-pulse {
+    opacity: 1;
+}
+
+.rail-official-map-station.is-nearest .rail-official-map-station-ring {
+    border-color: rgba(93, 118, 150, 0.42);
+}
+
+.rail-official-map-station.is-origin .rail-official-map-station-ring {
+    border-width: 3px;
+    border-color: #cf4a43;
+    background: rgba(207, 74, 67, 0.12);
+    box-shadow: 0 0 0 8px rgba(207, 74, 67, 0.12);
+}
+
+.rail-official-map-station.is-origin .rail-official-map-station-pulse {
+    border-color: rgba(207, 74, 67, 0.22);
+}
+
+.rail-official-map-station.is-destination .rail-official-map-station-ring {
+    border-width: 3px;
+    border-color: #2a67bf;
+    background: rgba(42, 103, 191, 0.12);
+    box-shadow: 0 0 0 8px rgba(42, 103, 191, 0.12);
+}
+
+.rail-official-map-station.is-destination .rail-official-map-station-pulse {
+    border-color: rgba(42, 103, 191, 0.22);
+}
+
+.rail-route-map-grid {
+    display: grid;
+    gap: 10px;
+    max-height: 52vh;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.rail-route-map-line {
+    --rail-line-color: #5A7694;
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--rail-line-color) 7%, white) 0%, rgba(255, 255, 255, 0.88) 100%);
+    box-shadow: inset 4px 0 0 var(--rail-line-color);
+}
+
+.rail-route-map-line-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.rail-route-map-line-heading,
+.rail-route-leg-heading {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+}
+
+.rail-route-map-line-dot,
+.rail-route-leg-line-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    margin-top: 4px;
+    background: var(--rail-line-color);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--rail-line-color) 16%, transparent);
+}
+
+.rail-route-map-line-kicker,
+.rail-route-leg-kicker {
+    margin: 0 0 4px;
+    color: var(--rail-line-color, var(--rail-muted));
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.rail-route-map-line-title,
+.rail-route-leg-title {
+    margin: 0;
+    color: var(--rail-ink);
+    font-size: 0.98rem;
+    font-weight: 700;
+}
+
+.rail-route-map-path-list {
+    display: grid;
+    gap: 8px;
+}
+
+.rail-route-map-path {
+    --rail-line-color: #5A7694;
+    display: grid;
+    gap: 8px;
+}
+
+.rail-route-map-path-label {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--rail-line-color) 10%, white);
+    color: color-mix(in srgb, var(--rail-line-color) 72%, var(--rail-ink));
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.rail-route-map-path-label::before {
+    content: "";
+    width: 18px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--rail-line-color);
+    flex: 0 0 auto;
+}
+
+.rail-route-map-stations {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.rail-route-map-link {
+    width: 20px;
+    min-width: 20px;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--rail-line-color);
+    opacity: 0.72;
+}
+
+.rail-route-map-station {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.84);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--rail-accent-strong);
+    cursor: pointer;
+    transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.rail-route-map-station:hover,
+.rail-route-map-station:focus-visible {
+    transform: translateY(-1px);
+    border-color: rgba(37, 64, 93, 0.22);
+}
+
+.rail-route-map-station-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--rail-line-color);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--rail-line-color) 18%, transparent);
+}
+
+.rail-route-map-station-name {
+    font-size: 0.84rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.rail-route-map-station.is-transfer {
+    border-style: dashed;
+}
+
+.rail-route-map-station.is-origin {
+    background: rgba(225, 240, 255, 0.98);
+    border-color: rgba(58, 116, 171, 0.3);
+}
+
+.rail-route-map-station.is-origin .rail-route-map-station-dot {
+    background: #2d6ea6;
+    box-shadow: 0 0 0 4px rgba(45, 110, 166, 0.12);
+}
+
+.rail-route-map-station.is-destination {
+    background: rgba(255, 239, 227, 0.98);
+    border-color: rgba(189, 106, 52, 0.26);
+}
+
+.rail-route-map-station.is-destination .rail-route-map-station-dot {
+    background: #bc6f39;
+    box-shadow: 0 0 0 4px rgba(188, 111, 57, 0.12);
+}
+
+.rail-route-map-station.is-on-route {
+    border-color: color-mix(in srgb, var(--rail-line-color) 44%, white);
+    background: color-mix(in srgb, var(--rail-line-color) 10%, white);
+}
+
+.rail-route-result {
+    box-shadow: none;
+}
+
+.rail-route-result-card {
+    display: grid;
+    gap: 14px;
+    padding: 14px;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.78);
+    background: rgba(255, 255, 255, 0.78);
+}
+
+.rail-route-overview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+}
+
+.rail-route-endpoint {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 12px 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.84);
+    background: rgba(246, 250, 254, 0.88);
+}
+
+.rail-route-endpoint.is-origin {
+    background: rgba(231, 243, 255, 0.9);
+}
+
+.rail-route-endpoint.is-destination {
+    background: rgba(255, 242, 232, 0.92);
+}
+
+.rail-route-endpoint-label {
+    color: var(--rail-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rail-route-endpoint-name {
+    color: var(--rail-ink);
+    font-size: 1rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rail-route-overview-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: rgba(37, 64, 93, 0.08);
+    color: var(--rail-accent-strong);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.rail-route-result-chips {
+    margin-bottom: 0;
+}
+
+.rail-route-option-gallery {
+    display: grid;
+    gap: 10px;
+}
+
+.rail-route-option-card {
+    appearance: none;
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.84);
+    border-radius: 20px;
+    background: rgba(244, 248, 252, 0.82);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--rail-soft-shadow);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.rail-route-option-card:hover,
+.rail-route-option-card:focus-visible {
+    transform: translateY(-1px);
+    border-color: rgba(37, 64, 93, 0.18);
+    background: rgba(248, 251, 255, 0.92);
+}
+
+.rail-route-option-card.is-active {
+    border-color: rgba(37, 64, 93, 0.22);
+    background: linear-gradient(180deg, rgba(228, 237, 247, 0.96) 0%, rgba(245, 249, 253, 0.9) 100%);
+    box-shadow: 0 16px 28px rgba(37, 64, 93, 0.12);
+}
+
+.rail-route-option-card-head {
+    display: grid;
+    gap: 8px;
+}
+
+.rail-route-option-card-kicker {
+    margin: 0;
+    color: var(--rail-accent);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rail-route-option-card-title {
+    margin: 0;
+    color: var(--rail-ink);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.rail-route-option-card-badge {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--rail-accent) 0%, var(--rail-accent-strong) 100%);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.rail-route-option-card-chips {
+    margin-bottom: 0;
+}
+
+.rail-route-view-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.rail-route-view-tab {
+    appearance: none;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.84);
+    border-radius: 999px;
+    background: rgba(240, 246, 252, 0.88);
+    color: var(--rail-muted);
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.16s ease, background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.rail-route-view-tab:hover,
+.rail-route-view-tab:focus-visible {
+    transform: translateY(-1px);
+    background: rgba(247, 251, 255, 0.98);
+}
+
+.rail-route-view-tab.is-active {
+    background: linear-gradient(180deg, var(--rail-accent) 0%, var(--rail-accent-strong) 100%);
+    color: #fff;
+    box-shadow: 0 14px 24px rgba(37, 64, 93, 0.18);
+}
+
+.rail-route-option-strip-wrap {
+    display: grid;
+    gap: 10px;
+}
+
+.rail-route-option-strip {
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+    overflow-x: auto;
+    padding: 2px 2px 8px;
+}
+
+.rail-route-option-stop {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    min-width: 86px;
+    flex: 0 0 86px;
+    text-align: center;
+}
+
+.rail-route-option-stop-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--rail-ink);
+    line-height: 1.25;
+}
+
+.rail-route-option-stop-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(24, 36, 55, 0.9);
+    background: #fff;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.rail-route-option-stop.is-transfer .rail-route-option-stop-dot {
+    background: rgba(24, 36, 55, 0.92);
+    box-shadow: 0 0 0 4px rgba(24, 36, 55, 0.08);
+}
+
+.rail-route-option-segment {
+    flex: var(--rail-segment-grow, 1) 1 40px;
+    min-width: 26px;
+    height: 5px;
+    margin: 0 0 4px;
+    border-radius: 999px;
+    background: var(--rail-line-color);
+}
+
+.rail-route-line-badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.rail-route-line-badge {
+    --rail-line-color: #5A7694;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--rail-line-color) 12%, white);
+    color: var(--rail-ink);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.rail-route-line-badge-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--rail-line-color);
+    flex: 0 0 auto;
+}
+
+.rail-route-leg-list {
+    display: grid;
+    gap: 10px;
+}
+
+.rail-route-transfer-callout {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    background: rgba(242, 247, 252, 0.82);
+}
+
+.rail-route-transfer-title {
+    margin: 0;
+    color: var(--rail-accent);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rail-route-transfer-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.rail-route-transfer-pill {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--rail-ink);
+    font-size: 0.84rem;
+}
+
+.rail-route-transfer-pill span {
+    color: var(--rail-muted);
+}
+
+.rail-route-leg-card {
+    --rail-line-color: #5A7694;
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    background: color-mix(in srgb, var(--rail-line-color) 8%, white);
+    box-shadow: inset 4px 0 0 var(--rail-line-color);
+}
+
+.rail-route-leg-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.rail-route-leg-stations,
+.rail-route-leg-note {
+    margin: 0;
+    color: var(--rail-muted);
+    font-size: 0.9rem;
 }
 
 @container nearest-line (min-width: 540px) {
@@ -865,6 +1704,35 @@ body::after {
         align-items: center;
     }
 
+    .rail-route-panel-head,
+    .rail-route-result-head {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+    }
+
+    .rail-route-map-panel-head {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+    }
+
+    .rail-route-option-gallery {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .rail-route-option-card-head {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+    }
+
+    .rail-route-panel-actions {
+        justify-self: end;
+        justify-content: flex-end;
+    }
+
+    .rail-route-selector-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .rail-result-header-card {
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
@@ -896,6 +1764,17 @@ body::after {
 
     .rail-nearest-direction-row {
         grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+    }
+
+    .rail-official-map-viewport {
+        height: min(66vh, 680px);
+    }
+}
+
+@media (min-width: 960px) {
+    .rail-route-map-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         align-items: start;
     }
 }
@@ -953,6 +1832,95 @@ body::after {
     .rail-loading-card {
         grid-template-columns: 1fr;
         justify-items: start;
+    }
+
+    .rail-route-panel,
+    .rail-route-result-card {
+        padding: 12px;
+        border-radius: 20px;
+    }
+
+    .rail-route-overview {
+        grid-template-columns: 1fr;
+    }
+
+    .rail-route-overview-arrow {
+        justify-self: center;
+        transform: rotate(90deg);
+    }
+
+    .rail-route-map-grid {
+        max-height: 48vh;
+    }
+
+    .rail-route-view-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 2px;
+    }
+
+    .rail-route-view-tab {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    .rail-route-option-card {
+        padding: 11px;
+        border-radius: 18px;
+    }
+
+    .rail-route-option-card-title {
+        font-size: 0.95rem;
+    }
+
+    .rail-route-map-panel-head {
+        gap: 10px;
+    }
+
+    .rail-route-map-legend {
+        gap: 6px;
+    }
+
+    .rail-route-map-legend-pill {
+        padding: 5px 9px;
+        font-size: 0.76rem;
+    }
+
+    .rail-official-map-viewport {
+        height: min(52vh, 420px);
+        border-radius: 18px;
+    }
+
+    .rail-official-map-station {
+        width: 32px;
+        height: 32px;
+        margin-left: -16px;
+        margin-top: -16px;
+    }
+
+    .rail-route-option-stop {
+        min-width: 72px;
+        flex-basis: 72px;
+    }
+
+    .rail-route-option-stop-name {
+        font-size: 0.82rem;
+    }
+
+    .rail-route-line-badge {
+        font-size: 0.8rem;
+    }
+
+    .rail-route-transfer-pill {
+        border-radius: 16px;
+    }
+
+    .rail-route-map-station {
+        padding: 8px 9px;
+    }
+
+    .rail-route-map-station-name {
+        font-size: 0.82rem;
     }
 
     .rail-service-card {
