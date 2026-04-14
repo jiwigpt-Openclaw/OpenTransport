@@ -62,7 +62,16 @@
                 result: null,
                 hasAutoFilledOrigin: false,
                 hasUserEditedOrigin: false,
-                hasUserEditedDestination: false
+                hasUserEditedDestination: false,
+                mapView: {
+                    scale: 1,
+                    x: 0,
+                    y: 0,
+                    minScale: 0.56,
+                    maxScale: 2.8,
+                    isInitialized: false,
+                    hasUserAdjusted: false
+                }
             },
             routing: {
                 runtime: null,
@@ -73,6 +82,17 @@
         },
         lightRail: { routeCode: "", stopId: "", routes: [], stopIndex: {} },
         ui: { isReady: false, statusKind: "info", statusMessage: "正在準備官方靜態索引..." }
+    };
+    const mapGestureState = {
+        activePointers: new Map(),
+        mode: "idle",
+        dragStartPoint: null,
+        dragStartView: null,
+        pinchStartDistance: 0,
+        pinchStartScale: 1,
+        pinchContentPoint: null,
+        suppressClickUntil: 0,
+        hasDragged: false
     };
 
     function escapeHtml(value) {
@@ -398,6 +418,123 @@
     }
     function getMtrOfficialMapStation(stationCode) {
         return railState.mtr.routing.officialMap?.stationHotspotLookup?.[String(stationCode || "").toUpperCase()] || null;
+    }
+    function getMapViewportState() {
+        return railState.mtr.routePlanner.mapView;
+    }
+    function clampMapScale(value) {
+        const mapView = getMapViewportState();
+        return Math.min(mapView.maxScale, Math.max(mapView.minScale, value));
+    }
+    function getMapViewportMetrics(viewport, scale = getMapViewportState().scale) {
+        const mapRuntime = railState.mtr.routing.officialMap;
+        if (!(viewport instanceof HTMLElement) || !mapRuntime) return null;
+        const scaledWidth = mapRuntime.width * scale;
+        const scaledHeight = mapRuntime.height * scale;
+        return {
+            viewportWidth: viewport.clientWidth,
+            viewportHeight: viewport.clientHeight,
+            mapWidth: mapRuntime.width,
+            mapHeight: mapRuntime.height,
+            scaledWidth,
+            scaledHeight
+        };
+    }
+    function clampMapOffset(viewport, x, y, scale = getMapViewportState().scale) {
+        const metrics = getMapViewportMetrics(viewport, scale);
+        if (!metrics) return { x, y };
+
+        const clampedX = metrics.scaledWidth <= metrics.viewportWidth
+            ? (metrics.viewportWidth - metrics.scaledWidth) / 2
+            : Math.min(0, Math.max(metrics.viewportWidth - metrics.scaledWidth, x));
+        const clampedY = metrics.scaledHeight <= metrics.viewportHeight
+            ? (metrics.viewportHeight - metrics.scaledHeight) / 2
+            : Math.min(0, Math.max(metrics.viewportHeight - metrics.scaledHeight, y));
+
+        return { x: clampedX, y: clampedY };
+    }
+    function getViewportLocalPoint(viewport, clientX, clientY) {
+        const rect = viewport.getBoundingClientRect();
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+    function getMapFocusBounds(stationCodes) {
+        const points = stationCodes.map((stationCode) => getMtrOfficialMapStation(stationCode)).filter(Boolean);
+        if (points.length === 0) return null;
+
+        return {
+            points,
+            minX: Math.min(...points.map((point) => point.x)),
+            maxX: Math.max(...points.map((point) => point.x)),
+            minY: Math.min(...points.map((point) => point.y)),
+            maxY: Math.max(...points.map((point) => point.y))
+        };
+    }
+    function getDefaultMapScale(viewport) {
+        const metrics = getMapViewportMetrics(viewport, 1);
+        if (!metrics) return 1;
+        const viewportWidth = metrics.viewportWidth;
+        if (viewportWidth < 420) return clampMapScale(0.72);
+        if (viewportWidth < 720) return clampMapScale(0.82);
+        if (viewportWidth < 1080) return clampMapScale(0.92);
+        return clampMapScale(1.02);
+    }
+    function setMapView(viewport, nextScale, nextX, nextY, { markAdjusted = false } = {}) {
+        const mapView = getMapViewportState();
+        const scale = clampMapScale(nextScale);
+        const offset = clampMapOffset(viewport, nextX, nextY, scale);
+        mapView.scale = scale;
+        mapView.x = offset.x;
+        mapView.y = offset.y;
+        if (markAdjusted) mapView.hasUserAdjusted = true;
+        applyMapTransform(viewport);
+    }
+    function applyMapTransform(viewport) {
+        const scene = document.getElementById("mtrOfficialMapScene");
+        if (!(viewport instanceof HTMLElement) || !(scene instanceof HTMLElement)) return;
+        const mapView = getMapViewportState();
+        scene.style.transform = `translate3d(${mapView.x}px, ${mapView.y}px, 0) scale(${mapView.scale})`;
+    }
+    function centerMapOnBounds(viewport, bounds, { scaleOverride = null, markAdjusted = false } = {}) {
+        if (!(viewport instanceof HTMLElement) || !bounds) return;
+        const metrics = getMapViewportMetrics(viewport, 1);
+        if (!metrics) return;
+
+        const scale = clampMapScale(scaleOverride ?? getMapViewportState().scale);
+        const paddingX = Math.min(110, Math.max(54, metrics.viewportWidth * 0.12));
+        const paddingY = Math.min(110, Math.max(54, metrics.viewportHeight * 0.14));
+        const centerX = (bounds.minX + bounds.maxX) / 2;
+        const centerY = (bounds.minY + bounds.maxY) / 2;
+        const targetX = metrics.viewportWidth / 2 - centerX * scale;
+        const targetY = metrics.viewportHeight / 2 - centerY * scale - paddingY * 0.08;
+
+        setMapView(viewport, scale, targetX, targetY, { markAdjusted });
+    }
+    function zoomMapAtPoint(viewport, nextScale, focusPoint, { markAdjusted = false } = {}) {
+        if (!(viewport instanceof HTMLElement) || !focusPoint) return;
+        const mapView = getMapViewportState();
+        const scale = clampMapScale(nextScale);
+        const contentX = (focusPoint.x - mapView.x) / mapView.scale;
+        const contentY = (focusPoint.y - mapView.y) / mapView.scale;
+        const nextX = focusPoint.x - contentX * scale;
+        const nextY = focusPoint.y - contentY * scale;
+        setMapView(viewport, scale, nextX, nextY, { markAdjusted });
+    }
+    function initializeMapViewport(viewport, focusStationCodes = []) {
+        const mapView = getMapViewportState();
+        if (!(viewport instanceof HTMLElement) || mapView.isInitialized) {
+            applyMapTransform(viewport);
+            return;
+        }
+
+        const focusBounds = getMapFocusBounds(focusStationCodes);
+        const defaultScale = getDefaultMapScale(viewport);
+        mapView.isInitialized = true;
+        if (focusBounds) {
+            centerMapOnBounds(viewport, focusBounds, { scaleOverride: defaultScale });
+            return;
+        }
+
+        setMapView(viewport, defaultScale, 0, 0);
     }
     function buildRoutePlannerActiveRouteBoxes(activeResult) {
         const mapRuntime = railState.mtr.routing.officialMap;
@@ -1308,50 +1445,53 @@
                 </div>
                 <div class="rail-route-map-legend">
                     <span class="rail-route-map-legend-pill is-active">${activeField === "origin" ? "正在選起點" : "正在選終點"}</span>
-                    <span class="rail-route-map-legend-pill">實心點＝轉線站</span>
-                    <span class="rail-route-map-legend-pill">雙圈＝已選站</span>
+                    <span class="rail-route-map-legend-pill">拖曳平移</span>
+                    <span class="rail-route-map-legend-pill">雙指縮放</span>
                 </div>
             </div>
             <div id="mtrOfficialMapViewport" class="rail-official-map-viewport">
-                <div class="rail-official-map-surface" style="width:${escapeHtml(String(mapRuntime.width))}px;height:${escapeHtml(String(mapRuntime.height))}px;">
-                    <div class="rail-official-map-lines rail-official-map-lines-base">
-                        ${mapRuntime.lines.map((line) => `
-                            <div class="rail-official-map-line ${escapeHtml(line.cssClassName)}">
-                                ${line.routes.map((route) => buildOfficialMapRouteDivMarkup(route, "is-base")).join("")}
-                            </div>
-                        `).join("")}
-                    </div>
-                    <div class="rail-official-map-lines rail-official-map-lines-active" aria-hidden="true">
-                        ${activeRouteBoxes.map((route) => `
-                            <div class="rail-official-map-line ${escapeHtml(route.cssClassName)}">
-                                ${buildOfficialMapRouteDivMarkup(route, "is-active")}
-                            </div>
-                        `).join("")}
-                    </div>
-                    <div class="rail-official-map-labels" aria-hidden="true"></div>
-                    <div class="rail-official-map-hotspots">
-                        ${mapRuntime.stationHotspots.map((station) => {
-                            const classNames = [
-                                "rail-official-map-station",
-                                station.stationCode === selectedOriginCode ? "is-origin" : "",
-                                station.stationCode === selectedDestinationCode ? "is-destination" : "",
-                                transferStationSet.has(station.stationCode) ? "is-transfer" : "",
-                                routeStationSet.has(station.stationCode) ? "is-on-route" : "",
-                                station.stationCode === nearestStationCode ? "is-nearest" : ""
-                            ].filter(Boolean).join(" ");
-                            return `
-                                <button
-                                    type="button"
-                                    class="${classNames}"
-                                    data-route-station="${escapeHtml(station.stationCode)}"
-                                    aria-label="${escapeHtml(station.stationNameZh)}"
-                                    title="${escapeHtml(station.stationNameZh)}"
-                                    style="left:${escapeHtml(String(station.x))}px;top:${escapeHtml(String(station.y))}px;"
-                                >
-                                    <span class="rail-official-map-station-ring" aria-hidden="true"></span>
-                                    <span class="rail-official-map-station-pulse" aria-hidden="true"></span>
-                                </button>`;
-                        }).join("")}
+                <div id="mtrOfficialMapScene" class="rail-official-map-scene">
+                    <div class="rail-official-map-surface" style="width:${escapeHtml(String(mapRuntime.width))}px;height:${escapeHtml(String(mapRuntime.height))}px;">
+                        <div class="rail-official-map-lines rail-official-map-lines-base">
+                            ${mapRuntime.lines.map((line) => `
+                                <div class="rail-official-map-line ${escapeHtml(line.cssClassName)}">
+                                    ${line.routes.map((route) => buildOfficialMapRouteDivMarkup(route, "is-base")).join("")}
+                                </div>
+                            `).join("")}
+                        </div>
+                        <div class="rail-official-map-lines rail-official-map-lines-active" aria-hidden="true">
+                            ${activeRouteBoxes.map((route) => `
+                                <div class="rail-official-map-line ${escapeHtml(route.cssClassName)}">
+                                    ${buildOfficialMapRouteDivMarkup(route, "is-active")}
+                                </div>
+                            `).join("")}
+                        </div>
+                        <div class="rail-official-map-labels" aria-hidden="true"></div>
+                        <div class="rail-official-map-hotspots">
+                            ${mapRuntime.stationHotspots.map((station) => {
+                                const classNames = [
+                                    "rail-official-map-station",
+                                    station.stationCode === selectedOriginCode ? "is-origin" : "",
+                                    station.stationCode === selectedDestinationCode ? "is-destination" : "",
+                                    transferStationSet.has(station.stationCode) ? "is-transfer" : "",
+                                    routeStationSet.has(station.stationCode) ? "is-on-route" : "",
+                                    station.stationCode === nearestStationCode ? "is-nearest" : ""
+                                ].filter(Boolean).join(" ");
+                                return `
+                                    <button
+                                        type="button"
+                                        class="${classNames}"
+                                        data-route-station="${escapeHtml(station.stationCode)}"
+                                        aria-label="${escapeHtml(station.stationNameZh)}"
+                                        title="${escapeHtml(station.stationNameZh)}"
+                                        style="left:${escapeHtml(String(station.x))}px;top:${escapeHtml(String(station.y))}px;"
+                                    >
+                                        <span class="rail-official-map-station-pulse" aria-hidden="true"></span>
+                                        <span class="rail-official-map-station-ring" aria-hidden="true"></span>
+                                        <span class="rail-official-map-station-core" aria-hidden="true"></span>
+                                    </button>`;
+                            }).join("")}
+                        </div>
                     </div>
                 </div>
             </div>`;
@@ -1646,42 +1786,190 @@
                 ${railState.mtr.routePlanner.isOpen ? buildRoutePlannerPanelMarkup() : ""}
             </section>`;
     }
+    function bindOfficialMapInteractions() {
+        const viewport = document.getElementById("mtrOfficialMapViewport");
+        if (!(viewport instanceof HTMLElement)) return;
+        mapGestureState.activePointers.clear();
+        mapGestureState.mode = "idle";
+        mapGestureState.dragStartPoint = null;
+        mapGestureState.dragStartView = null;
+        mapGestureState.pinchStartDistance = 0;
+        mapGestureState.pinchContentPoint = null;
+        mapGestureState.hasDragged = false;
+
+        const updateDragCursor = () => {
+            viewport.classList.toggle("is-dragging", mapGestureState.mode !== "idle");
+        };
+        const beginPinchFromActivePointers = () => {
+            if (mapGestureState.activePointers.size < 2) return;
+            const [firstPoint, secondPoint] = Array.from(mapGestureState.activePointers.values());
+            const mapView = getMapViewportState();
+            const startMid = {
+                x: (firstPoint.x + secondPoint.x) / 2,
+                y: (firstPoint.y + secondPoint.y) / 2
+            };
+            mapGestureState.mode = "pinch";
+            mapGestureState.hasDragged = true;
+            mapGestureState.dragStartPoint = null;
+            mapGestureState.dragStartView = null;
+            mapGestureState.pinchStartDistance = Math.max(1, Math.hypot(secondPoint.x - firstPoint.x, secondPoint.y - firstPoint.y));
+            mapGestureState.pinchStartScale = mapView.scale;
+            mapGestureState.pinchContentPoint = {
+                x: (startMid.x - mapView.x) / mapView.scale,
+                y: (startMid.y - mapView.y) / mapView.scale
+            };
+            updateDragCursor();
+        };
+        const handlePointerDown = (event) => {
+            if (event.button !== undefined && event.pointerType === "mouse" && event.button !== 0) return;
+            const point = getViewportLocalPoint(viewport, event.clientX, event.clientY);
+            mapGestureState.activePointers.set(event.pointerId, point);
+            viewport.setPointerCapture(event.pointerId);
+
+            if (mapGestureState.activePointers.size >= 2) {
+                beginPinchFromActivePointers();
+                return;
+            }
+
+            mapGestureState.mode = "pan";
+            mapGestureState.dragStartPoint = point;
+            mapGestureState.dragStartView = { x: getMapViewportState().x, y: getMapViewportState().y };
+            mapGestureState.hasDragged = false;
+            updateDragCursor();
+        };
+        const handlePointerMove = (event) => {
+            if (!mapGestureState.activePointers.has(event.pointerId)) return;
+            const point = getViewportLocalPoint(viewport, event.clientX, event.clientY);
+            mapGestureState.activePointers.set(event.pointerId, point);
+
+            if (mapGestureState.activePointers.size >= 2) {
+                if (mapGestureState.mode !== "pinch") beginPinchFromActivePointers();
+                const [firstPoint, secondPoint] = Array.from(mapGestureState.activePointers.values());
+                const currentDistance = Math.max(1, Math.hypot(secondPoint.x - firstPoint.x, secondPoint.y - firstPoint.y));
+                const currentMid = {
+                    x: (firstPoint.x + secondPoint.x) / 2,
+                    y: (firstPoint.y + secondPoint.y) / 2
+                };
+                const nextScale = clampMapScale(mapGestureState.pinchStartScale * (currentDistance / mapGestureState.pinchStartDistance));
+                const contentPoint = mapGestureState.pinchContentPoint || { x: 0, y: 0 };
+                const nextX = currentMid.x - contentPoint.x * nextScale;
+                const nextY = currentMid.y - contentPoint.y * nextScale;
+                setMapView(viewport, nextScale, nextX, nextY, { markAdjusted: true });
+                mapGestureState.hasDragged = true;
+                return;
+            }
+
+            if (mapGestureState.mode !== "pan" || !mapGestureState.dragStartPoint || !mapGestureState.dragStartView) return;
+            const deltaX = point.x - mapGestureState.dragStartPoint.x;
+            const deltaY = point.y - mapGestureState.dragStartPoint.y;
+            if (!mapGestureState.hasDragged && Math.hypot(deltaX, deltaY) > 6) {
+                mapGestureState.hasDragged = true;
+            }
+            if (!mapGestureState.hasDragged) return;
+            setMapView(
+                viewport,
+                getMapViewportState().scale,
+                mapGestureState.dragStartView.x + deltaX,
+                mapGestureState.dragStartView.y + deltaY,
+                { markAdjusted: true }
+            );
+        };
+        const finishPointerInteraction = (event) => {
+            if (mapGestureState.activePointers.has(event.pointerId)) {
+                mapGestureState.activePointers.delete(event.pointerId);
+            }
+            try {
+                if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+            } catch {}
+
+            if (mapGestureState.activePointers.size >= 2) {
+                beginPinchFromActivePointers();
+                return;
+            }
+
+            if (mapGestureState.activePointers.size === 1) {
+                const remainingPoint = Array.from(mapGestureState.activePointers.values())[0];
+                mapGestureState.mode = "pan";
+                mapGestureState.dragStartPoint = { x: remainingPoint.x, y: remainingPoint.y };
+                mapGestureState.dragStartView = { x: getMapViewportState().x, y: getMapViewportState().y };
+                updateDragCursor();
+                return;
+            }
+
+            if (mapGestureState.hasDragged) {
+                mapGestureState.suppressClickUntil = Date.now() + 220;
+            }
+            mapGestureState.mode = "idle";
+            mapGestureState.dragStartPoint = null;
+            mapGestureState.dragStartView = null;
+            mapGestureState.pinchStartDistance = 0;
+            mapGestureState.pinchContentPoint = null;
+            mapGestureState.hasDragged = false;
+            updateDragCursor();
+        };
+        const handleWheel = (event) => {
+            event.preventDefault();
+            const localPoint = getViewportLocalPoint(viewport, event.clientX, event.clientY);
+            const zoomFactor = Math.exp(event.deltaY * -0.0015);
+            zoomMapAtPoint(viewport, getMapViewportState().scale * zoomFactor, localPoint, { markAdjusted: true });
+            mapGestureState.suppressClickUntil = Date.now() + 120;
+        };
+        const handleClickCapture = (event) => {
+            const stationButton = event.target instanceof HTMLElement ? event.target.closest("[data-route-station]") : null;
+            if (!(stationButton instanceof HTMLElement)) return;
+            if (Date.now() < mapGestureState.suppressClickUntil) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        };
+
+        viewport.addEventListener("pointerdown", handlePointerDown);
+        viewport.addEventListener("pointermove", handlePointerMove);
+        viewport.addEventListener("pointerup", finishPointerInteraction);
+        viewport.addEventListener("pointercancel", finishPointerInteraction);
+        viewport.addEventListener("lostpointercapture", finishPointerInteraction);
+        viewport.addEventListener("wheel", handleWheel, { passive: false });
+        viewport.addEventListener("click", handleClickCapture, true);
+
+        initializeMapViewport(viewport, [
+            railState.mtr.routePlanner.originStationCode,
+            railState.mtr.routePlanner.destinationStationCode,
+            railState.mtr.nearest.nearestStation?.stationCode
+        ].filter(Boolean));
+        applyMapTransform(viewport);
+    }
     function maybeFocusOfficialMapViewport() {
         if (railState.currentTab !== "mtr" || !railState.mtr.routePlanner.isOpen) return;
 
         const viewport = document.getElementById("mtrOfficialMapViewport");
         if (!(viewport instanceof HTMLElement)) return;
 
-        const mapRuntime = railState.mtr.routing.officialMap;
-        if (!mapRuntime) return;
-
         const activeView = getActiveRoutePlannerView();
         const focusStationCodes = Array.isArray(activeView?.result?.stationCodes) && activeView.result.stationCodes.length > 0
             ? activeView.result.stationCodes
             : [railState.mtr.routePlanner.originStationCode, railState.mtr.routePlanner.destinationStationCode, railState.mtr.nearest.nearestStation?.stationCode].filter(Boolean);
-        const focusPoints = focusStationCodes
-            .map((stationCode) => getMtrOfficialMapStation(stationCode))
-            .filter(Boolean);
-
-        if (focusPoints.length === 0) return;
+        const focusBounds = getMapFocusBounds(focusStationCodes);
+        if (!focusBounds) return;
 
         const focusKey = `${activeView?.id || "idle"}:${focusStationCodes.join("|")}:${railState.mtr.routePlanner.activeField}`;
         if (railState.mtr.routePlanner.lastMapFocusKey === focusKey) return;
         railState.mtr.routePlanner.lastMapFocusKey = focusKey;
+        initializeMapViewport(viewport, focusStationCodes);
+        const currentScale = getMapViewportState().scale;
+        const metrics = getMapViewportMetrics(viewport, currentScale);
+        if (!metrics) return;
 
-        const minX = Math.min(...focusPoints.map((point) => point.x));
-        const maxX = Math.max(...focusPoints.map((point) => point.x));
-        const minY = Math.min(...focusPoints.map((point) => point.y));
-        const maxY = Math.max(...focusPoints.map((point) => point.y));
-        const padding = 140;
-        const targetLeft = Math.max(0, Math.min((minX + maxX) / 2 - viewport.clientWidth / 2, mapRuntime.width - viewport.clientWidth));
-        const targetTop = Math.max(0, Math.min((minY + maxY) / 2 - viewport.clientHeight / 2 - padding * 0.15, mapRuntime.height - viewport.clientHeight));
+        const focusWidth = Math.max(72, focusBounds.maxX - focusBounds.minX);
+        const focusHeight = Math.max(72, focusBounds.maxY - focusBounds.minY);
+        const fitScale = clampMapScale(Math.min(
+            (metrics.viewportWidth - 84) / focusWidth,
+            (metrics.viewportHeight - 96) / focusHeight
+        ));
+        const nextScale = getMapViewportState().hasUserAdjusted
+            ? currentScale
+            : Math.max(Math.min(currentScale, fitScale), getDefaultMapScale(viewport));
 
-        viewport.scrollTo({
-            left: targetLeft,
-            top: targetTop,
-            behavior: "smooth"
-        });
+        centerMapOnBounds(viewport, focusBounds, { scaleOverride: nextScale });
     }
     function buildMtrManualControlsMarkup(stationOptions) {
         return `
@@ -1855,6 +2143,7 @@
             });
         }
 
+        bindOfficialMapInteractions();
         requestAnimationFrame(() => {
             maybeFocusOfficialMapViewport();
         });
