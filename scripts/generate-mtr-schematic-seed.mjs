@@ -7,11 +7,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const officialRailIndexPath = path.join(projectRoot, "official-rail-index.json");
 const officialMapPath = path.join(projectRoot, "official-mtr-map.js");
+const officialMapCssPath = path.join(projectRoot, "official-mtr-map.css");
 const schematicLayoutPath = path.join(projectRoot, "mtr-schematic-layout.js");
 
 const OFFICIAL_MAP_PADDING_X = 110;
 const OFFICIAL_MAP_PADDING_Y = 90;
 const OFFICIAL_MAP_SCALE = 1.78;
+const OFFICIAL_ROUTE_CLIP_MARGIN = 6;
+const OFFICIAL_ROUTE_SAMPLE_STEP = 3;
+const OFFICIAL_ROUTE_SIMPLIFY_TOLERANCE = 1.6;
 
 const LINE_STYLE_MAP = {
     AEL: "#008A8B",
@@ -53,8 +57,8 @@ const LABEL_OVERRIDES = {
     HKU: middle(-34),
     SYP: middle(-34),
     SHW: middle(-34),
-    CEN: middle(-34),
-    ADM: right(-28),
+    CEN: { anchor: "middle", dx: 0, dy: -40 },
+    ADM: { anchor: "start", dx: 22, dy: -36 },
     WAC: middle(-34),
     CAB: middle(-34),
     TIH: middle(-34),
@@ -67,11 +71,11 @@ const LABEL_OVERRIDES = {
     HFC: right(22),
     CHW: right(24),
 
-    TST: left(-10),
-    JOR: left(-10),
-    YMT: left(-10),
-    MOK: left(-10),
-    PRE: left(-10),
+    TST: { anchor: "end", dx: -26, dy: -18 },
+    JOR: { anchor: "end", dx: -24, dy: -6 },
+    YMT: { anchor: "end", dx: -24, dy: -6 },
+    MOK: { anchor: "end", dx: -24, dy: -8 },
+    PRE: { anchor: "end", dx: -24, dy: -8 },
     SSP: middle(-28),
     CSW: middle(-28),
     LCK: middle(-28),
@@ -87,10 +91,10 @@ const LABEL_OVERRIDES = {
     KWF: middle(-30),
     LAK: left(-14),
     MEF: left(-14),
-    NAC: left(34),
-    OLY: left(30),
-    KOW: left(-24),
-    HOK: left(-26),
+    NAC: { anchor: "end", dx: -20, dy: 36 },
+    OLY: { anchor: "end", dx: -22, dy: 34 },
+    KOW: { anchor: "end", dx: -22, dy: -36 },
+    HOK: { anchor: "end", dx: -22, dy: -34 },
     TWW: middle(-30),
     KSR: middle(-30),
     YUL: middle(-30),
@@ -98,11 +102,11 @@ const LABEL_OVERRIDES = {
     TIS: middle(-30),
     SIH: right(26),
     TUM: right(24),
-    AUS: left(30),
-    ETS: left(-18),
+    AUS: { anchor: "end", dx: -28, dy: 40 },
+    ETS: { anchor: "start", dx: 22, dy: 6 },
 
-    HUH: right(30),
-    HOM: right(30),
+    HUH: { anchor: "start", dx: 20, dy: 24 },
+    HOM: { anchor: "start", dx: 20, dy: 34 },
     TKW: right(30),
     SUW: right(30),
     KAT: right(30),
@@ -117,7 +121,7 @@ const LABEL_OVERRIDES = {
     HEO: middle(-30),
     MOS: middle(-30),
     WKS: middle(-30),
-    EXC: right(-30),
+    EXC: { anchor: "start", dx: 22, dy: -20 },
 
     SHT: right(-20),
     FOT: right(-20),
@@ -261,6 +265,371 @@ function roundCoordinate(value) {
     return Math.round(value * 10) / 10;
 }
 
+function roundPoint([x, y]) {
+    return [roundCoordinate(x), roundCoordinate(y)];
+}
+
+function escapeRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeOfficialStationId(value) {
+    const numericId = Number.parseInt(String(value || "").replace(/^id/i, ""), 10);
+    return Number.isFinite(numericId) ? String(numericId) : "";
+}
+
+function getPointDistance([leftX, leftY], [rightX, rightY]) {
+    return Math.hypot(rightX - leftX, rightY - leftY);
+}
+
+function dedupePolylinePoints(points, minDistance = 0.5) {
+    const deduped = [];
+
+    for (const point of Array.isArray(points) ? points : []) {
+        if (!Array.isArray(point) || point.length < 2) continue;
+        const normalizedPoint = roundPoint(point);
+        const lastPoint = deduped[deduped.length - 1];
+        if (!lastPoint || getPointDistance(lastPoint, normalizedPoint) > minDistance) {
+            deduped.push(normalizedPoint);
+        }
+    }
+
+    if (deduped.length === 1) {
+        deduped.push([...deduped[0]]);
+    }
+
+    return deduped;
+}
+
+function getPointToSegmentDistance(point, segmentStart, segmentEnd) {
+    const [pointX, pointY] = point;
+    const [startX, startY] = segmentStart;
+    const [endX, endY] = segmentEnd;
+    const deltaX = endX - startX;
+    const deltaY = endY - startY;
+    const lengthSquared = deltaX * deltaX + deltaY * deltaY;
+
+    if (lengthSquared === 0) {
+        return getPointDistance(point, segmentStart);
+    }
+
+    const projection = ((pointX - startX) * deltaX + (pointY - startY) * deltaY) / lengthSquared;
+    const clampedProjection = Math.max(0, Math.min(1, projection));
+    return getPointDistance(point, [
+        startX + deltaX * clampedProjection,
+        startY + deltaY * clampedProjection
+    ]);
+}
+
+function simplifyPolyline(points, tolerance = OFFICIAL_ROUTE_SIMPLIFY_TOLERANCE) {
+    if (!Array.isArray(points) || points.length <= 2) {
+        return dedupePolylinePoints(points);
+    }
+
+    const keepFlags = new Array(points.length).fill(false);
+    keepFlags[0] = true;
+    keepFlags[points.length - 1] = true;
+
+    function markImportantPoints(startIndex, endIndex) {
+        if (endIndex - startIndex <= 1) return;
+
+        let furthestIndex = -1;
+        let furthestDistance = 0;
+
+        for (let index = startIndex + 1; index < endIndex; index += 1) {
+            const distance = getPointToSegmentDistance(points[index], points[startIndex], points[endIndex]);
+            if (distance > furthestDistance) {
+                furthestDistance = distance;
+                furthestIndex = index;
+            }
+        }
+
+        if (furthestIndex > -1 && furthestDistance > tolerance) {
+            keepFlags[furthestIndex] = true;
+            markImportantPoints(startIndex, furthestIndex);
+            markImportantPoints(furthestIndex, endIndex);
+        }
+    }
+
+    markImportantPoints(0, points.length - 1);
+
+    return dedupePolylinePoints(
+        points.filter((_, index) => keepFlags[index]).map((point) => roundPoint(point))
+    );
+}
+
+function cubicBezierValue(start, controlA, controlB, end, t) {
+    const inverse = 1 - t;
+    return inverse ** 3 * start
+        + 3 * inverse ** 2 * t * controlA
+        + 3 * inverse * t ** 2 * controlB
+        + t ** 3 * end;
+}
+
+function parseSvgPath(pathData) {
+    const tokens = String(pathData || "").match(/[A-Za-z]|-?\d*\.?\d+/g) || [];
+    const segments = [];
+    let tokenIndex = 0;
+    let currentCommand = "";
+    let currentX = 0;
+    let currentY = 0;
+
+    while (tokenIndex < tokens.length) {
+        if (/^[A-Za-z]$/.test(tokens[tokenIndex])) {
+            currentCommand = tokens[tokenIndex];
+            tokenIndex += 1;
+        }
+
+        switch (currentCommand) {
+            case "M":
+                currentX = Number(tokens[tokenIndex]);
+                currentY = Number(tokens[tokenIndex + 1]);
+                tokenIndex += 2;
+                break;
+            case "L": {
+                const nextX = Number(tokens[tokenIndex]);
+                const nextY = Number(tokens[tokenIndex + 1]);
+                tokenIndex += 2;
+                segments.push({
+                    type: "L",
+                    x1: currentX,
+                    y1: currentY,
+                    x2: nextX,
+                    y2: nextY
+                });
+                currentX = nextX;
+                currentY = nextY;
+                break;
+            }
+            case "H": {
+                const nextX = Number(tokens[tokenIndex]);
+                tokenIndex += 1;
+                segments.push({
+                    type: "L",
+                    x1: currentX,
+                    y1: currentY,
+                    x2: nextX,
+                    y2: currentY
+                });
+                currentX = nextX;
+                break;
+            }
+            case "V": {
+                const nextY = Number(tokens[tokenIndex]);
+                tokenIndex += 1;
+                segments.push({
+                    type: "L",
+                    x1: currentX,
+                    y1: currentY,
+                    x2: currentX,
+                    y2: nextY
+                });
+                currentY = nextY;
+                break;
+            }
+            case "C": {
+                const controlAX = Number(tokens[tokenIndex]);
+                const controlAY = Number(tokens[tokenIndex + 1]);
+                const controlBX = Number(tokens[tokenIndex + 2]);
+                const controlBY = Number(tokens[tokenIndex + 3]);
+                const endX = Number(tokens[tokenIndex + 4]);
+                const endY = Number(tokens[tokenIndex + 5]);
+                tokenIndex += 6;
+                segments.push({
+                    type: "C",
+                    x0: currentX,
+                    y0: currentY,
+                    x1: controlAX,
+                    y1: controlAY,
+                    x2: controlBX,
+                    y2: controlBY,
+                    x3: endX,
+                    y3: endY
+                });
+                currentX = endX;
+                currentY = endY;
+                break;
+            }
+            default:
+                throw new Error(`Unsupported SVG path command "${currentCommand}" in official route geometry.`);
+        }
+    }
+
+    return segments;
+}
+
+function sampleSvgSegment(segment) {
+    if (segment.type === "L") {
+        const length = Math.hypot(segment.x2 - segment.x1, segment.y2 - segment.y1);
+        const steps = Math.max(1, Math.ceil(length / OFFICIAL_ROUTE_SAMPLE_STEP));
+        return Array.from({ length: steps + 1 }, (_, stepIndex) => {
+            const ratio = stepIndex / steps;
+            return roundPoint([
+                segment.x1 + (segment.x2 - segment.x1) * ratio,
+                segment.y1 + (segment.y2 - segment.y1) * ratio
+            ]);
+        });
+    }
+
+    const approximateLength = Math.hypot(segment.x1 - segment.x0, segment.y1 - segment.y0)
+        + Math.hypot(segment.x2 - segment.x1, segment.y2 - segment.y1)
+        + Math.hypot(segment.x3 - segment.x2, segment.y3 - segment.y2)
+        + Math.hypot(segment.x3 - segment.x0, segment.y3 - segment.y0);
+    const steps = Math.max(12, Math.ceil(approximateLength / OFFICIAL_ROUTE_SAMPLE_STEP));
+
+    return Array.from({ length: steps + 1 }, (_, stepIndex) => {
+        const ratio = stepIndex / steps;
+        return roundPoint([
+            cubicBezierValue(segment.x0, segment.x1, segment.x2, segment.x3, ratio),
+            cubicBezierValue(segment.y0, segment.y1, segment.y2, segment.y3, ratio)
+        ]);
+    });
+}
+
+function sampleSvgPath(pathData) {
+    return parseSvgPath(pathData).flatMap((segment, segmentIndex) => {
+        const sampledPoints = sampleSvgSegment(segment);
+        return segmentIndex === 0 ? sampledPoints : sampledPoints.slice(1);
+    });
+}
+
+function extractOfficialLinePathSamples(cssContent, cssClassName) {
+    const patterns = [
+        new RegExp(`\\.rail-official-map-line\\.${escapeRegExp(cssClassName)}\\s+\\.rail-official-map-route\\{background-image:url\\("data:image\\/svg\\+xml;charset=UTF-8,([^"]+)"\\);\\}`),
+        new RegExp(`\\.lines-wrapper\\s+\\.line\\.${escapeRegExp(cssClassName)}\\s+\\.route\\{background-image:\\s*url\\("data:image\\/svg\\+xml;charset=UTF-8,([^"]+)"\\);\\}`)
+    ];
+
+    const matchedRule = patterns.map((pattern) => cssContent.match(pattern)).find(Boolean);
+    if (!matchedRule?.[1]) {
+        return [];
+    }
+
+    const svgMarkup = decodeURIComponent(matchedRule[1]);
+    const sampledPaths = [];
+
+    for (const pathMatch of svgMarkup.matchAll(/<path\b([^>]+?)\/>/g)) {
+        const attributes = pathMatch[1];
+        const pathDataMatch = attributes.match(/\bd='([^']+)'/);
+        const strokeWidthMatch = attributes.match(/\bstroke-width='([^']+)'/);
+        if (!pathDataMatch || !strokeWidthMatch) continue;
+
+        const strokeWidth = Number(strokeWidthMatch[1]);
+        if (!(strokeWidth >= 4.5)) continue;
+
+        const sampledPath = sampleSvgPath(pathDataMatch[1]);
+        if (sampledPath.length < 2) continue;
+
+        const maxX = Math.max(...sampledPath.map(([x]) => x));
+        if (maxX > 1200.5) continue;
+
+        sampledPaths.push(sampledPath);
+    }
+
+    return sampledPaths;
+}
+
+function clipOfficialRoutePathCandidates(sampledPaths, routeEntry) {
+    const minX = Number(routeEntry.x) - OFFICIAL_ROUTE_CLIP_MARGIN;
+    const maxX = Number(routeEntry.x) + Number(routeEntry.width) + OFFICIAL_ROUTE_CLIP_MARGIN;
+    const minY = Number(routeEntry.y) - OFFICIAL_ROUTE_CLIP_MARGIN;
+    const maxY = Number(routeEntry.y) + Number(routeEntry.height) + OFFICIAL_ROUTE_CLIP_MARGIN;
+    const candidates = [];
+
+    for (const sampledPath of Array.isArray(sampledPaths) ? sampledPaths : []) {
+        let currentRun = [];
+
+        for (const point of sampledPath) {
+            const [pointX, pointY] = point;
+            const isInside = pointX >= minX && pointX <= maxX && pointY >= minY && pointY <= maxY;
+
+            if (isInside) {
+                currentRun.push(point);
+                continue;
+            }
+
+            if (currentRun.length >= 2) {
+                candidates.push(currentRun);
+            }
+            currentRun = [];
+        }
+
+        if (currentRun.length >= 2) {
+            candidates.push(currentRun);
+        }
+    }
+
+    return candidates;
+}
+
+function getPolylineStationScore(points, fromStation, toStation) {
+    const fromPoint = [fromStation.x, fromStation.y];
+    const toPoint = [toStation.x, toStation.y];
+    const distancesToFrom = points.map((point) => getPointDistance(point, fromPoint));
+    const distancesToTo = points.map((point) => getPointDistance(point, toPoint));
+
+    return Math.min(...distancesToFrom) + Math.min(...distancesToTo);
+}
+
+function buildOfficialRoutePolyline(routeEntry, sampledPaths, fromStation, toStation) {
+    const candidates = clipOfficialRoutePathCandidates(sampledPaths, routeEntry);
+    if (candidates.length === 0) return null;
+
+    const bestCandidate = [...candidates]
+        .map((points) => ({
+            points,
+            score: getPolylineStationScore(points, fromStation, toStation)
+        }))
+        .sort((left, right) => left.score - right.score || right.points.length - left.points.length)[0];
+
+    if (!bestCandidate) return null;
+
+    const forwardScore = getPointDistance(bestCandidate.points[0], [fromStation.x, fromStation.y])
+        + getPointDistance(bestCandidate.points[bestCandidate.points.length - 1], [toStation.x, toStation.y]);
+    const reverseScore = getPointDistance(bestCandidate.points[0], [toStation.x, toStation.y])
+        + getPointDistance(bestCandidate.points[bestCandidate.points.length - 1], [fromStation.x, fromStation.y]);
+    const normalizedPoints = reverseScore < forwardScore
+        ? [...bestCandidate.points].reverse()
+        : [...bestCandidate.points];
+
+    return simplifyPolyline([
+        [fromStation.x, fromStation.y],
+        ...normalizedPoints,
+        [toStation.x, toStation.y]
+    ]);
+}
+
+function buildOfficialRouteGeometryLookup(officialMap, cssContent) {
+    const routeGeometryLookup = {};
+
+    for (const line of Array.isArray(officialMap?.lines) ? officialMap.lines : []) {
+        const sampledPaths = extractOfficialLinePathSamples(cssContent, line.cssClassName);
+        if (sampledPaths.length === 0) continue;
+
+        const stationIdLookup = new Map(
+            (Array.isArray(line.stations) ? line.stations : [])
+                .map((station) => [normalizeOfficialStationId(station.stationID), station])
+                .filter(([stationId]) => stationId)
+        );
+
+        for (const routeEntry of Array.isArray(line.routes) ? line.routes : []) {
+            const [fromStationId, toStationId] = String(routeEntry.relStation || "")
+                .split(",")
+                .map((stationId) => normalizeOfficialStationId(stationId));
+            const fromStation = stationIdLookup.get(fromStationId);
+            const toStation = stationIdLookup.get(toStationId);
+            if (!fromStation || !toStation) continue;
+
+            const polyline = buildOfficialRoutePolyline(routeEntry, sampledPaths, fromStation, toStation);
+            if (!polyline || polyline.length < 2) continue;
+
+            routeGeometryLookup[`${line.lineCode}:${fromStation.stationCode}-${toStation.stationCode}`] = polyline;
+            routeGeometryLookup[`${line.lineCode}:${toStation.stationCode}-${fromStation.stationCode}`] = [...polyline].reverse();
+        }
+    }
+
+    return routeGeometryLookup;
+}
+
 function getStationAveragePosition(entries) {
     return {
         x: entries.reduce((sum, entry) => sum + entry.x, 0) / entries.length,
@@ -358,9 +727,13 @@ function buildStationsFromOfficialMap(stationIndex, officialMap) {
             throw new Error(`官方地圖缺少車站座標：${stationCode}`);
         }
 
-        const averaged = getStationAveragePosition(officialEntries);
-        const x = OFFICIAL_MAP_PADDING_X + (averaged.x - minX) * OFFICIAL_MAP_SCALE;
-        const y = OFFICIAL_MAP_PADDING_Y + (averaged.y - minY) * OFFICIAL_MAP_SCALE;
+        const referenceLineCode = STATION_REFERENCE_LINE[stationCode];
+        const preferredEntry = referenceLineCode
+            ? officialEntries.find((entry) => entry.lineCode === referenceLineCode)
+            : null;
+        const referencePoint = preferredEntry || getStationAveragePosition(officialEntries);
+        const x = OFFICIAL_MAP_PADDING_X + (referencePoint.x - minX) * OFFICIAL_MAP_SCALE;
+        const y = OFFICIAL_MAP_PADDING_Y + (referencePoint.y - minY) * OFFICIAL_MAP_SCALE;
         const normalizedStation = {
             stationCode,
             nameZh: stationEntry.nameZh,
@@ -419,10 +792,20 @@ function buildIntermediatePoints(lineCode, fromCode, toCode, stations) {
     });
 }
 
-function buildSegmentPoints(lineCode, fromCode, toCode, stations, officialBounds) {
+function buildSegmentPoints(lineCode, fromCode, toCode, stations, officialBounds, officialRouteGeometry) {
     const from = stations[fromCode];
     const to = stations[toCode];
     if (!from || !to) return [[0, 0], [0, 0]];
+
+    const officialRoutePolyline = officialRouteGeometry?.[`${lineCode}:${fromCode}-${toCode}`];
+    if (Array.isArray(officialRoutePolyline) && officialRoutePolyline.length >= 2) {
+        const scaledPolyline = officialRoutePolyline.map((point) => scaleOfficialPoint(point, officialBounds));
+        return dedupePolylinePoints([
+            [from.x, from.y],
+            ...scaledPolyline.slice(1, -1),
+            [to.x, to.y]
+        ], 0.8);
+    }
 
     const directKey = `${lineCode}:${fromCode}-${toCode}`;
     const reverseKey = `${lineCode}:${toCode}-${fromCode}`;
@@ -442,7 +825,7 @@ function buildSegmentPoints(lineCode, fromCode, toCode, stations, officialBounds
     ];
 }
 
-function buildLinesWithSegments(lines, stations, officialBounds) {
+function buildLinesWithSegments(lines, stations, officialBounds, officialRouteGeometry) {
     return lines.map((line) => ({
         ...line,
         branches: line.branches.map((branch) => ({
@@ -451,7 +834,14 @@ function buildLinesWithSegments(lines, stations, officialBounds) {
                 segmentId: `${branch.branchId}:${stationCode}-${branch.stationCodes[index + 1]}`,
                 from: stationCode,
                 to: branch.stationCodes[index + 1],
-                points: buildSegmentPoints(line.lineCode, stationCode, branch.stationCodes[index + 1], stations, officialBounds)
+                points: buildSegmentPoints(
+                    line.lineCode,
+                    stationCode,
+                    branch.stationCodes[index + 1],
+                    stations,
+                    officialBounds,
+                    officialRouteGeometry
+                )
             }))
         }))
     }));
@@ -471,8 +861,8 @@ function buildWalkLinksAndLandmarks(stations) {
         stationCode: "HSR",
         nameZh: "高鐵",
         nameEn: "High Speed Rail",
-        x: roundCoordinate((austinStation.x + kowloonStation.x) / 2 + 2),
-        y: roundCoordinate(Math.max(austinStation.y, kowloonStation.y) + 42),
+        x: roundCoordinate((austinStation.x + kowloonStation.x) / 2 + 10),
+        y: roundCoordinate(Math.max(austinStation.y, kowloonStation.y) + 76),
         selectable: true,
         label: {
             text: "高鐵",
@@ -490,6 +880,8 @@ function buildWalkLinksAndLandmarks(stations) {
             to: "ETS",
             points: [
                 [tsimShaTsuiStation.x, tsimShaTsuiStation.y],
+                [roundCoordinate(tsimShaTsuiStation.x + 12), roundCoordinate(tsimShaTsuiStation.y + 16)],
+                [roundCoordinate(eastTsimShaTsuiStation.x - 14), roundCoordinate(eastTsimShaTsuiStation.y - 10)],
                 [eastTsimShaTsuiStation.x, eastTsimShaTsuiStation.y]
             ]
         },
@@ -500,6 +892,8 @@ function buildWalkLinksAndLandmarks(stations) {
             to: "HSR",
             points: [
                 [austinStation.x, austinStation.y],
+                [roundCoordinate(austinStation.x - 8), roundCoordinate(austinStation.y + 60)],
+                [roundCoordinate(highSpeedRailLandmark.x + 18), roundCoordinate(highSpeedRailLandmark.y - 10)],
                 [highSpeedRailLandmark.x, highSpeedRailLandmark.y]
             ]
         },
@@ -510,6 +904,8 @@ function buildWalkLinksAndLandmarks(stations) {
             to: "KOW",
             points: [
                 [highSpeedRailLandmark.x, highSpeedRailLandmark.y],
+                [roundCoordinate(highSpeedRailLandmark.x - 24), roundCoordinate(highSpeedRailLandmark.y - 8)],
+                [roundCoordinate(kowloonStation.x + 32), roundCoordinate(kowloonStation.y + 40)],
                 [kowloonStation.x, kowloonStation.y]
             ]
         }
@@ -524,6 +920,7 @@ function buildWalkLinksAndLandmarks(stations) {
 async function main() {
     const officialRailIndex = JSON.parse(await fs.readFile(officialRailIndexPath, "utf8"));
     const officialMap = await loadOfficialMap();
+    const officialMapCss = await fs.readFile(officialMapCssPath, "utf8");
     const heavyRail = officialRailIndex.heavyRail;
 
     if (!heavyRail?.lines || !heavyRail?.stationIndex) {
@@ -533,15 +930,16 @@ async function main() {
         throw new Error("official-mtr-map.js 缺少官方地圖線路資料。");
     }
 
+    const officialRouteGeometry = buildOfficialRouteGeometryLookup(officialMap, officialMapCss);
     const lineDefinitions = buildLineBranches(heavyRail.lines, heavyRail.stationIndex);
     const { stations, viewBox, officialBounds } = buildStationsFromOfficialMap(heavyRail.stationIndex, officialMap);
-    const lines = buildLinesWithSegments(lineDefinitions, stations, officialBounds);
+    const lines = buildLinesWithSegments(lineDefinitions, stations, officialBounds, officialRouteGeometry);
     const { landmarks, walkLinks } = buildWalkLinksAndLandmarks(stations);
 
     const layout = {
         generatedAt: new Date().toISOString(),
-        source: "official-rail-index.json + official-mtr-map.js",
-        version: 4,
+        source: "official-rail-index.json + official-mtr-map.js + official-mtr-map.css",
+        version: 5,
         viewBox,
         meta: {
             lineCount: lines.length,
