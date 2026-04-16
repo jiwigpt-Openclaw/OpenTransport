@@ -141,6 +141,11 @@
         lightRail: { routeCode: "", stopId: "", routes: [], stopIndex: {} },
         ui: { isReady: false, statusKind: "info", statusMessage: "正在準備官方靜態索引..." }
     };
+    railState.ui.nextTrainModal = {
+        isOpen: false,
+        lineCode: "",
+        directionKey: ""
+    };
     const mapGestureState = {
         activePointers: new Map(),
         mode: "idle",
@@ -1100,6 +1105,7 @@
         if (railState.currentTab !== "mtr") return;
         if (!force && railState.mtr.nearest.hasAttempted) return;
         abortNearestMtrRequest();
+        closeNextTrainModal();
         railState.mtr.nearest.requestId += 1;
         const requestId = railState.mtr.nearest.requestId;
         const controller = new AbortController();
@@ -2984,6 +2990,45 @@
                 </div>
             </section>`;
     }
+    function buildRoutePlannerOptionGalleryMarkup(routeViews, activeViewId) {
+        if (!Array.isArray(routeViews) || routeViews.length === 0) return "";
+        const galleryClassName = routeViews.length === 1
+            ? "rail-route-option-gallery is-single"
+            : "rail-route-option-gallery";
+        return `
+            <section class="${galleryClassName}" aria-label="路線方案">
+                ${routeViews.map((view) => buildRoutePlannerOptionCardMarkup(view, activeViewId)).join("")}
+            </section>`;
+    }
+    function buildRoutePlannerResultMarkup() {
+        const planner = railState.mtr.routePlanner;
+        const originStation = getRoutePlannerStationEntry(planner.originStationCode);
+        const destinationStation = getRoutePlannerStationEntry(planner.destinationStationCode);
+        const routeViews = getRoutePlannerViews();
+        const activeView = getActiveRoutePlannerView();
+        const activeResult = activeView?.result || null;
+
+        if (!originStation) {
+            return `<section class="rail-route-result rail-empty-card"><h3 class="rail-empty-title">請先選擇起點</h3><p class="rail-empty-text">你可以直接在 custom SVG 港鐵圖上點選起點站，之後再選終點。</p></section>`;
+        }
+
+        if (!destinationStation) {
+            return `<section class="rail-route-result rail-empty-card"><h3 class="rail-empty-title">請再選擇終點</h3><p class="rail-empty-text">起點已設定，現在請在 custom SVG 港鐵圖上點選終點站。</p></section>`;
+        }
+
+        if (!routeViews.length || !activeView || !activeResult) {
+            return `<section class="rail-route-result rail-empty-card"><h3 class="rail-empty-title">未找到可顯示的方案</h3><p class="rail-empty-text">請嘗試重新選擇起點與終點。</p></section>`;
+        }
+
+        if (activeResult.status === "unreachable") {
+            return `<section class="rail-route-result rail-empty-card rail-empty-card-error"><h3 class="rail-empty-title">暫時未找到合理路線</h3><p class="rail-empty-text">請檢查站點是否正確，或改用其他起點 / 終點再試一次。</p></section>`;
+        }
+
+        return `
+            <section class="rail-route-result rail-route-result-card rail-route-result-card-compact">
+                ${buildRoutePlannerOptionGalleryMarkup(routeViews, activeView.id)}
+            </section>`;
+    }
     function buildRoutePlannerPanelMarkup() {
         const planner = railState.mtr.routePlanner;
         const selectedOriginCode = planner.originStationCode;
@@ -3600,6 +3645,63 @@
         }
         return `<section class="rail-mtr-block rail-mtr-result-block">${headerMarkup}${bodyMarkup}</section>`;
     }
+    function getNextTrainModalServiceLabel(index) {
+        if (index === 0) return "下一班車";
+        const chineseNumbers = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+        const numberLabel = chineseNumbers[index] || String(index + 1);
+        return `第${numberLabel}班車`;
+    }
+    function buildNextTrainModalServiceLineMarkup(service, index) {
+        const lineLabel = getNextTrainModalServiceLabel(index);
+        const scheduleText = service.clockTime ? `（預計 ${service.clockTime}）` : "（官方未提供時鐘時間）";
+        const metaParts = [
+            service.platform ? `${service.platform}號月台` : "",
+            service.timeTypeLabel || "",
+            ...(Array.isArray(service.notes) ? service.notes : [])
+        ].filter(Boolean);
+
+        return `
+            <li class="rail-next-train-list-item ${index === 0 ? "is-primary" : ""}">
+                <span class="rail-next-train-list-label">${escapeHtml(lineLabel)}：</span>
+                <span class="rail-next-train-list-text">${escapeHtml(service.minutesLabel || "時間未提供")}${escapeHtml(scheduleText)}</span>
+                ${metaParts.length > 0 ? `<span class="rail-next-train-list-meta"> · ${escapeHtml(metaParts.join(" · "))}</span>` : ""}
+            </li>`;
+    }
+    function buildNextTrainModalMarkup() {
+        const modalState = railState.ui.nextTrainModal;
+        if (!modalState?.isOpen) return "";
+
+        const detail = getNextTrainModalDetail();
+        const lineSummary = detail?.lineSummary || null;
+        const directionSummary = detail?.directionSummary || null;
+        const services = Array.isArray(detail?.services) ? detail.services : [];
+        const lineColor = getMtrOfficialLineColor(lineSummary?.lineCode || modalState.lineCode || "");
+        const modalTitle = lineSummary && directionSummary
+            ? `${lineSummary.lineNameZh}　往 ${directionSummary.terminusNameZh}`
+            : "下一班車詳情";
+        const modalSubtitleBits = [directionSummary?.stationNameZh || lineSummary?.stationNameZh || ""];
+        if (lineSummary?.referenceTimeLabel) modalSubtitleBits.push(`更新 ${lineSummary.referenceTimeLabel}`);
+        const modalSubtitle = modalSubtitleBits.filter(Boolean).join(" · ");
+        const listMarkup = services.length > 0
+            ? `<ul class="rail-next-train-list">${services.map((service, index) => buildNextTrainModalServiceLineMarkup(service, index)).join("")}</ul>`
+            : '<p class="rail-next-train-empty">暫時沒有班次資料</p>';
+
+        return `
+            <section class="rail-next-train-modal-layer" id="mtrNextTrainModal">
+                <button type="button" class="rail-next-train-modal-backdrop" data-next-train-modal-close aria-label="關閉下一班車詳情"></button>
+                <div class="rail-next-train-modal" style="--rail-bubble-color: ${escapeHtml(lineColor)};" role="dialog" aria-modal="true" aria-labelledby="mtrNextTrainModalTitle" aria-describedby="mtrNextTrainModalSubtitle">
+                    <div class="rail-next-train-modal-head">
+                        <div class="rail-summary-main">
+                            <p class="rail-mtr-section-kicker">下一班車詳情</p>
+                            <h3 class="rail-summary-title" id="mtrNextTrainModalTitle">${escapeHtml(modalTitle)}</h3>
+                            <p class="rail-summary-text" id="mtrNextTrainModalSubtitle">${escapeHtml(modalSubtitle)}</p>
+                        </div>
+                        <button type="button" class="rail-next-train-modal-close" id="mtrNextTrainModalClose" data-next-train-modal-close aria-label="關閉">關閉</button>
+                    </div>
+                    <div class="rail-next-train-modal-body">${listMarkup}</div>
+                </div>
+            </section>`;
+    }
     function buildMtrMarkup() {
         return `
             <section class="rail-panel rail-mtr-panel">
@@ -3608,6 +3710,290 @@
                 </div>
                 ${buildNearestSectionMarkup()}
                 ${buildRoutePlannerShellMarkup()}
+            </section>`;
+    }
+    function buildNearestLineSummary(lineMembership, schedule) {
+        const directions = Array.isArray(schedule?.directions) ? schedule.directions : [];
+        const hasAnyDirectionData = directions.some((direction) => direction.hasData);
+        const referenceTime = schedule?.currentTime || schedule?.systemTime || "";
+        const referenceTimeLabel = schedule?.currentTimeLabel || schedule?.systemTimeLabel || "";
+        const stationCode = schedule?.stationCode || lineMembership.stationCode || "";
+        const stationNameZh = schedule?.stationNameZh || resolveMtrStationName(stationCode);
+
+        const directionSummaries = directions.map((direction) => {
+            const services = Array.isArray(direction.services) ? direction.services : [];
+            const nextService = services[0] || null;
+            const directionTerminusName = getMtrDirectionTerminusName(lineMembership.lineCode, direction.apiKey);
+
+            if (!nextService) {
+                return {
+                    status: "empty",
+                    lineCode: lineMembership.lineCode,
+                    lineNameZh: lineMembership.lineNameZh,
+                    stationCode,
+                    stationNameZh,
+                    directionKey: direction.apiKey,
+                    terminusNameZh: directionTerminusName || "終點站未提供",
+                    title: directionTerminusName ? `${lineMembership.lineNameZh} 往 ${directionTerminusName}` : lineMembership.lineNameZh,
+                    metaText: "下一班車 暫無官方資料",
+                    platformLabel: "",
+                    timeTypeLabel: "",
+                    notes: [],
+                    services: []
+                };
+            }
+
+            const terminusName = nextService.destinationNameZh || directionTerminusName || "終點站未提供";
+
+            return {
+                status: "success",
+                lineCode: lineMembership.lineCode,
+                lineNameZh: lineMembership.lineNameZh,
+                stationCode,
+                stationNameZh,
+                directionKey: direction.apiKey,
+                terminusNameZh: terminusName,
+                title: `${lineMembership.lineNameZh} 往 ${terminusName}`,
+                metaText: `下一班車 ${nextService.clockTime} ${nextService.minutesLabel}`,
+                platformLabel: nextService.platform ? `${nextService.platform}號月台` : "",
+                timeTypeLabel: nextService.timeTypeLabel || "",
+                notes: nextService.notes || [],
+                services
+            };
+        });
+
+        if (!hasAnyDirectionData) {
+            return {
+                status: "empty",
+                lineCode: lineMembership.lineCode,
+                lineNameZh: lineMembership.lineNameZh,
+                stationCode,
+                stationNameZh,
+                referenceTime,
+                referenceTimeLabel,
+                directionSummaries,
+                alertMessage: schedule?.alertMessage || "",
+                isDelay: Boolean(schedule?.isDelay)
+            };
+        }
+
+        return {
+            status: "success",
+            lineCode: lineMembership.lineCode,
+            lineNameZh: lineMembership.lineNameZh,
+            stationCode,
+            stationNameZh,
+            referenceTime,
+            referenceTimeLabel,
+            directionSummaries,
+            alertMessage: schedule?.alertMessage || "",
+            isDelay: Boolean(schedule?.isDelay)
+        };
+    }
+    function openNextTrainModal(lineCode, directionKey) {
+        railState.ui.nextTrainModal = {
+            isOpen: true,
+            lineCode: String(lineCode || "").toUpperCase(),
+            directionKey: String(directionKey || "").toUpperCase()
+        };
+    }
+    function closeNextTrainModal() {
+        railState.ui.nextTrainModal = {
+            isOpen: false,
+            lineCode: "",
+            directionKey: ""
+        };
+    }
+    function getNextTrainModalDetail() {
+        const modalState = railState.ui.nextTrainModal;
+        if (!modalState?.isOpen) return null;
+        const lineSummary = (railState.mtr.nearest.lineSummaries || []).find((summary) => summary.lineCode === modalState.lineCode) || null;
+        if (!lineSummary) return null;
+        const directionSummary = (lineSummary.directionSummaries || []).find((summary) => summary.directionKey === modalState.directionKey && summary.status === "success") || null;
+        if (!directionSummary) return null;
+        const services = Array.isArray(directionSummary.services) ? directionSummary.services : [];
+        return {
+            lineSummary,
+            directionSummary,
+            services,
+            nextService: services[0] || null,
+            followUpServices: services.slice(1)
+        };
+    }
+    function buildNearestDirectionRow(directionSummary) {
+        const notesMarkup = directionSummary.notes.length > 0
+            ? `<ul class="rail-note-list rail-nearest-note-list">${directionSummary.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>`
+            : "";
+        const tagsMarkup = directionSummary.platformLabel || directionSummary.timeTypeLabel
+            ? `<div class="rail-service-tags rail-nearest-direction-tags">${directionSummary.platformLabel ? `<span class="rail-meta-pill">${escapeHtml(directionSummary.platformLabel)}</span>` : ""}${directionSummary.timeTypeLabel ? `<span class="rail-meta-pill">${escapeHtml(directionSummary.timeTypeLabel)}</span>` : ""}</div>`
+            : "";
+
+        if (directionSummary.status !== "success") {
+            return `
+                <section class="rail-nearest-direction-row is-empty">
+                    <div class="rail-nearest-direction-main">
+                        <h5 class="rail-nearest-direction-title">${escapeHtml(directionSummary.title)}</h5>
+                        <p class="rail-nearest-direction-meta">${escapeHtml(directionSummary.metaText)}</p>
+                        ${notesMarkup}
+                    </div>
+                    ${tagsMarkup}
+                </section>`;
+        }
+
+        return `
+            <button
+                type="button"
+                class="rail-nearest-direction-row rail-nearest-direction-button"
+                data-next-train-trigger="true"
+                data-line-code="${escapeHtml(directionSummary.lineCode)}"
+                data-direction-key="${escapeHtml(directionSummary.directionKey)}"
+                aria-haspopup="dialog"
+                aria-controls="mtrNextTrainModal"
+            >
+                <div class="rail-nearest-direction-main">
+                    <h5 class="rail-nearest-direction-title">${escapeHtml(directionSummary.title)}</h5>
+                    <p class="rail-nearest-direction-meta">${escapeHtml(directionSummary.metaText)}</p>
+                    <span class="rail-nearest-direction-hint">查看其餘班車</span>
+                    ${notesMarkup}
+                </div>
+                ${tagsMarkup}
+            </button>`;
+    }
+    function buildNearestLineCard(summary) {
+        const lineColor = getMtrOfficialLineColor(summary.lineCode);
+        if (summary.status === "error") {
+            return `
+                <article class="rail-nearest-line-card rail-nearest-line-card-error" style="--rail-line-color: ${escapeHtml(lineColor)}">
+                    <div class="rail-nearest-line-top">
+                        <div><p class="rail-nearest-line-kicker">${escapeHtml(summary.lineCode)}</p><h4 class="rail-nearest-line-title">${escapeHtml(summary.lineNameZh)}</h4></div>
+                    </div>
+                    <p class="rail-nearest-inline-note">${escapeHtml(summary.errorMessage || "暫時未能載入該線資料。")}</p>
+                </article>`;
+        }
+
+        return `
+            <article class="rail-nearest-line-card" style="--rail-line-color: ${escapeHtml(lineColor)}">
+                <div class="rail-nearest-line-top">
+                    <div><p class="rail-nearest-line-kicker">${escapeHtml(summary.lineCode)}</p><h4 class="rail-nearest-line-title">${escapeHtml(summary.lineNameZh)}</h4></div>
+                    ${summary.isDelay || summary.alertMessage ? '<span class="rail-meta-pill">服務提示</span>' : ""}
+                </div>
+                <section class="rail-nearest-direction-list">
+                    ${(summary.directionSummaries || []).map((directionSummary) => buildNearestDirectionRow(directionSummary)).join("")}
+                </section>
+                ${summary.alertMessage ? `<p class="rail-nearest-inline-note">${escapeHtml(summary.alertMessage)}</p>` : ""}
+            </article>`;
+    }
+    function buildNextTrainModalServiceCardMarkup(service, index, terminusNameZh) {
+        const orderLabel = `第 ${index + 2} 班`;
+        const metaTags = `${service.platform ? `<span class="rail-meta-pill">${escapeHtml(service.platform)}號月台</span>` : ""}${service.timeTypeLabel ? `<span class="rail-meta-pill">${escapeHtml(service.timeTypeLabel)}</span>` : ""}`;
+        return `
+            <article class="rail-service-card rail-next-train-service-card">
+                <div class="rail-service-eta">
+                    <span class="rail-service-eta-value">${Number.isFinite(service.minutes) ? escapeHtml(String(service.minutes)) : "--"}</span>
+                    <span class="rail-service-eta-label">${escapeHtml(service.minutesLabel || "時間未提供")}</span>
+                </div>
+                <div class="rail-service-main">
+                    <div class="rail-service-header">
+                        <div>
+                            <p class="rail-next-train-service-kicker">${escapeHtml(orderLabel)}</p>
+                            <h5 class="rail-service-destination">${escapeHtml(terminusNameZh)}</h5>
+                        </div>
+                        ${metaTags ? `<div class="rail-service-tags">${metaTags}</div>` : ""}
+                    </div>
+                    <p class="rail-service-time">${service.clockTime ? `預計 ${escapeHtml(service.clockTime)}` : "官方未提供時鐘時間"}</p>
+                    ${service.notes.length > 0 ? `<ul class="rail-note-list rail-next-train-note-list">${service.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>` : ""}
+                </div>
+            </article>`;
+    }
+    function buildNextTrainModalMarkup() {
+        const detail = getNextTrainModalDetail();
+        if (!detail || !detail.nextService) return "";
+
+        const { lineSummary, directionSummary, nextService, followUpServices, services } = detail;
+        const modalTitle = `${lineSummary.lineNameZh}　往 ${directionSummary.terminusNameZh}`;
+        const modalSubtitleBits = [directionSummary.stationNameZh || lineSummary.stationNameZh || ""];
+        if (lineSummary.referenceTimeLabel) modalSubtitleBits.push(`更新 ${lineSummary.referenceTimeLabel}`);
+        const modalSubtitle = modalSubtitleBits.filter(Boolean).join("　·　");
+        const summaryTags = `${nextService.platform ? `<span class="rail-meta-pill">${escapeHtml(nextService.platform)}號月台</span>` : ""}${nextService.timeTypeLabel ? `<span class="rail-meta-pill">${escapeHtml(nextService.timeTypeLabel)}</span>` : ""}`;
+
+        return `
+            <section class="rail-next-train-modal-layer" id="mtrNextTrainModal">
+                <button type="button" class="rail-next-train-modal-backdrop" data-next-train-modal-close aria-label="關閉下一班車詳情"></button>
+                <div class="rail-next-train-modal" role="dialog" aria-modal="true" aria-labelledby="mtrNextTrainModalTitle" aria-describedby="mtrNextTrainModalSubtitle">
+                    <div class="rail-next-train-modal-head">
+                        <div class="rail-summary-main">
+                            <p class="rail-mtr-section-kicker">下一班車詳情</p>
+                            <h3 class="rail-summary-title" id="mtrNextTrainModalTitle">${escapeHtml(modalTitle)}</h3>
+                            <p class="rail-summary-text" id="mtrNextTrainModalSubtitle">${escapeHtml(modalSubtitle)}</p>
+                        </div>
+                        <button type="button" class="rail-next-train-modal-close" id="mtrNextTrainModalClose" data-next-train-modal-close aria-label="關閉">關閉</button>
+                    </div>
+                    <div class="rail-next-train-modal-body">
+                        <section class="rail-next-train-hero">
+                            <div class="rail-next-train-hero-main">
+                                <p class="rail-next-train-hero-kicker">下一班車：${escapeHtml(nextService.minutesLabel || "時間未提供")}</p>
+                                <h4 class="rail-next-train-hero-title">${escapeHtml(directionSummary.terminusNameZh)}</h4>
+                                <p class="rail-next-train-hero-time">${nextService.clockTime ? `預計 ${escapeHtml(nextService.clockTime)}` : "官方未提供時鐘時間"}</p>
+                            </div>
+                            ${summaryTags ? `<div class="rail-service-tags">${summaryTags}</div>` : ""}
+                            ${nextService.notes.length > 0 ? `<ul class="rail-note-list rail-next-train-note-list">${nextService.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>` : ""}
+                        </section>
+                        <section class="rail-next-train-followup">
+                            <div class="rail-next-train-followup-head">
+                                <h4 class="rail-next-train-followup-title">後續班車</h4>
+                                <p class="rail-next-train-followup-text">${followUpServices.length > 0 ? `官方目前提供 ${services.length} 班可顯示資料。` : "目前只有一班官方班次資料。"}</p>
+                            </div>
+                            ${followUpServices.length > 0
+                                ? `<div class="rail-service-list rail-next-train-service-list">${followUpServices.map((service, index) => buildNextTrainModalServiceCardMarkup(service, index, directionSummary.terminusNameZh)).join("")}</div>`
+                                : `<div class="rail-next-train-empty-state">目前只有一班官方班次資料。</div>`}
+                        </section>
+                    </div>
+                </div>
+            </section>`;
+    }
+    function buildMtrMarkup() {
+        return `
+            <section class="rail-panel rail-mtr-panel">
+                <div class="rail-mtr-panel-head">
+                    <p class="rail-panel-title">港鐵摘要</p>
+                </div>
+                ${buildNearestSectionMarkup()}
+                ${buildRoutePlannerShellMarkup()}
+            </section>
+            ${buildNextTrainModalMarkup()}`;
+    }
+    function buildNextTrainModalMarkup() {
+        const modalState = railState.ui.nextTrainModal;
+        if (!modalState?.isOpen) return "";
+
+        const detail = getNextTrainModalDetail();
+        const lineSummary = detail?.lineSummary || null;
+        const directionSummary = detail?.directionSummary || null;
+        const services = Array.isArray(detail?.services) ? detail.services : [];
+        const modalTitle = lineSummary && directionSummary
+            ? `${lineSummary.lineNameZh}　往 ${directionSummary.terminusNameZh}`
+            : "下一班車詳情";
+        const modalSubtitleBits = [directionSummary?.stationNameZh || lineSummary?.stationNameZh || ""];
+        if (lineSummary?.referenceTimeLabel) modalSubtitleBits.push(`更新 ${lineSummary.referenceTimeLabel}`);
+        const modalSubtitle = modalSubtitleBits.filter(Boolean).join(" · ");
+        const listMarkup = services.length > 0
+            ? `<ul class="rail-next-train-list">${services.map((service, index) => buildNextTrainModalServiceLineMarkup(service, index)).join("")}</ul>`
+            : '<p class="rail-next-train-empty">暫時沒有班次資料</p>';
+
+        return `
+            <section class="rail-next-train-modal-layer" id="mtrNextTrainModal">
+                <button type="button" class="rail-next-train-modal-backdrop" data-next-train-modal-close aria-label="關閉下一班車詳情"></button>
+                <div class="rail-next-train-modal" role="dialog" aria-modal="true" aria-labelledby="mtrNextTrainModalTitle" aria-describedby="mtrNextTrainModalSubtitle">
+                    <div class="rail-next-train-modal-head">
+                        <div class="rail-summary-main">
+                            <p class="rail-mtr-section-kicker">下一班車詳情</p>
+                            <h3 class="rail-summary-title" id="mtrNextTrainModalTitle">${escapeHtml(modalTitle)}</h3>
+                            <p class="rail-summary-text" id="mtrNextTrainModalSubtitle">${escapeHtml(modalSubtitle)}</p>
+                        </div>
+                        <button type="button" class="rail-next-train-modal-close" id="mtrNextTrainModalClose" data-next-train-modal-close aria-label="關閉">關閉</button>
+                    </div>
+                    <div class="rail-next-train-modal-body">${listMarkup}</div>
+                </div>
             </section>`;
     }
     function buildLightRailMarkup() {
@@ -3746,10 +4132,48 @@
         bindCurrentTabEvents();
         maybeStartNearestMtrSummary();
     }
+    contentElement.addEventListener("click", (event) => {
+        if (!(event.target instanceof Element)) return;
+
+        const nextTrainTrigger = event.target.closest("[data-next-train-trigger]");
+        if (nextTrainTrigger instanceof Element) {
+            const lineCode = nextTrainTrigger.getAttribute("data-line-code") || "";
+            const directionKey = nextTrainTrigger.getAttribute("data-direction-key") || "";
+            if (!lineCode || !directionKey) return;
+            openNextTrainModal(lineCode, directionKey);
+            renderCurrentTab();
+            bindCurrentTabEvents();
+            requestAnimationFrame(() => {
+                const closeButton = document.getElementById("mtrNextTrainModalClose");
+                if (closeButton instanceof HTMLButtonElement) closeButton.focus();
+            });
+            return;
+        }
+
+        const modalCloseTrigger = event.target.closest("[data-next-train-modal-close]");
+        if (modalCloseTrigger instanceof Element) {
+            closeNextTrainModal();
+            renderCurrentTab();
+            bindCurrentTabEvents();
+            return;
+        }
+
+        const nearestRetryButton = event.target.closest("#mtrNearestRetryButton");
+        if (nearestRetryButton instanceof Element && railState.ui.nextTrainModal?.isOpen) {
+            closeNextTrainModal();
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !railState.ui.nextTrainModal?.isOpen) return;
+        closeNextTrainModal();
+        renderCurrentTab();
+        bindCurrentTabEvents();
+    });
     for (const button of tabButtons) {
         button.addEventListener("click", () => {
             const nextTab = button.getAttribute("data-tab-trigger") || "";
             if (!nextTab || railState.currentTab === nextTab) return;
+            closeNextTrainModal();
             railState.currentTab = nextTab;
             setStatus(nextTab === "lightRail" ? "已切換到輕鐵頁殼，這一輪只載入靜態路線與站點資料。" : "已切換到港鐵頁殼，可使用最近站摘要與手動即時查詢。", "info");
             renderCurrentTab();

@@ -656,6 +656,198 @@ body::after {
     font-size: 0.84rem;
 }
 
+.rail-nearest-direction-button {
+    appearance: none;
+    width: 100%;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.rail-nearest-direction-button:hover,
+.rail-nearest-direction-button:focus-visible {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--rail-line-color) 28%, rgba(255, 255, 255, 0.78));
+    background: color-mix(in srgb, var(--rail-line-color) 10%, rgba(247, 251, 255, 0.94));
+    box-shadow: 0 14px 24px rgba(37, 64, 93, 0.1);
+}
+
+.rail-nearest-direction-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--rail-accent);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.rail-nearest-direction-hint::after {
+    content: "›";
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.rail-next-train-modal-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+}
+
+.rail-next-train-modal-backdrop {
+    appearance: none;
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: rgba(19, 34, 52, 0.38);
+    backdrop-filter: blur(14px);
+    cursor: pointer;
+}
+
+.rail-next-train-modal {
+    --rail-bubble-color: #5a7694;
+    position: relative;
+    z-index: 1;
+    width: min(560px, calc(100vw - 18px));
+    max-height: min(76vh, 620px);
+    overflow: auto;
+    display: grid;
+    gap: 12px;
+    padding: 14px 15px 15px;
+    border-radius: 26px;
+    border: 1px solid color-mix(in srgb, var(--rail-bubble-color) 18%, rgba(255, 255, 255, 0.96));
+    background:
+        radial-gradient(circle at 14% 14%, color-mix(in srgb, var(--rail-bubble-color) 18%, white) 0%, rgba(255, 255, 255, 0) 34%),
+        radial-gradient(circle at 84% 20%, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0) 28%),
+        linear-gradient(180deg, color-mix(in srgb, var(--rail-bubble-color) 10%, rgba(255, 255, 255, 0.98)) 0%, rgba(248, 251, 255, 0.94) 48%, color-mix(in srgb, var(--rail-bubble-color) 7%, rgba(243, 248, 253, 0.96)) 100%);
+    box-shadow:
+        0 20px 46px rgba(17, 33, 52, 0.22),
+        0 8px 18px rgba(17, 33, 52, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        inset 0 -10px 18px color-mix(in srgb, var(--rail-bubble-color) 8%, rgba(255, 255, 255, 0));
+}
+
+.rail-next-train-modal::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+        inset 3px 3px 8px rgba(255, 255, 255, 0.42),
+        inset -6px -10px 18px color-mix(in srgb, var(--rail-bubble-color) 10%, rgba(255, 255, 255, 0));
+    opacity: 0.9;
+}
+
+.rail-next-train-modal-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: start;
+}
+
+.rail-next-train-modal .rail-summary-main {
+    gap: 2px;
+}
+
+.rail-next-train-modal .rail-mtr-section-kicker {
+    color: color-mix(in srgb, var(--rail-bubble-color) 68%, #35506f);
+}
+
+.rail-next-train-modal .rail-summary-title {
+    font-size: 1.1rem;
+    letter-spacing: -0.02em;
+}
+
+.rail-next-train-modal .rail-summary-text {
+    color: color-mix(in srgb, var(--rail-bubble-color) 36%, #687b91);
+}
+
+.rail-next-train-modal-close {
+    appearance: none;
+    border: 1px solid color-mix(in srgb, var(--rail-bubble-color) 16%, rgba(255, 255, 255, 0.92));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, color-mix(in srgb, var(--rail-bubble-color) 8%, rgba(245, 249, 253, 0.94)) 100%);
+    color: color-mix(in srgb, var(--rail-bubble-color) 70%, #27425f);
+    border-radius: 999px;
+    padding: 8px 13px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 8px 18px rgba(17, 33, 52, 0.08);
+    transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.rail-next-train-modal-close:hover,
+.rail-next-train-modal-close:focus-visible {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--rail-bubble-color) 24%, rgba(255, 255, 255, 0.96));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, color-mix(in srgb, var(--rail-bubble-color) 10%, rgba(247, 251, 255, 0.98)) 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.98),
+        0 10px 20px rgba(17, 33, 52, 0.1);
+}
+
+.rail-next-train-modal-body {
+    display: grid;
+    gap: 0;
+}
+
+.rail-next-train-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.rail-next-train-list-item {
+    margin: 0;
+    padding: 3px 1px;
+    color: var(--rail-ink);
+    font-size: 1rem;
+    line-height: 1.68;
+}
+
+.rail-next-train-list-item + .rail-next-train-list-item {
+    margin-top: 2px;
+    padding-top: 7px;
+    border-top: 1px dashed color-mix(in srgb, var(--rail-bubble-color) 14%, rgba(255, 255, 255, 0.92));
+}
+
+.rail-next-train-list-item.is-primary {
+    font-weight: 700;
+    color: color-mix(in srgb, var(--rail-bubble-color) 78%, #1f3550);
+}
+
+.rail-next-train-list-label {
+    font-weight: 700;
+    color: color-mix(in srgb, var(--rail-bubble-color) 74%, #28435f);
+}
+
+.rail-next-train-list-text {
+    font-weight: 400;
+}
+
+.rail-next-train-list-item.is-primary .rail-next-train-list-text {
+    font-weight: 700;
+}
+
+.rail-next-train-list-meta {
+    color: color-mix(in srgb, var(--rail-bubble-color) 34%, #75879a);
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+
+.rail-next-train-empty {
+    margin: 0;
+    color: var(--rail-muted);
+    font-size: 0.98rem;
+    line-height: 1.7;
+}
+
 .rail-nearest-card .rail-loading-card {
     gap: 12px;
     padding: 14px;
@@ -1613,6 +1805,12 @@ body::after {
     background: rgba(255, 255, 255, 0.78);
 }
 
+.rail-route-result-card-compact {
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.72);
+}
+
 .rail-route-overview {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -1711,6 +1909,10 @@ body::after {
 .rail-route-option-gallery {
     display: grid;
     gap: 10px;
+}
+
+.rail-route-option-gallery.is-single {
+    max-width: 560px;
 }
 
 .rail-route-option-card {
@@ -2482,6 +2684,37 @@ body::after {
 
     .rail-route-map-station-name {
         font-size: 0.82rem;
+    }
+
+    .rail-next-train-modal-layer {
+        padding: 10px;
+    }
+
+    .rail-next-train-modal {
+        width: min(100vw - 12px, 520px);
+        max-height: calc(100vh - 18px);
+        gap: 10px;
+        padding: 12px 12px 13px;
+        border-radius: 22px;
+    }
+
+    .rail-next-train-modal-head {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .rail-next-train-modal-close {
+        justify-self: start;
+        padding: 7px 11px;
+    }
+
+    .rail-next-train-list-item {
+        font-size: 0.96rem;
+        line-height: 1.62;
+    }
+
+    .rail-next-train-list-meta {
+        font-size: 0.86rem;
     }
 
     .rail-service-card {
