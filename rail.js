@@ -528,8 +528,21 @@
                     nameEn: stationEntry.nameEn || stationCode,
                     x: Number(stationEntry.x) || 0,
                     y: Number(stationEntry.y) || 0,
+                    marker: {
+                        x: Number(stationEntry.markerX ?? stationEntry.x) || 0,
+                        y: Number(stationEntry.markerY ?? stationEntry.y) || 0
+                    },
                     interchange: Boolean(stationEntry.interchange),
                     lines: Array.isArray(stationEntry.lines) ? stationEntry.lines : [],
+                    lineAnchors: Object.fromEntries(
+                        Object.entries(stationEntry.lineAnchors || {}).map(([lineCode, anchorEntry]) => [
+                            lineCode,
+                            {
+                                x: Number(anchorEntry?.x) || Number(stationEntry.markerX ?? stationEntry.x) || 0,
+                                y: Number(anchorEntry?.y) || Number(stationEntry.markerY ?? stationEntry.y) || 0
+                            }
+                        ])
+                    ),
                     label: {
                         text: stationEntry.label?.text || stationEntry.nameZh || stationCode,
                         anchor: stationEntry.label?.anchor || "start",
@@ -589,8 +602,10 @@
         );
 
         const stationList = Object.values(stations).sort((left, right) => {
-            if (left.y !== right.y) return left.y - right.y;
-            return left.x - right.x;
+            if ((left.marker?.y ?? left.y) !== (right.marker?.y ?? right.y)) {
+                return (left.marker?.y ?? left.y) - (right.marker?.y ?? right.y);
+            }
+            return (left.marker?.x ?? left.x) - (right.marker?.x ?? right.x);
         });
         const landmarkList = Object.values(landmarks).sort((left, right) => {
             if (left.y !== right.y) return left.y - right.y;
@@ -1609,6 +1624,41 @@
         if (views.length === 0) return null;
         return views.find((view) => view.id === planner.activeViewId) || views[0] || null;
     }
+    function syncRoutePlannerStatusMessage() {
+        const planner = railState.mtr.routePlanner;
+        const originStation = getRoutePlannerStationEntry(planner.originStationCode);
+        const destinationStation = getRoutePlannerStationEntry(planner.destinationStationCode);
+        const activeView = getActiveRoutePlannerView();
+        const activeResult = activeView?.result || null;
+
+        if (!originStation) {
+            setStatus("請先在 custom SVG 港鐵圖上選擇起點。", "info");
+            return;
+        }
+        if (!destinationStation) {
+            setStatus(`已選起點 ${originStation.nameZh}，請再選終點。`, "info");
+            return;
+        }
+        if (!activeResult) {
+            setStatus(`正在整理 ${originStation.nameZh} → ${destinationStation.nameZh} 的建議方案。`, "info");
+            return;
+        }
+        if (activeResult.status === "sameStation") {
+            setStatus("起點與終點相同，無需乘車或步行接駁。", "warning");
+            return;
+        }
+        if (activeResult.status === "unreachable") {
+            setStatus(`暫時找不到 ${originStation.nameZh} 到 ${destinationStation.nameZh} 的合理路線。`, "warning");
+            return;
+        }
+
+        const transferSummary = activeResult.needsTransfer
+            ? `，於 ${activeResult.transferStations.map((station) => station.stationNameZh).join("、")} 轉線`
+            : activeResult.hasWalkConnections
+                ? "，包含步行連接"
+                : "，直達";
+        setStatus(`已載入 ${activeView?.label || "建議方案"}：${originStation.nameZh} → ${destinationStation.nameZh}${transferSummary}。`, "info");
+    }
     function getRoutePlannerActiveField() {
         const planner = railState.mtr.routePlanner;
         if (!planner.originStationCode) return "origin";
@@ -1623,6 +1673,7 @@
         const matchingView = getRoutePlannerViews().find((view) => view.id === viewId);
         if (!matchingView) return;
         railState.mtr.routePlanner.activeViewId = matchingView.id;
+        syncRoutePlannerStatusMessage();
     }
     function selectRoutePlannerStation(stationCode) {
         const planner = railState.mtr.routePlanner;
@@ -1638,12 +1689,14 @@
         }
 
         refreshRoutePlannerResult();
+        syncRoutePlannerStatusMessage();
     }
     function clearRoutePlannerDestination() {
         railState.mtr.routePlanner.destinationStationCode = "";
         railState.mtr.routePlanner.result = null;
         railState.mtr.routePlanner.activeViewId = "";
         railState.mtr.routePlanner.activeField = "destination";
+        syncRoutePlannerStatusMessage();
     }
     function swapRoutePlannerStations() {
         const planner = railState.mtr.routePlanner;
@@ -1655,6 +1708,7 @@
         planner.hasUserEditedDestination = true;
         planner.activeField = "destination";
         refreshRoutePlannerResult();
+        syncRoutePlannerStatusMessage();
     }
     function toggleRoutePlanner() {
         const planner = railState.mtr.routePlanner;
@@ -1838,6 +1892,154 @@
             activeLineSet
         };
     }
+    function getSchematicStationCenter(station) {
+        return {
+            x: Number(station?.marker?.x ?? station?.x) || 0,
+            y: Number(station?.marker?.y ?? station?.y) || 0
+        };
+    }
+    function dedupeSchematicAnchorPoints(anchorPoints, minDistance = 1.4) {
+        const deduped = [];
+        for (const anchorPoint of Array.isArray(anchorPoints) ? anchorPoints : []) {
+            const normalizedPoint = {
+                x: Number(anchorPoint?.x) || 0,
+                y: Number(anchorPoint?.y) || 0
+            };
+            const exists = deduped.some((existingPoint) => Math.hypot(existingPoint.x - normalizedPoint.x, existingPoint.y - normalizedPoint.y) < minDistance);
+            if (!exists) deduped.push(normalizedPoint);
+        }
+        return deduped;
+    }
+    function getSchematicStationAnchorPoints(station) {
+        const center = getSchematicStationCenter(station);
+        const anchorPoints = dedupeSchematicAnchorPoints(Object.values(station?.lineAnchors || {}));
+        return anchorPoints.length > 0 ? anchorPoints : [center];
+    }
+    function getSchematicConnectorAxis(anchorPoints) {
+        if (!Array.isArray(anchorPoints) || anchorPoints.length <= 1) return { x: 1, y: 0 };
+        let startPoint = anchorPoints[0];
+        let endPoint = anchorPoints[anchorPoints.length - 1];
+        let furthestDistance = -1;
+        for (let leftIndex = 0; leftIndex < anchorPoints.length; leftIndex += 1) {
+            for (let rightIndex = leftIndex + 1; rightIndex < anchorPoints.length; rightIndex += 1) {
+                const distance = Math.hypot(
+                    anchorPoints[rightIndex].x - anchorPoints[leftIndex].x,
+                    anchorPoints[rightIndex].y - anchorPoints[leftIndex].y
+                );
+                if (distance > furthestDistance) {
+                    furthestDistance = distance;
+                    startPoint = anchorPoints[leftIndex];
+                    endPoint = anchorPoints[rightIndex];
+                }
+            }
+        }
+        const length = Math.max(1, Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y));
+        return {
+            x: (endPoint.x - startPoint.x) / length,
+            y: (endPoint.y - startPoint.y) / length
+        };
+    }
+    function getSchematicStationGeometry(station) {
+        const center = getSchematicStationCenter(station);
+        const anchorPoints = getSchematicStationAnchorPoints(station);
+        const isInterchangeMarker = anchorPoints.length > 1 || Boolean(station?.interchange);
+        const axis = getSchematicConnectorAxis(anchorPoints);
+        const nodes = anchorPoints
+            .slice()
+            .sort((leftPoint, rightPoint) => {
+                const leftProjection = leftPoint.x * axis.x + leftPoint.y * axis.y;
+                const rightProjection = rightPoint.x * axis.x + rightPoint.y * axis.y;
+                return leftProjection - rightProjection;
+            });
+        const connectors = [];
+
+        if (isInterchangeMarker) {
+            for (let index = 0; index < nodes.length - 1; index += 1) {
+                const leftNode = nodes[index];
+                const rightNode = nodes[index + 1];
+                const distance = Math.hypot(rightNode.x - leftNode.x, rightNode.y - leftNode.y);
+                if (distance < 0.8) continue;
+                connectors.push({
+                    x1: leftNode.x,
+                    y1: leftNode.y,
+                    x2: rightNode.x,
+                    y2: rightNode.y
+                });
+            }
+        }
+
+        return {
+            center,
+            nodes,
+            connectors,
+            isInterchangeMarker,
+            hitRadius: isInterchangeMarker ? Math.max(19, 13 + nodes.length * 1.8) : 15,
+            haloRadius: isInterchangeMarker ? Math.max(13.5, 9.5 + nodes.length * 1.25) : 10.5,
+            bedRadius: isInterchangeMarker ? 8.9 : 8.2,
+            nodeRadius: isInterchangeMarker ? 6.3 : 6
+        };
+    }
+    function buildSchematicStationVisualMarkup(station) {
+        const geometry = getSchematicStationGeometry(station);
+        const centerPoint = geometry.center;
+
+        return `
+            <circle
+                class="rail-schematic-station-hit"
+                cx="${escapeHtml(String(centerPoint.x))}"
+                cy="${escapeHtml(String(centerPoint.y))}"
+                r="${escapeHtml(String(geometry.hitRadius))}"
+            />
+            <g class="rail-schematic-station-visual" aria-hidden="true">
+                <circle
+                    class="rail-schematic-station-halo"
+                    cx="${escapeHtml(String(centerPoint.x))}"
+                    cy="${escapeHtml(String(centerPoint.y))}"
+                    r="${escapeHtml(String(geometry.haloRadius))}"
+                />
+                ${geometry.connectors.map((connector) => `
+                    <line
+                        class="rail-schematic-station-bed-connector"
+                        x1="${escapeHtml(String(connector.x1))}"
+                        y1="${escapeHtml(String(connector.y1))}"
+                        x2="${escapeHtml(String(connector.x2))}"
+                        y2="${escapeHtml(String(connector.y2))}"
+                    />
+                `).join("")}
+                ${geometry.nodes.map((node) => `
+                    <circle
+                        class="rail-schematic-station-bed"
+                        cx="${escapeHtml(String(node.x))}"
+                        cy="${escapeHtml(String(node.y))}"
+                        r="${escapeHtml(String(geometry.bedRadius))}"
+                    />
+                `).join("")}
+                ${geometry.connectors.map((connector) => `
+                    <line
+                        class="rail-schematic-station-connector-casing"
+                        x1="${escapeHtml(String(connector.x1))}"
+                        y1="${escapeHtml(String(connector.y1))}"
+                        x2="${escapeHtml(String(connector.x2))}"
+                        y2="${escapeHtml(String(connector.y2))}"
+                    />
+                    <line
+                        class="rail-schematic-station-connector"
+                        x1="${escapeHtml(String(connector.x1))}"
+                        y1="${escapeHtml(String(connector.y1))}"
+                        x2="${escapeHtml(String(connector.x2))}"
+                        y2="${escapeHtml(String(connector.y2))}"
+                    />
+                `).join("")}
+                ${geometry.nodes.map((node) => `
+                    <circle
+                        class="rail-schematic-station-dot"
+                        cx="${escapeHtml(String(node.x))}"
+                        cy="${escapeHtml(String(node.y))}"
+                        r="${escapeHtml(String(geometry.nodeRadius))}"
+                    />
+                `).join("")}
+            </g>`;
+    }
     function buildCustomSchematicMarkup() {
         const schematicRuntime = railState.mtr.routing.customSchematic;
         if (!schematicRuntime) {
@@ -1896,6 +2098,10 @@
                                                 <g class="rail-schematic-branch" data-branch-id="${escapeHtml(branch.branchId)}">
                                                     ${branch.segments.map((segment) => `
                                                         <path
+                                                            class="rail-schematic-segment-casing ${hasActiveRoute && activeSegmentSet.has(`${line.lineCode}:${[segment.from, segment.to].sort().join("|")}`) ? "is-on-route" : hasActiveRoute ? "is-dimmed" : ""}"
+                                                            d="${escapeHtml(pointsToSvgPath(segment.points))}"
+                                                        />
+                                                        <path
                                                             class="rail-schematic-segment ${hasActiveRoute && activeSegmentSet.has(`${line.lineCode}:${[segment.from, segment.to].sort().join("|")}`) ? "is-on-route" : hasActiveRoute ? "is-dimmed" : ""}"
                                                             d="${escapeHtml(pointsToSvgPath(segment.points))}"
                                                         />
@@ -1907,6 +2113,10 @@
                                 </g>
                                 <g class="rail-schematic-walk-layer" aria-hidden="true">
                                     ${schematicRuntime.walkLinks.map((walkLink) => `
+                                        <path
+                                            class="rail-schematic-walk-link-casing ${hasActiveRoute && activeWalkSegmentSet.has(walkLink.linkKey) ? "is-on-route" : hasActiveRoute ? "is-dimmed" : ""}"
+                                            d="${escapeHtml(pointsToSvgPath(walkLink.points))}"
+                                        />
                                         <path
                                             class="rail-schematic-walk-link ${hasActiveRoute && activeWalkSegmentSet.has(walkLink.linkKey) ? "is-on-route" : hasActiveRoute ? "is-dimmed" : ""}"
                                             d="${escapeHtml(pointsToSvgPath(walkLink.points))}"
@@ -1959,26 +2169,7 @@
                                             tabindex="0"
                                             aria-label="選擇 ${escapeHtml(station.nameZh)} 作為${planner.activeField === "origin" ? "起點" : "終點"}"
                                         >
-                                            <circle
-                                                class="rail-schematic-station-hit"
-                                                cx="${escapeHtml(String(station.x))}"
-                                                cy="${escapeHtml(String(station.y))}"
-                                                r="${station.interchange ? "18" : "15"}"
-                                            />
-                                            <g class="rail-schematic-station-visual" aria-hidden="true">
-                                                <circle
-                                                    class="rail-schematic-station-halo"
-                                                    cx="${escapeHtml(String(station.x))}"
-                                                    cy="${escapeHtml(String(station.y))}"
-                                                    r="${station.interchange ? "13" : "10"}"
-                                                />
-                                                <circle
-                                                    class="rail-schematic-station-dot"
-                                                    cx="${escapeHtml(String(station.x))}"
-                                                    cy="${escapeHtml(String(station.y))}"
-                                                    r="${station.interchange ? "7" : "4.8"}"
-                                                />
-                                            </g>
+                                            ${buildSchematicStationVisualMarkup(station)}
                                             <text
                                                 class="rail-schematic-station-label"
                                                 x="${escapeHtml(String(station.x + station.label.dx))}"
@@ -2516,6 +2707,283 @@
                 </div>
             </section>`;
     }
+    function getRoutePlannerLegHeadline(leg) {
+        if (!leg) return "";
+        if (leg.kind === "walk") return leg.walkLabelZh || "步行連接";
+        const fallbackTerminus = getRoutePlannerStationEntry(leg.stations?.[leg.stations.length - 1])?.nameZh || leg.stations?.[leg.stations.length - 1] || "";
+        return `${leg.lineNameZh}　往 ${leg.terminusNameZh || fallbackTerminus}`;
+    }
+    function getRoutePlannerLegStationNames(leg) {
+        return Array.isArray(leg?.stations)
+            ? leg.stations.map((stationCode) => getRoutePlannerStationEntry(stationCode)?.nameZh || stationCode)
+            : [];
+    }
+    function getRoutePlannerViewSummaryText(result) {
+        if (!result) return "";
+        if (result.status === "sameStation") return "起點與終點相同";
+        if (result.needsTransfer) {
+            const transferSummary = result.transferStations.map((station) => station.stationNameZh).join("、");
+            return `於 ${transferSummary} 轉線${result.hasWalkConnections ? "，含步行連接" : ""}`;
+        }
+        if (result.hasWalkConnections) return "直達，含步行連接";
+        return "直達";
+    }
+    function buildRoutePlannerSummaryGridMarkup(activeView, activeResult) {
+        const transferSummary = activeResult.needsTransfer
+            ? activeResult.transferStations.map((station) => station.stationNameZh).join("、")
+            : "無需轉線";
+        const walkSummary = activeResult.hasWalkConnections
+            ? `${activeResult.legs.filter((leg) => leg.kind === "walk").length} 段步行`
+            : "全程乘車";
+        const legSummary = activeResult.legs.map((leg) => getRoutePlannerLegHeadline(leg)).join(" / ");
+
+        return `
+            <div class="rail-route-summary-grid">
+                <article class="rail-route-summary-card">
+                    <span class="rail-route-summary-label">建議方案</span>
+                    <strong class="rail-route-summary-value">${escapeHtml(activeView.label)}</strong>
+                    <p class="rail-route-summary-note">${escapeHtml(getRoutePlannerViewSummaryText(activeResult))}</p>
+                </article>
+                <article class="rail-route-summary-card">
+                    <span class="rail-route-summary-label">轉線安排</span>
+                    <strong class="rail-route-summary-value">${escapeHtml(activeResult.needsTransfer ? `${activeResult.transferStations.length} 次轉線` : "無需轉線")}</strong>
+                    <p class="rail-route-summary-note">${escapeHtml(transferSummary)}</p>
+                </article>
+                <article class="rail-route-summary-card">
+                    <span class="rail-route-summary-label">各段路線</span>
+                    <strong class="rail-route-summary-value">${escapeHtml(String(activeResult.legs.length))} 段</strong>
+                    <p class="rail-route-summary-note">${escapeHtml(`${walkSummary}；${legSummary}`)}</p>
+                </article>
+            </div>`;
+    }
+    function buildRoutePlannerOptionCardMarkup(view, activeViewId) {
+        const result = view?.result;
+        if (!result || (result.status !== "ready" && result.status !== "sameStation")) return "";
+
+        const summaryChips = result.status === "sameStation"
+            ? `<span class="rail-chip">0 站</span><span class="rail-chip">同站</span>`
+            : [
+                `<span class="rail-chip">${escapeHtml(String(result.totalStops))} 站</span>`,
+                `<span class="rail-chip">${result.needsTransfer ? `${escapeHtml(String(result.transferStations.length))} 次轉線` : "無需轉線"}</span>`,
+                result.hasWalkConnections ? '<span class="rail-chip">含步行</span>' : "",
+                `<span class="rail-chip">${escapeHtml(String(result.legs.length))} 段</span>`
+            ].filter(Boolean).join("");
+
+        return `
+            <button
+                type="button"
+                class="rail-route-option-card ${view.id === activeViewId ? "is-active" : ""}"
+                data-route-view="${escapeHtml(view.id)}"
+                aria-pressed="${view.id === activeViewId ? "true" : "false"}"
+            >
+                <div class="rail-route-option-card-head">
+                    <div class="rail-summary-main">
+                        <p class="rail-route-option-card-kicker">${escapeHtml(view.label)}</p>
+                        <h4 class="rail-route-option-card-title">${escapeHtml(getRoutePlannerViewSummaryText(result))}</h4>
+                    </div>
+                    ${view.id === activeViewId ? '<span class="rail-route-option-card-badge">目前查看</span>' : ""}
+                </div>
+                <div class="rail-chip-row rail-route-option-card-chips">${summaryChips}</div>
+                ${result.status === "ready" ? buildRoutePlannerOptionStripMarkup(result) : ""}
+            </button>`;
+    }
+    function buildRoutePlannerOptionStripMarkup(routeResult) {
+        if (!routeResult || routeResult.status !== "ready") return "";
+        const transferStationSet = new Set(Array.isArray(routeResult.transferStations) ? routeResult.transferStations.map((station) => station.stationCode) : []);
+        const stopPoints = [];
+        const displaySegments = [];
+        const pushStopPoint = (stationCode) => {
+            const normalizedStationCode = String(stationCode || "").toUpperCase();
+            if (!normalizedStationCode || stopPoints[stopPoints.length - 1]?.stationCode === normalizedStationCode) return;
+            stopPoints.push({
+                stationCode: normalizedStationCode,
+                stationNameZh: getRoutePlannerStationEntry(normalizedStationCode)?.nameZh || normalizedStationCode,
+                isTransfer: transferStationSet.has(normalizedStationCode),
+                isOrigin: normalizedStationCode === routeResult.originStationCode,
+                isDestination: normalizedStationCode === routeResult.destinationStationCode,
+                isWalkNode: Boolean(getVirtualRoutePlannerStation(normalizedStationCode)) || normalizedStationCode === "HSR"
+            });
+        };
+
+        pushStopPoint(routeResult.originStationCode);
+        for (const leg of Array.isArray(routeResult.legs) ? routeResult.legs : []) {
+            if (leg.kind === "walk") {
+                for (const stationCode of leg.stations.slice(1)) {
+                    pushStopPoint(stationCode);
+                    displaySegments.push({
+                        lineCode: leg.lineCode,
+                        grow: 1,
+                        kind: "walk"
+                    });
+                }
+                continue;
+            }
+            pushStopPoint(leg.stations[leg.stations.length - 1]);
+            displaySegments.push({
+                lineCode: leg.lineCode,
+                grow: Math.max(leg.stopCount, 1),
+                kind: "ride"
+            });
+        }
+        pushStopPoint(routeResult.destinationStationCode);
+
+        const stripMarkup = stopPoints.map((stopPoint, index) => {
+            const segmentEntry = displaySegments[index] || null;
+            const segmentMarkup = segmentEntry
+                ? `<span class="rail-route-option-segment ${segmentEntry.kind === "walk" ? "is-walk" : ""}" style="--rail-line-color: ${escapeHtml(getMtrOfficialLineColor(segmentEntry.lineCode))}; --rail-segment-grow: ${Math.max(segmentEntry.grow, 1)}" aria-hidden="true"></span>`
+                : "";
+            return `
+                <div class="rail-route-option-stop ${stopPoint.isTransfer ? "is-transfer" : ""} ${stopPoint.isOrigin ? "is-origin" : ""} ${stopPoint.isDestination ? "is-destination" : ""} ${stopPoint.isWalkNode ? "is-walk" : ""}">
+                    <span class="rail-route-option-stop-name">${escapeHtml(stopPoint.stationNameZh)}</span>
+                    <span class="rail-route-option-stop-dot" aria-hidden="true"></span>
+                </div>
+                ${segmentMarkup}`;
+        }).join("");
+
+        const lineBadgesMarkup = routeResult.legs.map((leg) => `
+            <span class="rail-route-line-badge ${leg.kind === "walk" ? "is-walk" : ""}" style="--rail-line-color: ${escapeHtml(getMtrOfficialLineColor(leg.lineCode))}">
+                <span class="rail-route-line-badge-dot" aria-hidden="true"></span>
+                <span>${escapeHtml(getRoutePlannerLegHeadline(leg))}</span>
+            </span>
+        `).join("");
+
+        return `
+            <div class="rail-route-option-strip-wrap">
+                <div class="rail-route-option-strip">
+                    ${stripMarkup}
+                </div>
+                <div class="rail-route-line-badge-row">
+                    ${lineBadgesMarkup}
+                </div>
+            </div>`;
+    }
+    function buildRoutePlannerLegCardMarkup(leg, legIndex) {
+        const lineColor = getMtrOfficialLineColor(leg.lineCode);
+        const stationNames = getRoutePlannerLegStationNames(leg);
+        const originName = stationNames[0] || "";
+        const destinationName = stationNames[stationNames.length - 1] || "";
+        const intermediateStations = stationNames.slice(1, -1);
+        const noteText = leg.kind === "walk"
+            ? `請跟隨灰色步行連接前往 ${destinationName}`
+            : intermediateStations.length > 0
+                ? `途經 ${intermediateStations.join("、")}`
+                : "此段直達，無需中途轉線";
+
+        return `
+            <article class="rail-route-leg-card ${leg.kind === "walk" ? "is-walk" : ""}" style="--rail-line-color: ${escapeHtml(lineColor)}">
+                <div class="rail-route-leg-head">
+                    <div class="rail-route-leg-heading">
+                        <span class="rail-route-leg-line-dot" aria-hidden="true"></span>
+                        <div>
+                            <p class="rail-route-leg-kicker">${escapeHtml(leg.kind === "walk" ? `第 ${legIndex + 1} 段｜WALK` : `第 ${legIndex + 1} 段｜${leg.lineCode}`)}</p>
+                            <h4 class="rail-route-leg-title">${escapeHtml(getRoutePlannerLegHeadline(leg))}</h4>
+                        </div>
+                    </div>
+                    <span class="rail-meta-pill">${leg.kind === "walk" ? "步行" : `${escapeHtml(String(leg.stopCount))} 站`}</span>
+                </div>
+                <div class="rail-route-leg-meta-grid">
+                    <div class="rail-route-leg-meta">
+                        <span class="rail-route-leg-meta-label">由</span>
+                        <strong class="rail-route-leg-meta-value">${escapeHtml(originName)}</strong>
+                    </div>
+                    <div class="rail-route-leg-meta">
+                        <span class="rail-route-leg-meta-label">到</span>
+                        <strong class="rail-route-leg-meta-value">${escapeHtml(destinationName)}</strong>
+                    </div>
+                    <div class="rail-route-leg-meta">
+                        <span class="rail-route-leg-meta-label">${leg.kind === "walk" ? "方式" : "方向"}</span>
+                        <strong class="rail-route-leg-meta-value">${escapeHtml(leg.kind === "walk" ? "步行連接" : leg.terminusNameZh || destinationName)}</strong>
+                    </div>
+                </div>
+                <p class="rail-route-leg-stations">${escapeHtml(stationNames.join(" → "))}</p>
+                <p class="rail-route-leg-note">${escapeHtml(noteText)}</p>
+            </article>`;
+    }
+    function buildRoutePlannerResultMarkup() {
+        const planner = railState.mtr.routePlanner;
+        const originStation = getRoutePlannerStationEntry(planner.originStationCode);
+        const destinationStation = getRoutePlannerStationEntry(planner.destinationStationCode);
+        const routeViews = getRoutePlannerViews();
+        const activeView = getActiveRoutePlannerView();
+        const activeResult = activeView?.result || null;
+
+        if (!originStation) {
+            return `<section class="rail-route-result rail-empty-card"><h3 class="rail-empty-title">先選起點</h3><p class="rail-empty-text">請先在 custom SVG 港鐵圖上選擇起點，系統便會引導你繼續選終點。</p></section>`;
+        }
+
+        if (!destinationStation) {
+            return `<section class="rail-route-result rail-empty-card"><h3 class="rail-empty-title">再選終點</h3><p class="rail-empty-text">起點已選好，接著在 custom SVG 港鐵圖上選擇終點，結果卡會立即更新。</p></section>`;
+        }
+
+        if (!routeViews.length || !activeResult) {
+            return `<section class="rail-route-result rail-empty-card"><h3 class="rail-empty-title">正在整理建議方案</h3><p class="rail-empty-text">路線資料暫時未完成更新，請重新選擇終點或稍後再試一次。</p></section>`;
+        }
+
+        if (activeResult.status === "sameStation") {
+            return `
+                <section class="rail-route-result rail-route-result-card">
+                    <div class="rail-route-result-head">
+                        <div class="rail-summary-main">
+                            <p class="rail-mtr-section-kicker">${escapeHtml(activeView.label)}</p>
+                            <h3 class="rail-summary-title">${escapeHtml(originStation.nameZh)} 已是起點與終點</h3>
+                            <p class="rail-summary-text">不用乘車、轉線或步行接駁；如需查詢其他路線，請改選另一個終點。</p>
+                        </div>
+                        <div class="rail-chip-row rail-route-result-chips"><span class="rail-chip">0 站</span><span class="rail-chip">同站</span></div>
+                    </div>
+                </section>`;
+        }
+
+        if (activeResult.status === "unreachable") {
+            return `<section class="rail-route-result rail-empty-card rail-empty-card-error"><h3 class="rail-empty-title">暫時找不到合理路線</h3><p class="rail-empty-text">請重選起點或終點，或改查附近可步行接駁的站點組合。</p></section>`;
+        }
+
+        const transferSummary = activeResult.transferStations.length > 0
+            ? activeResult.transferStations.map((station) => station.stationNameZh).join("、")
+            : "無需轉線";
+        const legMarkup = activeResult.legs.map((leg, index) => buildRoutePlannerLegCardMarkup(leg, index)).join("");
+        const routeSummaryChips = [
+            `<span class="rail-chip">${escapeHtml(String(activeResult.totalStops))} 站</span>`,
+            `<span class="rail-chip">${activeResult.needsTransfer ? `${escapeHtml(String(activeResult.transferStations.length))} 次轉線` : "無需轉線"}</span>`,
+            activeResult.hasWalkConnections ? '<span class="rail-chip">含步行連接</span>' : "",
+            `<span class="rail-chip">${escapeHtml(String(activeResult.legs.length))} 段路線</span>`
+        ].filter(Boolean).join("");
+        const summaryText = activeResult.needsTransfer
+            ? `建議於 ${transferSummary} 轉線${activeResult.hasWalkConnections ? "，並包含步行連接" : ""}`
+            : activeResult.hasWalkConnections
+                ? "建議方案包含步行連接"
+                : "建議直達";
+
+        return `
+            <section class="rail-route-result rail-route-result-card">
+                ${buildRoutePlannerViewTabsMarkup(routeViews, activeView.id)}
+                ${buildRoutePlannerOptionGalleryMarkup(routeViews, activeView.id)}
+                <div class="rail-route-overview">
+                    <div class="rail-route-endpoint is-origin">
+                        <span class="rail-route-endpoint-label">起點</span>
+                        <strong class="rail-route-endpoint-name">${escapeHtml(originStation.nameZh)}</strong>
+                    </div>
+                    <span class="rail-route-overview-arrow" aria-hidden="true">→</span>
+                    <div class="rail-route-endpoint is-destination">
+                        <span class="rail-route-endpoint-label">終點</span>
+                        <strong class="rail-route-endpoint-name">${escapeHtml(destinationStation.nameZh)}</strong>
+                    </div>
+                </div>
+                <div class="rail-route-result-head">
+                    <div class="rail-summary-main">
+                        <p class="rail-mtr-section-kicker">${escapeHtml(activeView.label)}</p>
+                        <h3 class="rail-summary-title">${escapeHtml(originStation.nameZh)} → ${escapeHtml(destinationStation.nameZh)}</h3>
+                        <p class="rail-summary-text">${escapeHtml(summaryText)}</p>
+                    </div>
+                    <div class="rail-chip-row rail-route-result-chips">${routeSummaryChips}</div>
+                </div>
+                ${buildRoutePlannerSummaryGridMarkup(activeView, activeResult)}
+                ${buildRoutePlannerOptionStripMarkup(activeResult)}
+                ${buildRoutePlannerTransferCalloutMarkup(activeResult)}
+                <div class="rail-route-leg-list">
+                    ${legMarkup}
+                </div>
+            </section>`;
+    }
     function buildRoutePlannerPanelMarkup() {
         const planner = railState.mtr.routePlanner;
         const selectedOriginCode = planner.originStationCode;
@@ -2788,10 +3256,10 @@
 
         return {
             points,
-            minX: Math.min(...points.map((point) => point.x)),
-            maxX: Math.max(...points.map((point) => point.x)),
-            minY: Math.min(...points.map((point) => point.y)),
-            maxY: Math.max(...points.map((point) => point.y))
+            minX: Math.min(...points.map((point) => point.marker?.x ?? point.x)),
+            maxX: Math.max(...points.map((point) => point.marker?.x ?? point.x)),
+            minY: Math.min(...points.map((point) => point.marker?.y ?? point.y)),
+            maxY: Math.max(...points.map((point) => point.marker?.y ?? point.y))
         };
     }
     function getDefaultSchematicBounds() {

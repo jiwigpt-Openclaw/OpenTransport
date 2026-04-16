@@ -1,7 +1,7 @@
 window.__MTR_SCHEMATIC_LAYOUT__ = {
-  "generatedAt": "2026-04-15T03:44:04.202Z",
+  "generatedAt": "2026-04-16T04:26:38.894Z",
   "source": "official-rail-index.json + official-mtr-map.js + official-mtr-map.css",
-  "version": 5,
+  "version": 6,
   "viewBox": {
     "minX": 0,
     "minY": 0,
@@ -136,7 +136,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   649.3,
-                  486.9
+                  483.8
                 ]
               ]
             },
@@ -147,7 +147,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   649.3,
-                  486.9
+                  483.8
                 ],
                 [
                   648.5,
@@ -159,7 +159,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   738.3,
-                  497.6
+                  483.8
                 ]
               ]
             },
@@ -170,7 +170,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   738.3,
-                  497.6
+                  483.8
                 ],
                 [
                   739.1,
@@ -262,7 +262,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   560.5
                 ],
                 [
-                  1070.3,
+                  1061.1,
                   549.2
                 ]
               ]
@@ -273,7 +273,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "MOK",
               "points": [
                 [
-                  1070.3,
+                  1061.1,
                   549.2
                 ],
                 [
@@ -285,7 +285,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   634.5
                 ],
                 [
-                  1070.3,
+                  1061.1,
                   620.4
                 ]
               ]
@@ -296,7 +296,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "YMT",
               "points": [
                 [
-                  1070.3,
+                  1061.1,
                   620.4
                 ],
                 [
@@ -308,7 +308,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   708.6
                 ],
                 [
-                  1070.3,
+                  1061.1,
                   689.9
                 ]
               ]
@@ -319,7 +319,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "JOR",
               "points": [
                 [
-                  1070.3,
+                  1061.1,
                   689.9
                 ],
                 [
@@ -394,7 +394,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   998.2,
-                  992.5
+                  970.1
                 ]
               ]
             },
@@ -405,7 +405,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   998.2,
-                  992.5
+                  970.1
                 ],
                 [
                   1016.6,
@@ -417,7 +417,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   891.4,
-                  992.5
+                  979.9
                 ]
               ]
             }
@@ -465,7 +465,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1866.9,
-                  771.7
+                  756.3
                 ],
                 [
                   1877.7,
@@ -481,7 +481,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1763.6,
-                  771.7
+                  756.3
                 ]
               ]
             },
@@ -492,7 +492,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1763.6,
-                  771.7
+                  756.3
                 ],
                 [
                   1780.9,
@@ -651,7 +651,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1553.6,
-                  497.6
+                  482.1
                 ]
               ]
             },
@@ -662,7 +662,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1553.6,
-                  497.6
+                  482.1
                 ],
                 [
                   1568.7,
@@ -720,7 +720,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1247.4,
-                  495.8
+                  482.6
                 ]
               ]
             },
@@ -731,7 +731,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1247.4,
-                  495.8
+                  482.6
                 ],
                 [
                   1260.1,
@@ -777,7 +777,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   567.4
                 ],
                 [
-                  1070.3,
+                  1079.8,
                   549.2
                 ]
               ]
@@ -788,7 +788,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "MOK",
               "points": [
                 [
-                  1070.3,
+                  1079.8,
                   549.2
                 ],
                 [
@@ -800,7 +800,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   635.9
                 ],
                 [
-                  1070.3,
+                  1079.8,
                   620.4
                 ]
               ]
@@ -811,7 +811,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "YMT",
               "points": [
                 [
-                  1070.3,
+                  1079.8,
                   620.4
                 ],
                 [
@@ -823,7 +823,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   707.3
                 ],
                 [
-                  1070.3,
+                  1079.7,
                   689.9
                 ]
               ]
@@ -834,7 +834,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "HOM",
               "points": [
                 [
-                  1070.3,
+                  1079.7,
                   689.9
                 ],
                 [
@@ -859,7 +859,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1302.6,
-                  737.9
+                  728
                 ]
               ]
             },
@@ -870,7 +870,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1302.6,
-                  737.9
+                  728
                 ],
                 [
                   1305.1,
@@ -1050,7 +1050,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1658.6,
-                  992.5
+                  996.7
                 ]
               ]
             },
@@ -1061,7 +1061,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1658.6,
-                  992.5
+                  996.7
                 ],
                 [
                   1673.4,
@@ -1073,7 +1073,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1557.1,
-                  992.5
+                  996.7
                 ]
               ]
             },
@@ -1084,7 +1084,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1557.1,
-                  992.5
+                  996.7
                 ],
                 [
                   1571.9,
@@ -1188,7 +1188,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   998.2,
-                  992.5
+                  987.7
                 ]
               ]
             },
@@ -1199,7 +1199,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   998.2,
-                  992.5
+                  987.7
                 ],
                 [
                   1016.7,
@@ -1211,7 +1211,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   891.4,
-                  992.5
+                  996.3
                 ]
               ]
             },
@@ -1222,7 +1222,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   891.4,
-                  992.5
+                  996.3
                 ],
                 [
                   909.9,
@@ -1563,7 +1563,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   738.3,
-                  497.6
+                  500.7
                 ]
               ]
             },
@@ -1574,7 +1574,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   738.3,
-                  497.6
+                  500.7
                 ],
                 [
                   747.1,
@@ -1585,7 +1585,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   609.8
                 ],
                 [
-                  738.3,
+                  742.1,
                   592
                 ]
               ]
@@ -1596,7 +1596,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "AUS",
               "points": [
                 [
-                  738.3,
+                  742.1,
                   592
                 ],
                 [
@@ -1678,8 +1678,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   832.3
                 ],
                 [
-                  1208.3,
-                  818
+                  1205,
+                  814.6
                 ]
               ]
             },
@@ -1689,8 +1689,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "HOM",
               "points": [
                 [
-                  1208.3,
-                  818
+                  1205,
+                  814.6
                 ],
                 [
                   1215,
@@ -1710,7 +1710,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1302.6,
-                  737.9
+                  747.9
                 ]
               ]
             },
@@ -1721,7 +1721,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1302.6,
-                  737.9
+                  747.9
                 ],
                 [
                   1303,
@@ -1814,7 +1814,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1553.6,
-                  497.6
+                  502.3
                 ]
               ]
             },
@@ -1825,7 +1825,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1553.6,
-                  497.6
+                  502.3
                 ],
                 [
                   1562.5,
@@ -1879,7 +1879,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   375.3
                 ],
                 [
-                  1247.4,
+                  1260.3,
                   374.8
                 ]
               ]
@@ -1890,7 +1890,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "CKT",
               "points": [
                 [
-                  1247.4,
+                  1260.3,
                   374.8
                 ],
                 [
@@ -2181,7 +2181,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1866.9,
-                  771.7
+                  776.5
                 ]
               ]
             }
@@ -2285,7 +2285,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1866.9,
-                  771.7
+                  776.5
                 ]
               ]
             },
@@ -2296,7 +2296,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1866.9,
-                  771.7
+                  776.5
                 ],
                 [
                   1881.8,
@@ -2308,7 +2308,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1763.6,
-                  771.7
+                  776.5
                 ]
               ]
             },
@@ -2319,7 +2319,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1763.6,
-                  771.7
+                  776.5
                 ],
                 [
                   1781.2,
@@ -2359,7 +2359,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1658.6,
-                  992.5
+                  979.5
                 ]
               ]
             },
@@ -2370,7 +2370,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1658.6,
-                  992.5
+                  979.5
                 ],
                 [
                   1675.2,
@@ -2382,7 +2382,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1557.1,
-                  992.5
+                  979.5
                 ]
               ]
             }
@@ -2432,8 +2432,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   673.8
                 ],
                 [
-                  434,
-                  673.8
+                  431.3,
+                  671.7
                 ]
               ]
             },
@@ -2443,8 +2443,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "TSY",
               "points": [
                 [
-                  434,
-                  673.8
+                  431.3,
+                  671.7
                 ],
                 [
                   434.7,
@@ -2463,8 +2463,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   564.7
                 ],
                 [
-                  531.9,
-                  563.5
+                  528.8,
+                  560.4
                 ]
               ]
             },
@@ -2474,8 +2474,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "LAK",
               "points": [
                 [
-                  531.9,
-                  563.5
+                  528.8,
+                  560.4
                 ],
                 [
                   531.1,
@@ -2495,7 +2495,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   649.3,
-                  486.9
+                  500.7
                 ]
               ]
             },
@@ -2506,7 +2506,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   649.3,
-                  486.9
+                  500.7
                 ],
                 [
                   648.1,
@@ -2529,7 +2529,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   607.8
                 ],
                 [
-                  738.3,
+                  725.5,
                   592
                 ]
               ]
@@ -2540,7 +2540,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "OLY",
               "points": [
                 [
-                  738.3,
+                  725.5,
                   592
                 ],
                 [
@@ -2575,7 +2575,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   824.3
                 ],
                 [
-                  729.4,
+                  734.8,
                   807.3
                 ]
               ]
@@ -2586,7 +2586,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "HOK",
               "points": [
                 [
-                  729.4,
+                  734.8,
                   807.3
                 ],
                 [
@@ -2611,7 +2611,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   891.4,
-                  955.1
+                  950.9
                 ]
               ]
             }
@@ -2721,8 +2721,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   569
                 ],
                 [
-                  531.9,
-                  563.5
+                  542.2,
+                  573.8
                 ]
               ]
             },
@@ -2732,8 +2732,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "KOW",
               "points": [
                 [
-                  531.9,
-                  563.5
+                  542.2,
+                  573.8
                 ],
                 [
                   535.8,
@@ -2764,7 +2764,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   822.3
                 ],
                 [
-                  729.4,
+                  713.4,
                   807.3
                 ]
               ]
@@ -2775,7 +2775,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "HOK",
               "points": [
                 [
-                  729.4,
+                  713.4,
                   807.3
                 ],
                 [
@@ -2804,7 +2804,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   891.4,
-                  955.1
+                  968.3
                 ]
               ]
             }
@@ -2836,8 +2836,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "DIS",
               "points": [
                 [
-                  434,
-                  673.8
+                  443.8,
+                  681.3
                 ],
                 [
                   449.1,
@@ -3022,7 +3022,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   998.2,
-                  992.5
+                  1026.3
                 ]
               ]
             }
@@ -3263,7 +3263,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   391.2
                 ],
                 [
-                  1247.4,
+                  1243.3,
                   374.8
                 ]
               ]
@@ -3274,7 +3274,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "KOT",
               "points": [
                 [
-                  1247.4,
+                  1243.3,
                   374.8
                 ],
                 [
@@ -3287,7 +3287,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1247.4,
-                  495.8
+                  500
                 ]
               ]
             },
@@ -3298,7 +3298,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1247.4,
-                  495.8
+                  500
                 ],
                 [
                   1256.5,
@@ -3332,8 +3332,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   787.2
                 ],
                 [
-                  1208.3,
-                  818
+                  1218.8,
+                  828.4
                 ]
               ]
             },
@@ -3343,8 +3343,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "EXC",
               "points": [
                 [
-                  1208.3,
-                  818
+                  1218.8,
+                  828.4
                 ],
                 [
                   1231.6,
@@ -3387,7 +3387,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   998.2,
-                  992.5
+                  1005.3
                 ]
               ]
             }
@@ -3608,7 +3608,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   391.2
                 ],
                 [
-                  1247.4,
+                  1243.3,
                   374.8
                 ]
               ]
@@ -3619,7 +3619,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "KOT",
               "points": [
                 [
-                  1247.4,
+                  1243.3,
                   374.8
                 ],
                 [
@@ -3632,7 +3632,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   1247.4,
-                  495.8
+                  500
                 ]
               ]
             },
@@ -3643,7 +3643,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "points": [
                 [
                   1247.4,
-                  495.8
+                  500
                 ],
                 [
                   1256.5,
@@ -3677,8 +3677,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                   787.2
                 ],
                 [
-                  1208.3,
-                  818
+                  1218.8,
+                  828.4
                 ]
               ]
             },
@@ -3688,8 +3688,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
               "to": "EXC",
               "points": [
                 [
-                  1208.3,
-                  818
+                  1218.8,
+                  828.4
                 ],
                 [
                   1231.6,
@@ -3732,7 +3732,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
                 ],
                 [
                   998.2,
-                  992.5
+                  1005.3
                 ]
               ]
             }
@@ -3838,6 +3838,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Admiralty",
       "x": 998.2,
       "y": 992.5,
+      "markerX": 998.2,
+      "markerY": 997.4,
       "interchange": true,
       "lines": [
         "TWL",
@@ -3845,6 +3847,24 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "SIL",
         "EAL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 998.2,
+          "y": 987.7
+        },
+        "SIL": {
+          "x": 998.2,
+          "y": 1026.3
+        },
+        "TWL": {
+          "x": 998.2,
+          "y": 970.1
+        },
+        "EAL": {
+          "x": 998.2,
+          "y": 1005.3
+        }
+      },
       "label": {
         "text": "金鐘",
         "anchor": "start",
@@ -3858,10 +3878,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Airport",
       "x": 252.4,
       "y": 743.3,
+      "markerX": 252.4,
+      "markerY": 743.3,
       "interchange": false,
       "lines": [
         "AEL"
       ],
+      "lineAnchors": {
+        "AEL": {
+          "x": 252.4,
+          "y": 743.3
+        }
+      },
       "label": {
         "text": "機場",
         "anchor": "end",
@@ -3875,10 +3903,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Austin",
       "x": 930.6,
       "y": 805.6,
+      "markerX": 930.6,
+      "markerY": 805.6,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 930.6,
+          "y": 805.6
+        }
+      },
       "label": {
         "text": "柯士甸",
         "anchor": "end",
@@ -3892,10 +3928,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "AsiaWorld-Expo",
       "x": 314.7,
       "y": 656,
+      "markerX": 314.7,
+      "markerY": 656,
       "interchange": false,
       "lines": [
         "AEL"
       ],
+      "lineAnchors": {
+        "AEL": {
+          "x": 314.7,
+          "y": 656
+        }
+      },
       "label": {
         "text": "博覽館",
         "anchor": "end",
@@ -3909,10 +3953,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Causeway Bay",
       "x": 1256.3,
       "y": 992.5,
+      "markerX": 1256.3,
+      "markerY": 992.5,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 1256.3,
+          "y": 992.5
+        }
+      },
       "label": {
         "text": "銅鑼灣",
         "anchor": "middle",
@@ -3926,11 +3978,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Central",
       "x": 891.4,
       "y": 992.5,
+      "markerX": 891.4,
+      "markerY": 988.1,
       "interchange": true,
       "lines": [
         "TWL",
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 891.4,
+          "y": 996.3
+        },
+        "TWL": {
+          "x": 891.4,
+          "y": 979.9
+        }
+      },
       "label": {
         "text": "中環",
         "anchor": "middle",
@@ -3944,10 +4008,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Choi Hung",
       "x": 1626.6,
       "y": 486.9,
+      "markerX": 1626.6,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1626.6,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "彩虹",
         "anchor": "middle",
@@ -3961,10 +4033,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Chai Wan",
       "x": 2023.5,
       "y": 1250.6,
+      "markerX": 2023.5,
+      "markerY": 1250.6,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 2023.5,
+          "y": 1250.6
+        }
+      },
       "label": {
         "text": "柴灣",
         "anchor": "start",
@@ -3978,10 +4058,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "City One",
       "x": 1466.4,
       "y": 113.1,
+      "markerX": 1466.4,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1466.4,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "第一城",
         "anchor": "middle",
@@ -3995,10 +4083,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Che Kung Temple",
       "x": 1409.4,
       "y": 298.3,
+      "markerX": 1409.4,
+      "markerY": 298.3,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1409.4,
+          "y": 298.3
+        }
+      },
       "label": {
         "text": "車公廟",
         "anchor": "middle",
@@ -4012,10 +4108,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Cheung Sha Wan",
       "x": 918.1,
       "y": 486.9,
+      "markerX": 918.1,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "TWL"
       ],
+      "lineAnchors": {
+        "TWL": {
+          "x": 918.1,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "長沙灣",
         "anchor": "middle",
@@ -4029,11 +4133,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Diamond Hill",
       "x": 1553.6,
       "y": 497.6,
+      "markerX": 1553.6,
+      "markerY": 492.2,
       "interchange": true,
       "lines": [
         "KTL",
         "TML"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1553.6,
+          "y": 482.1
+        },
+        "TML": {
+          "x": 1553.6,
+          "y": 502.3
+        }
+      },
       "label": {
         "text": "鑽石山",
         "anchor": "start",
@@ -4047,10 +4163,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Disneyland Resort",
       "x": 503.4,
       "y": 753.9,
+      "markerX": 503.4,
+      "markerY": 753.9,
       "interchange": false,
       "lines": [
         "DRL"
       ],
+      "lineAnchors": {
+        "DRL": {
+          "x": 503.4,
+          "y": 753.9
+        }
+      },
       "label": {
         "text": "迪士尼",
         "anchor": "end",
@@ -4064,10 +4188,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "East Tsim Sha Tsui",
       "x": 1097.9,
       "y": 862.5,
+      "markerX": 1097.9,
+      "markerY": 862.5,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1097.9,
+          "y": 862.5
+        }
+      },
       "label": {
         "text": "尖東",
         "anchor": "start",
@@ -4081,10 +4213,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Exhibition Centre",
       "x": 1099.7,
       "y": 955.1,
+      "markerX": 1099.7,
+      "markerY": 955.1,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 1099.7,
+          "y": 955.1
+        }
+      },
       "label": {
         "text": "會展",
         "anchor": "start",
@@ -4098,10 +4238,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Fanling",
       "x": 902.1,
       "y": 113.1,
+      "markerX": 902.1,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 902.1,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "粉嶺",
         "anchor": "start",
@@ -4115,10 +4263,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Fortress Hill",
       "x": 1457.5,
       "y": 992.5,
+      "markerX": 1457.5,
+      "markerY": 992.5,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 1457.5,
+          "y": 992.5
+        }
+      },
       "label": {
         "text": "炮台山",
         "anchor": "middle",
@@ -4132,10 +4288,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Fo Tan",
       "x": 1249.2,
       "y": 218.2,
+      "markerX": 1249.2,
+      "markerY": 218.2,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 1249.2,
+          "y": 218.2
+        }
+      },
       "label": {
         "text": "火炭",
         "anchor": "start",
@@ -4149,10 +4313,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Hang Hau",
       "x": 2023.5,
       "y": 666.7,
+      "markerX": 2023.5,
+      "markerY": 666.7,
       "interchange": false,
       "lines": [
         "TKL"
       ],
+      "lineAnchors": {
+        "TKL": {
+          "x": 2023.5,
+          "y": 666.7
+        }
+      },
       "label": {
         "text": "坑口",
         "anchor": "start",
@@ -4166,10 +4338,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Heng On",
       "x": 1799.2,
       "y": 113.1,
+      "markerX": 1799.2,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1799.2,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "恆安",
         "anchor": "middle",
@@ -4183,10 +4363,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Heng Fa Chuen",
       "x": 2023.5,
       "y": 1165.1,
+      "markerX": 2023.5,
+      "markerY": 1165.1,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 2023.5,
+          "y": 1165.1
+        }
+      },
       "label": {
         "text": "杏花邨",
         "anchor": "start",
@@ -4200,10 +4388,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Hin Keng",
       "x": 1432.5,
       "y": 397.9,
+      "markerX": 1432.5,
+      "markerY": 397.9,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1432.5,
+          "y": 397.9
+        }
+      },
       "label": {
         "text": "顯徑",
         "anchor": "end",
@@ -4217,10 +4413,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "HKU",
       "x": 567.5,
       "y": 992.5,
+      "markerX": 567.5,
+      "markerY": 992.5,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 567.5,
+          "y": 992.5
+        }
+      },
       "label": {
         "text": "香港大學",
         "anchor": "middle",
@@ -4234,11 +4438,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Hong Kong",
       "x": 891.4,
       "y": 955.1,
+      "markerX": 891.4,
+      "markerY": 959.6,
       "interchange": true,
       "lines": [
         "TCL",
         "AEL"
       ],
+      "lineAnchors": {
+        "TCL": {
+          "x": 891.4,
+          "y": 950.9
+        },
+        "AEL": {
+          "x": 891.4,
+          "y": 968.3
+        }
+      },
       "label": {
         "text": "香港",
         "anchor": "end",
@@ -4252,11 +4468,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Ho Man Tin",
       "x": 1302.6,
       "y": 737.9,
+      "markerX": 1302.6,
+      "markerY": 738,
       "interchange": true,
       "lines": [
         "KTL",
         "TML"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1302.6,
+          "y": 728
+        },
+        "TML": {
+          "x": 1302.6,
+          "y": 747.9
+        }
+      },
       "label": {
         "text": "何文田",
         "anchor": "start",
@@ -4270,11 +4498,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Hung Hom",
       "x": 1208.3,
       "y": 818,
+      "markerX": 1211.9,
+      "markerY": 821.5,
       "interchange": true,
       "lines": [
         "TML",
         "EAL"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1205,
+          "y": 814.6
+        },
+        "EAL": {
+          "x": 1218.8,
+          "y": 828.4
+        }
+      },
       "label": {
         "text": "紅磡",
         "anchor": "start",
@@ -4288,10 +4528,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Jordan",
       "x": 1065.9,
       "y": 759.3,
+      "markerX": 1065.9,
+      "markerY": 759.3,
       "interchange": false,
       "lines": [
         "TWL"
       ],
+      "lineAnchors": {
+        "TWL": {
+          "x": 1065.9,
+          "y": 759.3
+        }
+      },
       "label": {
         "text": "佐敦",
         "anchor": "end",
@@ -4305,10 +4553,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Kai Tak",
       "x": 1555.4,
       "y": 559.9,
+      "markerX": 1555.4,
+      "markerY": 559.9,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1555.4,
+          "y": 559.9
+        }
+      },
       "label": {
         "text": "啟德",
         "anchor": "start",
@@ -4322,10 +4578,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Kennedy Town",
       "x": 460.7,
       "y": 992.5,
+      "markerX": 460.7,
+      "markerY": 992.5,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 460.7,
+          "y": 992.5
+        }
+      },
       "label": {
         "text": "堅尼地城",
         "anchor": "middle",
@@ -4339,10 +4603,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Kowloon Bay",
       "x": 1696,
       "y": 503,
+      "markerX": 1696,
+      "markerY": 503,
       "interchange": false,
       "lines": [
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1696,
+          "y": 503
+        }
+      },
       "label": {
         "text": "九龍灣",
         "anchor": "middle",
@@ -4356,11 +4628,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Kowloon Tong",
       "x": 1247.4,
       "y": 495.8,
+      "markerX": 1247.4,
+      "markerY": 491.3,
       "interchange": true,
       "lines": [
         "KTL",
         "EAL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1247.4,
+          "y": 482.6
+        },
+        "EAL": {
+          "x": 1247.4,
+          "y": 500
+        }
+      },
       "label": {
         "text": "九龍塘",
         "anchor": "middle",
@@ -4374,11 +4658,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Kowloon",
       "x": 729.4,
       "y": 807.3,
+      "markerX": 724.1,
+      "markerY": 807.3,
       "interchange": true,
       "lines": [
         "TCL",
         "AEL"
       ],
+      "lineAnchors": {
+        "TCL": {
+          "x": 734.8,
+          "y": 807.3
+        },
+        "AEL": {
+          "x": 713.4,
+          "y": 807.3
+        }
+      },
       "label": {
         "text": "九龍",
         "anchor": "end",
@@ -4392,10 +4688,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Kam Sheung Road",
       "x": 188.3,
       "y": 317.8,
+      "markerX": 188.3,
+      "markerY": 317.8,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 188.3,
+          "y": 317.8
+        }
+      },
       "label": {
         "text": "錦上路",
         "anchor": "middle",
@@ -4409,10 +4713,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Kwai Fong",
       "x": 551.4,
       "y": 486.9,
+      "markerX": 551.4,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "TWL"
       ],
+      "lineAnchors": {
+        "TWL": {
+          "x": 551.4,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "葵芳",
         "anchor": "middle",
@@ -4426,10 +4738,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Kwai Hing",
       "x": 446.4,
       "y": 486.9,
+      "markerX": 446.4,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "TWL"
       ],
+      "lineAnchors": {
+        "TWL": {
+          "x": 446.4,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "葵興",
         "anchor": "middle",
@@ -4443,10 +4763,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Kwun Tong",
       "x": 1710.2,
       "y": 632.9,
+      "markerX": 1710.2,
+      "markerY": 632.9,
       "interchange": false,
       "lines": [
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1710.2,
+          "y": 632.9
+        }
+      },
       "label": {
         "text": "觀塘",
         "anchor": "middle",
@@ -4460,11 +4788,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Lai King",
       "x": 649.3,
       "y": 486.9,
+      "markerX": 649.3,
+      "markerY": 492.3,
       "interchange": true,
       "lines": [
         "TWL",
         "TCL"
       ],
+      "lineAnchors": {
+        "TCL": {
+          "x": 649.3,
+          "y": 500.7
+        },
+        "TWL": {
+          "x": 649.3,
+          "y": 483.8
+        }
+      },
       "label": {
         "text": "茘景",
         "anchor": "end",
@@ -4478,10 +4818,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Lam Tin",
       "x": 1710.2,
       "y": 704.1,
+      "markerX": 1710.2,
+      "markerY": 704.1,
       "interchange": false,
       "lines": [
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1710.2,
+          "y": 704.1
+        }
+      },
       "label": {
         "text": "藍田",
         "anchor": "middle",
@@ -4495,10 +4843,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Lai Chi Kok",
       "x": 814.9,
       "y": 486.9,
+      "markerX": 814.9,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "TWL"
       ],
+      "lineAnchors": {
+        "TWL": {
+          "x": 814.9,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "茘枝角",
         "anchor": "middle",
@@ -4512,10 +4868,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Lei Tung",
       "x": 718.8,
       "y": 1202.5,
+      "markerX": 718.8,
+      "markerY": 1202.5,
       "interchange": false,
       "lines": [
         "SIL"
       ],
+      "lineAnchors": {
+        "SIL": {
+          "x": 718.8,
+          "y": 1202.5
+        }
+      },
       "label": {
         "text": "利東",
         "anchor": "middle",
@@ -4529,10 +4893,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "LOHAS Park",
       "x": 2023.5,
       "y": 844.7,
+      "markerX": 2023.5,
+      "markerY": 844.7,
       "interchange": false,
       "lines": [
         "TKL"
       ],
+      "lineAnchors": {
+        "TKL": {
+          "x": 2023.5,
+          "y": 844.7
+        }
+      },
       "label": {
         "text": "康城",
         "anchor": "start",
@@ -4546,10 +4918,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Lok Ma Chau",
       "x": 629.8,
       "y": 155.9,
+      "markerX": 629.8,
+      "markerY": 155.9,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 629.8,
+          "y": 155.9
+        }
+      },
       "label": {
         "text": "落馬洲",
         "anchor": "start",
@@ -4563,10 +4943,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Lok Fu",
       "x": 1325.7,
       "y": 486.9,
+      "markerX": 1325.7,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1325.7,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "樂富",
         "anchor": "middle",
@@ -4580,10 +4968,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Long Ping",
       "x": 188.3,
       "y": 166.5,
+      "markerX": 188.3,
+      "markerY": 166.5,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 188.3,
+          "y": 166.5
+        }
+      },
       "label": {
         "text": "朗屏",
         "anchor": "middle",
@@ -4597,10 +4993,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Lo Wu",
       "x": 704.5,
       "y": 113.1,
+      "markerX": 704.5,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 704.5,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "羅湖",
         "anchor": "start",
@@ -4614,11 +5018,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Mei Foo",
       "x": 738.3,
       "y": 497.6,
+      "markerX": 738.3,
+      "markerY": 492.3,
       "interchange": true,
       "lines": [
         "TWL",
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 738.3,
+          "y": 500.7
+        },
+        "TWL": {
+          "x": 738.3,
+          "y": 483.8
+        }
+      },
       "label": {
         "text": "美孚",
         "anchor": "end",
@@ -4632,10 +5048,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Mong Kok East",
       "x": 1249.2,
       "y": 620.4,
+      "markerX": 1249.2,
+      "markerY": 620.4,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 1249.2,
+          "y": 620.4
+        }
+      },
       "label": {
         "text": "旺角東",
         "anchor": "start",
@@ -4649,11 +5073,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Mong Kok",
       "x": 1070.3,
       "y": 620.4,
+      "markerX": 1070.4,
+      "markerY": 620.4,
       "interchange": true,
       "lines": [
         "TWL",
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1079.8,
+          "y": 620.4
+        },
+        "TWL": {
+          "x": 1061.1,
+          "y": 620.4
+        }
+      },
       "label": {
         "text": "旺角",
         "anchor": "end",
@@ -4667,10 +5103,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Ma On Shan",
       "x": 1907.8,
       "y": 113.1,
+      "markerX": 1907.8,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1907.8,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "馬鞍山",
         "anchor": "middle",
@@ -4684,11 +5128,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Nam Cheong",
       "x": 738.3,
       "y": 592,
+      "markerX": 733.8,
+      "markerY": 592,
       "interchange": true,
       "lines": [
         "TML",
         "TCL"
       ],
+      "lineAnchors": {
+        "TCL": {
+          "x": 725.5,
+          "y": 592
+        },
+        "TML": {
+          "x": 742.1,
+          "y": 592
+        }
+      },
       "label": {
         "text": "南昌",
         "anchor": "end",
@@ -4702,11 +5158,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "North Point",
       "x": 1557.1,
       "y": 992.5,
+      "markerX": 1557.1,
+      "markerY": 988.1,
       "interchange": true,
       "lines": [
         "ISL",
         "TKL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 1557.1,
+          "y": 996.7
+        },
+        "TKL": {
+          "x": 1557.1,
+          "y": 979.5
+        }
+      },
       "label": {
         "text": "北角",
         "anchor": "middle",
@@ -4720,10 +5188,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Ngau Tau Kok",
       "x": 1710.2,
       "y": 561.7,
+      "markerX": 1710.2,
+      "markerY": 561.7,
       "interchange": false,
       "lines": [
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1710.2,
+          "y": 561.7
+        }
+      },
       "label": {
         "text": "牛頭角",
         "anchor": "middle",
@@ -4737,10 +5213,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Ocean Park",
       "x": 1051.6,
       "y": 1085,
+      "markerX": 1051.6,
+      "markerY": 1085,
       "interchange": false,
       "lines": [
         "SIL"
       ],
+      "lineAnchors": {
+        "SIL": {
+          "x": 1051.6,
+          "y": 1085
+        }
+      },
       "label": {
         "text": "海洋公園",
         "anchor": "start",
@@ -4754,10 +5238,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Olympic",
       "x": 729.4,
       "y": 705.9,
+      "markerX": 729.4,
+      "markerY": 705.9,
       "interchange": false,
       "lines": [
         "TCL"
       ],
+      "lineAnchors": {
+        "TCL": {
+          "x": 729.4,
+          "y": 705.9
+        }
+      },
       "label": {
         "text": "奧運",
         "anchor": "end",
@@ -4771,10 +5263,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Po Lam",
       "x": 2023.5,
       "y": 559.9,
+      "markerX": 2023.5,
+      "markerY": 559.9,
       "interchange": false,
       "lines": [
         "TKL"
       ],
+      "lineAnchors": {
+        "TKL": {
+          "x": 2023.5,
+          "y": 559.9
+        }
+      },
       "label": {
         "text": "寶琳",
         "anchor": "start",
@@ -4788,11 +5288,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Prince Edward",
       "x": 1070.3,
       "y": 549.2,
+      "markerX": 1070.4,
+      "markerY": 549.2,
       "interchange": true,
       "lines": [
         "TWL",
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1079.8,
+          "y": 549.2
+        },
+        "TWL": {
+          "x": 1061.1,
+          "y": 549.2
+        }
+      },
       "label": {
         "text": "太子",
         "anchor": "end",
@@ -4806,11 +5318,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Quarry Bay",
       "x": 1658.6,
       "y": 992.5,
+      "markerX": 1658.6,
+      "markerY": 988.1,
       "interchange": true,
       "lines": [
         "ISL",
         "TKL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 1658.6,
+          "y": 996.7
+        },
+        "TKL": {
+          "x": 1658.6,
+          "y": 979.5
+        }
+      },
       "label": {
         "text": "鰂魚涌",
         "anchor": "middle",
@@ -4824,10 +5348,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Shek Mun",
       "x": 1576.7,
       "y": 113.1,
+      "markerX": 1576.7,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1576.7,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "石門",
         "anchor": "middle",
@@ -4841,10 +5373,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Sheung Shui",
       "x": 802.4,
       "y": 116.7,
+      "markerX": 802.4,
+      "markerY": 116.7,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 802.4,
+          "y": 116.7
+        }
+      },
       "label": {
         "text": "上水",
         "anchor": "start",
@@ -4858,10 +5398,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Sha Tin",
       "x": 1249.2,
       "y": 298.3,
+      "markerX": 1249.2,
+      "markerY": 298.3,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 1249.2,
+          "y": 298.3
+        }
+      },
       "label": {
         "text": "沙田",
         "anchor": "start",
@@ -4875,10 +5423,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Sheung Wan",
       "x": 784.6,
       "y": 992.5,
+      "markerX": 784.6,
+      "markerY": 992.5,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 784.6,
+          "y": 992.5
+        }
+      },
       "label": {
         "text": "上環",
         "anchor": "middle",
@@ -4892,10 +5448,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Siu Hong",
       "x": 110,
       "y": 241.3,
+      "markerX": 110,
+      "markerY": 241.3,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 110,
+          "y": 241.3
+        }
+      },
       "label": {
         "text": "兆康",
         "anchor": "start",
@@ -4909,10 +5473,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Shek Kip Mei",
       "x": 1131.7,
       "y": 486.9,
+      "markerX": 1131.7,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1131.7,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "石硤尾",
         "anchor": "end",
@@ -4926,10 +5498,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Shau Kei Wan",
       "x": 1979,
       "y": 1067.2,
+      "markerX": 1979,
+      "markerY": 1067.2,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 1979,
+          "y": 1067.2
+        }
+      },
       "label": {
         "text": "筲箕灣",
         "anchor": "start",
@@ -4943,10 +5523,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "South Horizons",
       "x": 585.3,
       "y": 1202.5,
+      "markerX": 585.3,
+      "markerY": 1202.5,
       "interchange": false,
       "lines": [
         "SIL"
       ],
+      "lineAnchors": {
+        "SIL": {
+          "x": 585.3,
+          "y": 1202.5
+        }
+      },
       "label": {
         "text": "海怡半島",
         "anchor": "middle",
@@ -4960,10 +5548,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Sham Shui Po",
       "x": 1008.9,
       "y": 486.9,
+      "markerX": 1008.9,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "TWL"
       ],
+      "lineAnchors": {
+        "TWL": {
+          "x": 1008.9,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "深水埗",
         "anchor": "middle",
@@ -4977,10 +5573,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Sha Tin Wai",
       "x": 1409.4,
       "y": 218.2,
+      "markerX": 1409.4,
+      "markerY": 218.2,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1409.4,
+          "y": 218.2
+        }
+      },
       "label": {
         "text": "沙田圍",
         "anchor": "middle",
@@ -4994,11 +5598,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Sunny Bay",
       "x": 434,
       "y": 673.8,
+      "markerX": 437.6,
+      "markerY": 676.5,
       "interchange": true,
       "lines": [
         "TCL",
         "DRL"
       ],
+      "lineAnchors": {
+        "TCL": {
+          "x": 431.3,
+          "y": 671.7
+        },
+        "DRL": {
+          "x": 443.8,
+          "y": 681.3
+        }
+      },
       "label": {
         "text": "欣澳",
         "anchor": "end",
@@ -5012,10 +5628,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Sung Wong Toi",
       "x": 1516.2,
       "y": 627.6,
+      "markerX": 1516.2,
+      "markerY": 627.6,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1516.2,
+          "y": 627.6
+        }
+      },
       "label": {
         "text": "宋皇臺",
         "anchor": "start",
@@ -5029,10 +5653,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Sai Wan Ho",
       "x": 1879.3,
       "y": 992.5,
+      "markerX": 1879.3,
+      "markerY": 992.5,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 1879.3,
+          "y": 992.5
+        }
+      },
       "label": {
         "text": "西灣河",
         "anchor": "middle",
@@ -5046,10 +5678,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Sai Ying Pun",
       "x": 676,
       "y": 992.5,
+      "markerX": 676,
+      "markerY": 992.5,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 676,
+          "y": 992.5
+        }
+      },
       "label": {
         "text": "西營盤",
         "anchor": "middle",
@@ -5063,10 +5703,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tai Koo",
       "x": 1769,
       "y": 992.5,
+      "markerX": 1769,
+      "markerY": 992.5,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 1769,
+          "y": 992.5
+        }
+      },
       "label": {
         "text": "太古",
         "anchor": "middle",
@@ -5080,10 +5728,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tai Po Market",
       "x": 1101.5,
       "y": 113.1,
+      "markerX": 1101.5,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 1101.5,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "大埔墟",
         "anchor": "start",
@@ -5097,11 +5753,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tai Wai",
       "x": 1247.4,
       "y": 374.8,
+      "markerX": 1251.8,
+      "markerY": 374.8,
       "interchange": true,
       "lines": [
         "TML",
         "EAL"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1260.3,
+          "y": 374.8
+        },
+        "EAL": {
+          "x": 1243.3,
+          "y": 374.8
+        }
+      },
       "label": {
         "text": "大圍",
         "anchor": "start",
@@ -5115,10 +5783,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tin Hau",
       "x": 1357.8,
       "y": 992.5,
+      "markerX": 1357.8,
+      "markerY": 992.5,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 1357.8,
+          "y": 992.5
+        }
+      },
       "label": {
         "text": "天后",
         "anchor": "middle",
@@ -5132,11 +5808,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tiu Keng Leng",
       "x": 1866.9,
       "y": 771.7,
+      "markerX": 1866.9,
+      "markerY": 766.4,
       "interchange": true,
       "lines": [
         "KTL",
         "TKL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1866.9,
+          "y": 756.3
+        },
+        "TKL": {
+          "x": 1866.9,
+          "y": 776.5
+        }
+      },
       "label": {
         "text": "調景嶺",
         "anchor": "start",
@@ -5150,10 +5838,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tin Shui Wai",
       "x": 149.2,
       "y": 90,
+      "markerX": 149.2,
+      "markerY": 90,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 149.2,
+          "y": 90
+        }
+      },
       "label": {
         "text": "天水圍",
         "anchor": "middle",
@@ -5167,10 +5863,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tseung Kwan O",
       "x": 1975.4,
       "y": 777.1,
+      "markerX": 1975.4,
+      "markerY": 777.1,
       "interchange": false,
       "lines": [
         "TKL"
       ],
+      "lineAnchors": {
+        "TKL": {
+          "x": 1975.4,
+          "y": 777.1
+        }
+      },
       "label": {
         "text": "將軍澳",
         "anchor": "start",
@@ -5184,10 +5888,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "To Kwa Wan",
       "x": 1453.9,
       "y": 689.9,
+      "markerX": 1453.9,
+      "markerY": 689.9,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1453.9,
+          "y": 689.9
+        }
+      },
       "label": {
         "text": "土瓜灣",
         "anchor": "start",
@@ -5201,10 +5913,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tai Shui Hang",
       "x": 1692.4,
       "y": 113.1,
+      "markerX": 1692.4,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 1692.4,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "大水坑",
         "anchor": "middle",
@@ -5218,10 +5938,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tsim Sha Tsui",
       "x": 1065.9,
       "y": 830.5,
+      "markerX": 1065.9,
+      "markerY": 830.5,
       "interchange": false,
       "lines": [
         "TWL"
       ],
+      "lineAnchors": {
+        "TWL": {
+          "x": 1065.9,
+          "y": 830.5
+        }
+      },
       "label": {
         "text": "尖沙咀",
         "anchor": "end",
@@ -5235,10 +5963,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tsuen Wan",
       "x": 236.4,
       "y": 486.9,
+      "markerX": 236.4,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "TWL"
       ],
+      "lineAnchors": {
+        "TWL": {
+          "x": 236.4,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "荃灣",
         "anchor": "middle",
@@ -5252,11 +5988,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tsing Yi",
       "x": 531.9,
       "y": 563.5,
+      "markerX": 535.5,
+      "markerY": 567.1,
       "interchange": true,
       "lines": [
         "TCL",
         "AEL"
       ],
+      "lineAnchors": {
+        "TCL": {
+          "x": 528.8,
+          "y": 560.4
+        },
+        "AEL": {
+          "x": 542.2,
+          "y": 573.8
+        }
+      },
       "label": {
         "text": "青衣",
         "anchor": "end",
@@ -5270,10 +6018,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tung Chung",
       "x": 298.7,
       "y": 810.9,
+      "markerX": 298.7,
+      "markerY": 810.9,
       "interchange": false,
       "lines": [
         "TCL"
       ],
+      "lineAnchors": {
+        "TCL": {
+          "x": 298.7,
+          "y": 810.9
+        }
+      },
       "label": {
         "text": "東涌",
         "anchor": "end",
@@ -5287,10 +6043,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tuen Mun",
       "x": 110,
       "y": 348.1,
+      "markerX": 110,
+      "markerY": 348.1,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 110,
+          "y": 348.1
+        }
+      },
       "label": {
         "text": "屯門",
         "anchor": "start",
@@ -5304,10 +6068,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tai Wo Hau",
       "x": 343.2,
       "y": 486.9,
+      "markerX": 343.2,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "TWL"
       ],
+      "lineAnchors": {
+        "TWL": {
+          "x": 343.2,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "大窩口",
         "anchor": "middle",
@@ -5321,10 +6093,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tai Wo",
       "x": 1001.8,
       "y": 113.1,
+      "markerX": 1001.8,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 1001.8,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "太和",
         "anchor": "start",
@@ -5338,10 +6118,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Tsuen Wan West",
       "x": 236.4,
       "y": 406.8,
+      "markerX": 236.4,
+      "markerY": 406.8,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 236.4,
+          "y": 406.8
+        }
+      },
       "label": {
         "text": "荃灣西",
         "anchor": "middle",
@@ -5355,10 +6143,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "University",
       "x": 1199.4,
       "y": 113.1,
+      "markerX": 1199.4,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "EAL"
       ],
+      "lineAnchors": {
+        "EAL": {
+          "x": 1199.4,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "大學",
         "anchor": "start",
@@ -5372,10 +6168,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Wan Chai",
       "x": 1158.4,
       "y": 992.5,
+      "markerX": 1158.4,
+      "markerY": 992.5,
       "interchange": false,
       "lines": [
         "ISL"
       ],
+      "lineAnchors": {
+        "ISL": {
+          "x": 1158.4,
+          "y": 992.5
+        }
+      },
       "label": {
         "text": "灣仔",
         "anchor": "middle",
@@ -5389,10 +6193,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Wong Chuk Hang",
       "x": 893.2,
       "y": 1127.7,
+      "markerX": 893.2,
+      "markerY": 1127.7,
       "interchange": false,
       "lines": [
         "SIL"
       ],
+      "lineAnchors": {
+        "SIL": {
+          "x": 893.2,
+          "y": 1127.7
+        }
+      },
       "label": {
         "text": "黃竹坑",
         "anchor": "middle",
@@ -5406,10 +6218,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Whampoa",
       "x": 1375.6,
       "y": 773.5,
+      "markerX": 1375.6,
+      "markerY": 773.5,
       "interchange": false,
       "lines": [
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1375.6,
+          "y": 773.5
+        }
+      },
       "label": {
         "text": "黃埔",
         "anchor": "start",
@@ -5423,10 +6243,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Wu Kai Sha",
       "x": 2025.3,
       "y": 113.1,
+      "markerX": 2025.3,
+      "markerY": 113.1,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 2025.3,
+          "y": 113.1
+        }
+      },
       "label": {
         "text": "烏溪沙",
         "anchor": "middle",
@@ -5440,10 +6268,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Wong Tai Sin",
       "x": 1409.4,
       "y": 486.9,
+      "markerX": 1409.4,
+      "markerY": 486.9,
       "interchange": false,
       "lines": [
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1409.4,
+          "y": 486.9
+        }
+      },
       "label": {
         "text": "黃大仙",
         "anchor": "middle",
@@ -5457,11 +6293,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Yau Tong",
       "x": 1763.6,
       "y": 771.7,
+      "markerX": 1763.6,
+      "markerY": 766.4,
       "interchange": true,
       "lines": [
         "KTL",
         "TKL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1763.6,
+          "y": 756.3
+        },
+        "TKL": {
+          "x": 1763.6,
+          "y": 776.5
+        }
+      },
       "label": {
         "text": "油塘",
         "anchor": "middle",
@@ -5475,11 +6323,23 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Yau Ma Tei",
       "x": 1070.3,
       "y": 689.9,
+      "markerX": 1070.4,
+      "markerY": 689.9,
       "interchange": true,
       "lines": [
         "TWL",
         "KTL"
       ],
+      "lineAnchors": {
+        "KTL": {
+          "x": 1079.7,
+          "y": 689.9
+        },
+        "TWL": {
+          "x": 1061.1,
+          "y": 689.9
+        }
+      },
       "label": {
         "text": "油麻地",
         "anchor": "end",
@@ -5493,10 +6353,18 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "nameEn": "Yuen Long",
       "x": 188.3,
       "y": 241.3,
+      "markerX": 188.3,
+      "markerY": 241.3,
       "interchange": false,
       "lines": [
         "TML"
       ],
+      "lineAnchors": {
+        "TML": {
+          "x": 188.3,
+          "y": 241.3
+        }
+      },
       "label": {
         "text": "元朗",
         "anchor": "middle",

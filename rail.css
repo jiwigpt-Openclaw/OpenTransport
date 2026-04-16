@@ -915,67 +915,83 @@ body::after {
     pointer-events: auto;
 }
 
-.rail-schematic-station {
-    cursor: pointer;
-    outline: none;
-}
-
-.rail-schematic-station-visual {
-    pointer-events: none;
-}
-
 .rail-schematic-line {
     --rail-line-color: #5A7694;
+    --rail-line-casing: rgba(249, 252, 255, 0.98);
+}
+
+.rail-schematic-segment-casing,
+.rail-schematic-segment {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: opacity 0.18s ease, stroke-width 0.18s ease, filter 0.18s ease, stroke 0.18s ease;
+}
+
+.rail-schematic-segment-casing {
+    stroke: var(--rail-line-casing);
+    stroke-width: 16;
+    opacity: 0.98;
 }
 
 .rail-schematic-segment {
-    fill: none;
     stroke: var(--rail-line-color);
-    stroke-width: 10;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    opacity: 0.96;
-    transition: opacity 0.18s ease, stroke-width 0.18s ease, filter 0.18s ease;
+    stroke-width: 9.8;
+    opacity: 0.98;
+}
+
+.rail-schematic-segment-casing.is-on-route {
+    stroke-width: 17;
+    opacity: 1;
 }
 
 .rail-schematic-segment.is-on-route {
-    stroke-width: 11;
+    stroke-width: 10.8;
     opacity: 1;
     filter: drop-shadow(0 0 10px color-mix(in srgb, var(--rail-line-color) 26%, white));
 }
 
+.rail-schematic-segment-casing.is-dimmed,
 .rail-schematic-segment.is-dimmed {
-    opacity: 0.15;
+    opacity: 0.18;
+}
+
+.rail-schematic-walk-link-casing {
+    fill: none;
+    stroke: rgba(249, 252, 255, 0.9);
+    stroke-width: 11;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.84;
+    transition: opacity 0.18s ease, stroke-width 0.18s ease, filter 0.18s ease, stroke 0.18s ease;
 }
 
 .rail-schematic-walk-link {
     fill: none;
-    stroke: rgba(127, 139, 154, 0.72);
-    stroke-width: 6.5;
+    stroke: rgba(130, 139, 149, 0.82);
+    stroke-width: 6.2;
     stroke-linecap: round;
     stroke-linejoin: round;
-    stroke-dasharray: 7 10;
-    opacity: 0.54;
+    stroke-dasharray: 10 9;
+    opacity: 0.72;
     transition: opacity 0.18s ease, stroke-width 0.18s ease, filter 0.18s ease, stroke 0.18s ease;
 }
 
+.rail-schematic-walk-link-casing.is-on-route {
+    stroke-width: 11.8;
+    opacity: 0.96;
+}
+
 .rail-schematic-walk-link.is-on-route {
-    stroke: rgba(116, 129, 145, 0.94);
-    stroke-width: 7.8;
-    opacity: 0.88;
+    stroke: rgba(108, 119, 132, 0.96);
+    stroke-width: 6.9;
+    opacity: 0.96;
     filter: drop-shadow(0 0 6px rgba(127, 139, 156, 0.16));
 }
 
+.rail-schematic-walk-link-casing.is-dimmed,
 .rail-schematic-walk-link.is-dimmed {
-    opacity: 0.14;
-}
-
-.rail-schematic-station-dot {
-    fill: #fff;
-    stroke: rgba(25, 42, 62, 0.9);
-    stroke-width: 2.6;
-    pointer-events: none;
-    transition: opacity 0.18s ease, fill 0.18s ease, stroke 0.18s ease, filter 0.18s ease;
+    opacity: 0.16;
 }
 
 .rail-schematic-station-hit {
@@ -984,26 +1000,77 @@ body::after {
     pointer-events: all;
 }
 
+.rail-schematic-station {
+    cursor: pointer;
+    outline: none;
+    --rail-station-fill: #ffffff;
+    --rail-station-stroke: rgba(23, 37, 53, 0.96);
+    --rail-station-halo-fill: rgba(37, 64, 93, 0.08);
+}
+
+.rail-schematic-station-visual {
+    pointer-events: none;
+}
+
 .rail-schematic-station-halo {
-    fill: rgba(37, 64, 93, 0.08);
+    fill: var(--rail-station-halo-fill);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.18s ease, fill 0.18s ease, filter 0.18s ease;
 }
 
+.rail-schematic-station-bed {
+    fill: rgba(249, 252, 255, 0.995);
+    pointer-events: none;
+}
+
+.rail-schematic-station-bed-connector,
+.rail-schematic-station-connector-casing,
+.rail-schematic-station-connector {
+    fill: none;
+    pointer-events: none;
+    stroke-linecap: round;
+    transition: opacity 0.18s ease, stroke 0.18s ease, stroke-width 0.18s ease;
+}
+
+.rail-schematic-station-bed-connector {
+    stroke: rgba(249, 252, 255, 0.995);
+    stroke-width: 17;
+    opacity: 1;
+}
+
+.rail-schematic-station-connector-casing {
+    stroke: var(--rail-station-stroke);
+    stroke-width: 13.2;
+    opacity: 0.98;
+}
+
+.rail-schematic-station-connector {
+    stroke: var(--rail-station-fill);
+    stroke-width: 9.4;
+    opacity: 1;
+}
+
+.rail-schematic-station-dot {
+    fill: var(--rail-station-fill);
+    stroke: var(--rail-station-stroke);
+    stroke-width: 2.5;
+    pointer-events: none;
+    transition: opacity 0.18s ease, fill 0.18s ease, stroke 0.18s ease, filter 0.18s ease;
+}
+
 .rail-schematic-station.is-interchange .rail-schematic-station-dot {
-    fill: rgba(248, 251, 255, 0.98);
-    stroke-width: 3.4;
+    stroke-width: 2.7;
 }
 
 .rail-schematic-station-label {
     fill: var(--rail-ink);
-    font-size: 19px;
+    font-size: 18px;
     font-weight: 700;
     letter-spacing: 0.01em;
     paint-order: stroke;
     stroke: rgba(249, 251, 254, 0.94);
-    stroke-width: 8px;
+    stroke-width: 7px;
     stroke-linejoin: round;
     dominant-baseline: central;
     pointer-events: none;
@@ -1013,7 +1080,7 @@ body::after {
 .rail-schematic-station:hover .rail-schematic-station-halo,
 .rail-schematic-station:focus-visible .rail-schematic-station-halo {
     opacity: 1;
-    fill: rgba(46, 84, 126, 0.16);
+    fill: color-mix(in srgb, var(--rail-station-halo-fill) 86%, white);
     filter: drop-shadow(0 0 6px rgba(58, 88, 124, 0.18));
 }
 
@@ -1022,50 +1089,48 @@ body::after {
     filter: drop-shadow(0 0 4px rgba(41, 63, 90, 0.1));
 }
 
-.rail-schematic-station.is-on-route .rail-schematic-station-halo {
-    opacity: 1;
-    fill: rgba(58, 88, 124, 0.14);
+.rail-schematic-station.is-on-route {
+    --rail-station-fill: rgba(241, 247, 255, 0.98);
+    --rail-station-stroke: rgba(30, 53, 79, 0.98);
+    --rail-station-halo-fill: rgba(58, 88, 124, 0.14);
 }
 
-.rail-schematic-station.is-on-route .rail-schematic-station-dot {
-    fill: rgba(240, 247, 255, 0.98);
-    stroke: rgba(34, 57, 82, 0.96);
+.rail-schematic-station.is-on-route .rail-schematic-station-halo {
+    opacity: 1;
+}
+
+.rail-schematic-station.is-transfer {
+    --rail-station-fill: rgba(239, 244, 250, 0.98);
+    --rail-station-stroke: rgba(26, 40, 58, 0.98);
+    --rail-station-halo-fill: rgba(36, 50, 69, 0.13);
 }
 
 .rail-schematic-station.is-transfer .rail-schematic-station-halo {
     opacity: 1;
-    fill: rgba(36, 50, 69, 0.12);
 }
 
-.rail-schematic-station.is-transfer .rail-schematic-station-dot {
-    fill: rgba(238, 244, 250, 0.98);
-    stroke: rgba(26, 40, 58, 0.98);
+.rail-schematic-station.is-origin {
+    --rail-station-fill: #fff4f2;
+    --rail-station-stroke: #c44b4f;
+    --rail-station-halo-fill: rgba(217, 88, 84, 0.2);
 }
 
 .rail-schematic-station.is-origin .rail-schematic-station-halo {
     opacity: 1;
-    fill: rgba(217, 88, 84, 0.18);
-}
-
-.rail-schematic-station.is-origin .rail-schematic-station-dot {
-    fill: #fff4f2;
-    stroke: #c44b4f;
-    stroke-width: 4;
 }
 
 .rail-schematic-station.is-origin .rail-schematic-station-label {
     fill: #a83835;
 }
 
-.rail-schematic-station.is-destination .rail-schematic-station-halo {
-    opacity: 1;
-    fill: rgba(62, 118, 218, 0.16);
+.rail-schematic-station.is-destination {
+    --rail-station-fill: #f4f9ff;
+    --rail-station-stroke: #2f71d3;
+    --rail-station-halo-fill: rgba(62, 118, 218, 0.18);
 }
 
-.rail-schematic-station.is-destination .rail-schematic-station-dot {
-    fill: #f4f9ff;
-    stroke: #2f71d3;
-    stroke-width: 4;
+.rail-schematic-station.is-destination .rail-schematic-station-halo {
+    opacity: 1;
 }
 
 .rail-schematic-station.is-destination .rail-schematic-station-label {
@@ -1073,6 +1138,8 @@ body::after {
 }
 
 .rail-schematic-station.is-dimmed .rail-schematic-station-dot,
+.rail-schematic-station.is-dimmed .rail-schematic-station-connector-casing,
+.rail-schematic-station.is-dimmed .rail-schematic-station-connector,
 .rail-schematic-station.is-dimmed .rail-schematic-station-label {
     opacity: 0.26;
 }
@@ -1605,6 +1672,42 @@ body::after {
     margin-bottom: 0;
 }
 
+.rail-route-summary-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.rail-route-summary-card {
+    display: grid;
+    gap: 6px;
+    padding: 12px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    background: rgba(243, 248, 253, 0.88);
+    box-shadow: var(--rail-soft-shadow);
+}
+
+.rail-route-summary-label {
+    color: var(--rail-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rail-route-summary-value {
+    color: var(--rail-ink);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.rail-route-summary-note {
+    margin: 0;
+    color: var(--rail-muted);
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
 .rail-route-option-gallery {
     display: grid;
     gap: 10px;
@@ -1753,6 +1856,24 @@ body::after {
     box-shadow: 0 0 0 4px rgba(24, 36, 55, 0.08);
 }
 
+.rail-route-option-stop.is-origin .rail-route-option-stop-dot {
+    border-color: #2d6ea6;
+    background: #f4f9ff;
+    box-shadow: 0 0 0 4px rgba(45, 110, 166, 0.12);
+}
+
+.rail-route-option-stop.is-destination .rail-route-option-stop-dot {
+    border-color: #bc6f39;
+    background: #fff6ee;
+    box-shadow: 0 0 0 4px rgba(188, 111, 57, 0.12);
+}
+
+.rail-route-option-stop.is-walk .rail-route-option-stop-dot {
+    border-style: dashed;
+    border-color: rgba(122, 134, 147, 0.92);
+    background: rgba(247, 249, 251, 0.96);
+}
+
 .rail-route-option-segment {
     flex: var(--rail-segment-grow, 1) 1 40px;
     min-width: 26px;
@@ -1760,6 +1881,14 @@ body::after {
     margin: 0 0 4px;
     border-radius: 999px;
     background: var(--rail-line-color);
+}
+
+.rail-route-option-segment.is-walk {
+    background: repeating-linear-gradient(
+        90deg,
+        rgba(127, 139, 154, 0.94) 0 10px,
+        rgba(127, 139, 154, 0.2) 10px 18px
+    );
 }
 
 .rail-route-line-badge-row {
@@ -1787,6 +1916,15 @@ body::after {
     border-radius: 999px;
     background: var(--rail-line-color);
     flex: 0 0 auto;
+}
+
+.rail-route-line-badge.is-walk {
+    background: rgba(241, 245, 249, 0.94);
+    color: #55677c;
+}
+
+.rail-route-line-badge.is-walk .rail-route-line-badge-dot {
+    background: rgba(127, 139, 154, 0.9);
 }
 
 .rail-route-leg-list {
@@ -1837,7 +1975,7 @@ body::after {
 .rail-route-leg-card {
     --rail-line-color: #5A7694;
     display: grid;
-    gap: 8px;
+    gap: 10px;
     padding: 12px;
     border-radius: 18px;
     border: 1px solid rgba(255, 255, 255, 0.8);
@@ -1845,11 +1983,44 @@ body::after {
     box-shadow: inset 4px 0 0 var(--rail-line-color);
 }
 
+.rail-route-leg-card.is-walk {
+    background: rgba(244, 247, 250, 0.92);
+    box-shadow: inset 4px 0 0 rgba(127, 139, 154, 0.9);
+}
+
 .rail-route-leg-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 10px;
+}
+
+.rail-route-leg-meta-grid {
+    display: grid;
+    gap: 8px;
+}
+
+.rail-route-leg-meta {
+    display: grid;
+    gap: 4px;
+    padding: 10px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.68);
+    border: 1px solid rgba(255, 255, 255, 0.84);
+}
+
+.rail-route-leg-meta-label {
+    color: var(--rail-muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rail-route-leg-meta-value {
+    color: var(--rail-ink);
+    font-size: 0.92rem;
+    font-weight: 700;
 }
 
 .rail-route-leg-stations,
@@ -2070,6 +2241,11 @@ body::after {
     .rail-route-result-head {
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: start;
+    }
+
+    .rail-route-summary-grid,
+    .rail-route-leg-meta-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .rail-route-map-panel-head {

@@ -52,6 +52,29 @@ const STATION_REFERENCE_LINE = {
     DIH: "TML"
 };
 
+const INTERCHANGE_ANCHOR_SCALE = 1.58;
+const INTERCHANGE_ANCHOR_SCALE_OVERRIDES = {
+    ADM: 1.98,
+    CEN: 1.84,
+    TSY: 1.9,
+    KOW: 2.02,
+    HOK: 1.96,
+    NAC: 1.86,
+    PRE: 2.1,
+    MOK: 2.1,
+    YMT: 2.08,
+    HUH: 1.94,
+    HOM: 1.86,
+    TAW: 1.92,
+    KOT: 1.96,
+    DIH: 1.88,
+    QUB: 1.94,
+    NOP: 1.94,
+    YAT: 1.9,
+    TIK: 1.9,
+    SUN: 1.76
+};
+
 const LABEL_OVERRIDES = {
     KET: middle(-34),
     HKU: middle(-34),
@@ -637,6 +660,42 @@ function getStationAveragePosition(entries) {
     };
 }
 
+function getInterchangeAnchorScale(stationCode, anchorCount) {
+    if (anchorCount <= 1) return 1;
+    return INTERCHANGE_ANCHOR_SCALE_OVERRIDES[stationCode] || INTERCHANGE_ANCHOR_SCALE;
+}
+
+function buildStationLineAnchors(stationCode, officialEntries, officialBounds) {
+    const averagePosition = getStationAveragePosition(officialEntries);
+    const [centerX, centerY] = scaleOfficialPoint([averagePosition.x, averagePosition.y], officialBounds);
+    const anchorScale = getInterchangeAnchorScale(stationCode, officialEntries.length);
+    const lineAnchors = {};
+
+    for (const officialEntry of officialEntries) {
+        const [scaledX, scaledY] = scaleOfficialPoint([officialEntry.x, officialEntry.y], officialBounds);
+        lineAnchors[officialEntry.lineCode] = {
+            x: roundCoordinate(centerX + (scaledX - centerX) * anchorScale),
+            y: roundCoordinate(centerY + (scaledY - centerY) * anchorScale)
+        };
+    }
+
+    const anchorValues = Object.values(lineAnchors);
+    const markerCenter = anchorValues.length > 0
+        ? {
+            x: roundCoordinate(anchorValues.reduce((sum, anchor) => sum + anchor.x, 0) / anchorValues.length),
+            y: roundCoordinate(anchorValues.reduce((sum, anchor) => sum + anchor.y, 0) / anchorValues.length)
+        }
+        : {
+            x: roundCoordinate(centerX),
+            y: roundCoordinate(centerY)
+        };
+
+    return {
+        markerCenter,
+        lineAnchors
+    };
+}
+
 async function loadOfficialMap() {
     const scriptContent = await fs.readFile(officialMapPath, "utf8");
     const sandbox = { window: {} };
@@ -719,6 +778,7 @@ function buildStationsFromOfficialMap(stationIndex, officialMap) {
     const maxX = Math.max(...allPoints.map((point) => point.x));
     const minY = Math.min(...allPoints.map((point) => point.y));
     const maxY = Math.max(...allPoints.map((point) => point.y));
+    const officialBounds = { minX, maxX, minY, maxY };
 
     const stations = {};
     for (const [stationCode, stationEntry] of Object.entries(stationIndex)) {
@@ -732,6 +792,7 @@ function buildStationsFromOfficialMap(stationIndex, officialMap) {
             ? officialEntries.find((entry) => entry.lineCode === referenceLineCode)
             : null;
         const referencePoint = preferredEntry || getStationAveragePosition(officialEntries);
+        const { markerCenter, lineAnchors } = buildStationLineAnchors(stationCode, officialEntries, officialBounds);
         const x = OFFICIAL_MAP_PADDING_X + (referencePoint.x - minX) * OFFICIAL_MAP_SCALE;
         const y = OFFICIAL_MAP_PADDING_Y + (referencePoint.y - minY) * OFFICIAL_MAP_SCALE;
         const normalizedStation = {
@@ -740,8 +801,11 @@ function buildStationsFromOfficialMap(stationIndex, officialMap) {
             nameEn: stationEntry.nameEn,
             x: roundCoordinate(x),
             y: roundCoordinate(y),
+            markerX: markerCenter.x,
+            markerY: markerCenter.y,
             interchange: Array.isArray(stationEntry.lines) && stationEntry.lines.length > 1,
-            lines: Array.isArray(stationEntry.lines) ? stationEntry.lines.map((line) => line.lineCode) : []
+            lines: Array.isArray(stationEntry.lines) ? stationEntry.lines.map((line) => line.lineCode) : [],
+            lineAnchors
         };
 
         stations[stationCode] = {
@@ -761,7 +825,7 @@ function buildStationsFromOfficialMap(stationIndex, officialMap) {
             width: roundCoordinate((maxX - minX) * OFFICIAL_MAP_SCALE + OFFICIAL_MAP_PADDING_X * 2),
             height: roundCoordinate((maxY - minY) * OFFICIAL_MAP_SCALE + OFFICIAL_MAP_PADDING_Y * 2)
         },
-        officialBounds: { minX, maxX, minY, maxY }
+        officialBounds
     };
 }
 
@@ -772,12 +836,28 @@ function scaleOfficialPoint([x, y], officialBounds) {
     ];
 }
 
+function getStationLineAnchor(stations, stationCode, lineCode) {
+    const station = stations[stationCode];
+    if (!station) return { x: 0, y: 0 };
+    const lineAnchor = station.lineAnchors?.[lineCode];
+    if (lineAnchor) {
+        return {
+            x: Number(lineAnchor.x) || 0,
+            y: Number(lineAnchor.y) || 0
+        };
+    }
+    return {
+        x: Number(station.markerX ?? station.x) || 0,
+        y: Number(station.markerY ?? station.y) || 0
+    };
+}
+
 function buildIntermediatePoints(lineCode, fromCode, toCode, stations) {
     const key = `${lineCode}:${fromCode}-${toCode}`;
     const reverseKey = `${lineCode}:${toCode}-${fromCode}`;
     const ratios = SEGMENT_POINT_OVERRIDES[key] || SEGMENT_POINT_OVERRIDES[reverseKey] || [];
-    const from = stations[fromCode];
-    const to = stations[toCode];
+    const from = getStationLineAnchor(stations, fromCode, lineCode);
+    const to = getStationLineAnchor(stations, toCode, lineCode);
     if (!from || !to || ratios.length === 0) return [];
 
     return ratios.map(([distanceRatio = 0.5, normalOffsetRatio = 0]) => {
@@ -793,8 +873,8 @@ function buildIntermediatePoints(lineCode, fromCode, toCode, stations) {
 }
 
 function buildSegmentPoints(lineCode, fromCode, toCode, stations, officialBounds, officialRouteGeometry) {
-    const from = stations[fromCode];
-    const to = stations[toCode];
+    const from = getStationLineAnchor(stations, fromCode, lineCode);
+    const to = getStationLineAnchor(stations, toCode, lineCode);
     if (!from || !to) return [[0, 0], [0, 0]];
 
     const officialRoutePolyline = officialRouteGeometry?.[`${lineCode}:${fromCode}-${toCode}`];
@@ -812,10 +892,20 @@ function buildSegmentPoints(lineCode, fromCode, toCode, stations, officialBounds
     const directPolyline = SEGMENT_POLYLINE_OVERRIDES[directKey];
     const reversePolyline = SEGMENT_POLYLINE_OVERRIDES[reverseKey];
     if (Array.isArray(directPolyline)) {
-        return directPolyline.map((point) => scaleOfficialPoint(point, officialBounds));
+        const scaledPolyline = directPolyline.map((point) => scaleOfficialPoint(point, officialBounds));
+        return dedupePolylinePoints([
+            [from.x, from.y],
+            ...scaledPolyline.slice(1, -1),
+            [to.x, to.y]
+        ], 0.8);
     }
     if (Array.isArray(reversePolyline)) {
-        return [...reversePolyline].reverse().map((point) => scaleOfficialPoint(point, officialBounds));
+        const scaledPolyline = [...reversePolyline].reverse().map((point) => scaleOfficialPoint(point, officialBounds));
+        return dedupePolylinePoints([
+            [from.x, from.y],
+            ...scaledPolyline.slice(1, -1),
+            [to.x, to.y]
+        ], 0.8);
     }
 
     return [
@@ -939,7 +1029,7 @@ async function main() {
     const layout = {
         generatedAt: new Date().toISOString(),
         source: "official-rail-index.json + official-mtr-map.js + official-mtr-map.css",
-        version: 5,
+        version: 6,
         viewBox,
         meta: {
             lineCount: lines.length,
