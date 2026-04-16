@@ -127,6 +127,23 @@
                     viewId: "",
                     legIndex: -1
                 },
+                transferStopPopover: {
+                    viewId: "",
+                    stationCode: "",
+                    stationNameZh: "",
+                    stationNameEn: "",
+                    legIndex: -1,
+                    lineCode: "",
+                    lineNameZh: "",
+                    terminusCode: "",
+                    terminusNameZh: "",
+                    directionKey: "",
+                    status: "idle",
+                    errorMessage: "",
+                    services: [],
+                    requestId: 0,
+                    activeController: null
+                },
                 mapView: {
                     scale: 1,
                     x: 0,
@@ -1626,6 +1643,7 @@
     function refreshRoutePlannerResult() {
         const planner = railState.mtr.routePlanner;
         closeRoutePlannerLegPopover();
+        closeRoutePlannerTransferStopPopover();
         if (!planner.originStationCode || !planner.destinationStationCode) {
             planner.result = null;
             planner.activeViewId = "";
@@ -1647,6 +1665,38 @@
         if (views.length === 0) return null;
         return views.find((view) => view.id === planner.activeViewId) || views[0] || null;
     }
+    function abortRoutePlannerTransferStopRequest() {
+        const transferPopover = railState.mtr.routePlanner.transferStopPopover;
+        if (transferPopover.activeController instanceof AbortController) {
+            transferPopover.activeController.abort();
+        }
+        transferPopover.activeController = null;
+    }
+    function closeRoutePlannerTransferStopPopover() {
+        const transferPopover = railState.mtr.routePlanner.transferStopPopover;
+        abortRoutePlannerTransferStopRequest();
+        transferPopover.viewId = "";
+        transferPopover.stationCode = "";
+        transferPopover.stationNameZh = "";
+        transferPopover.stationNameEn = "";
+        transferPopover.legIndex = -1;
+        transferPopover.lineCode = "";
+        transferPopover.lineNameZh = "";
+        transferPopover.terminusCode = "";
+        transferPopover.terminusNameZh = "";
+        transferPopover.directionKey = "";
+        transferPopover.status = "idle";
+        transferPopover.errorMessage = "";
+        transferPopover.services = [];
+        transferPopover.requestId += 1;
+    }
+    function isRoutePlannerTransferStopPopoverOpen(viewId, stationCode, legIndex = -1) {
+        const transferPopover = railState.mtr.routePlanner.transferStopPopover;
+        if (!viewId || !stationCode) return false;
+        return transferPopover.viewId === viewId
+            && transferPopover.stationCode === String(stationCode || "").toUpperCase()
+            && (legIndex < 0 || transferPopover.legIndex === legIndex);
+    }
     function closeRoutePlannerLegPopover() {
         const popoverState = railState.mtr.routePlanner.legPopover;
         popoverState.viewId = "";
@@ -1665,6 +1715,7 @@
             closeRoutePlannerLegPopover();
             return;
         }
+        closeRoutePlannerTransferStopPopover();
         railState.mtr.routePlanner.legPopover.viewId = viewId;
         railState.mtr.routePlanner.legPopover.legIndex = legIndex;
     }
@@ -1743,6 +1794,195 @@
                 </div>
             </div>`;
     }
+    function resolveRouteLegTerminusStationCode(leg) {
+        const runtime = railState.mtr.routing.runtime;
+        if (!runtime?.paths || !leg?.lineCode || !Array.isArray(leg.stations) || leg.stations.length < 2) {
+            return leg?.stations?.[leg?.stations?.length - 1] || "";
+        }
+
+        for (const pathEntry of runtime.paths) {
+            if (pathEntry.lineCode !== leg.lineCode) continue;
+            if (isOrderedSubsequence(pathEntry.stationCodes, leg.stations)) {
+                return pathEntry.terminusEndCode;
+            }
+            const reversed = [...pathEntry.stationCodes].reverse();
+            if (isOrderedSubsequence(reversed, leg.stations)) {
+                return pathEntry.terminusStartCode;
+            }
+        }
+
+        return leg.stations[leg.stations.length - 1] || "";
+    }
+    function buildRoutePlannerTransferStopTargetMap(routeResult, viewId) {
+        const targetMap = new Map();
+        if (!routeResult || routeResult.status !== "ready" || !Array.isArray(routeResult.legs) || !viewId) return targetMap;
+        const transferStationSet = new Set(
+            Array.isArray(routeResult.transferStations)
+                ? routeResult.transferStations.map((station) => String(station.stationCode || "").toUpperCase()).filter(Boolean)
+                : []
+        );
+
+        for (let legIndex = 1; legIndex < routeResult.legs.length; legIndex += 1) {
+            const nextLeg = routeResult.legs[legIndex];
+            const previousLeg = routeResult.legs[legIndex - 1];
+            if (!nextLeg || nextLeg.kind === "walk") continue;
+            const stationCode = String(nextLeg.stations?.[0] || "").toUpperCase();
+            const previousTerminal = String(previousLeg?.stations?.[previousLeg.stations.length - 1] || "").toUpperCase();
+            if (!stationCode || stationCode !== previousTerminal || !transferStationSet.has(stationCode)) continue;
+
+            const stationEntry = getRoutePlannerStationEntry(stationCode);
+            const terminusCode = String(resolveRouteLegTerminusStationCode(nextLeg) || "").toUpperCase();
+            targetMap.set(`${stationCode}:${legIndex}`, {
+                viewId,
+                stationCode,
+                stationNameZh: stationEntry?.nameZh || stationCode,
+                stationNameEn: stationEntry?.nameEn || "",
+                legIndex,
+                lineCode: nextLeg.lineCode,
+                lineNameZh: nextLeg.lineNameZh || getLineNameByCode(nextLeg.lineCode),
+                terminusCode,
+                terminusNameZh: nextLeg.terminusNameZh || getRoutePlannerStationDisplayName(terminusCode) || getRoutePlannerStationDisplayName(nextLeg.stations?.[nextLeg.stations.length - 1])
+            });
+        }
+
+        return targetMap;
+    }
+    function getRoutePlannerTransferStopTarget(viewId, stationCode, legIndex = -1) {
+        if (!viewId || !stationCode) return null;
+        const routeView = getRoutePlannerViews().find((view) => view.id === viewId);
+        const routeResult = routeView?.result;
+        if (!routeResult || routeResult.status !== "ready") return null;
+        const normalizedStationCode = String(stationCode || "").toUpperCase();
+        const targetMap = buildRoutePlannerTransferStopTargetMap(routeResult, viewId);
+        if (Number.isInteger(legIndex) && legIndex >= 0) {
+            return targetMap.get(`${normalizedStationCode}:${legIndex}`) || null;
+        }
+        return [...targetMap.values()].find((target) => target.stationCode === normalizedStationCode) || null;
+    }
+    function findScheduleTerminusGroupForRouteLeg(schedule, transferTarget) {
+        const terminusGroups = Array.isArray(schedule?.terminusGroups) ? schedule.terminusGroups : [];
+        if (!transferTarget) return null;
+        const normalizedTerminusCode = String(transferTarget.terminusCode || "").toUpperCase();
+        const normalizedTerminusName = String(transferTarget.terminusNameZh || "").trim();
+        return terminusGroups.find((group) => String(group.terminusCode || "").toUpperCase() === normalizedTerminusCode)
+            || terminusGroups.find((group) => String(group.terminusNameZh || "").trim() === normalizedTerminusName)
+            || null;
+    }
+    async function requestRoutePlannerTransferStopSchedule(transferTarget, requestId, controller) {
+        try {
+            const schedule = await fetchMtrSchedule(
+                { lineCode: transferTarget.lineCode, lineNameZh: transferTarget.lineNameZh },
+                {
+                    stationCode: transferTarget.stationCode,
+                    stationNameZh: transferTarget.stationNameZh,
+                    stationNameEn: transferTarget.stationNameEn
+                },
+                controller.signal
+            );
+            const transferPopover = railState.mtr.routePlanner.transferStopPopover;
+            if (transferPopover.requestId !== requestId) return;
+
+            const matchedGroup = findScheduleTerminusGroupForRouteLeg(schedule, transferTarget);
+            if (!matchedGroup || !Array.isArray(matchedGroup.services) || matchedGroup.services.length === 0) {
+                transferPopover.status = "empty";
+                transferPopover.directionKey = Array.isArray(matchedGroup?.directionKeys) ? matchedGroup.directionKeys[0] || "" : "";
+                transferPopover.errorMessage = isWithinGeneralMtrClosedWindow(schedule.currentTime || schedule.systemTime)
+                    ? "已過港鐵一般營業時間，這個換乘方向暫時沒有官方班次。"
+                    : "官方暫時未有這個換乘方向的即時班次。";
+                transferPopover.services = [];
+                return;
+            }
+
+            transferPopover.status = "success";
+            transferPopover.directionKey = Array.isArray(matchedGroup.directionKeys) ? matchedGroup.directionKeys[0] || "" : "";
+            transferPopover.errorMessage = "";
+            transferPopover.services = matchedGroup.services.slice(0, 2);
+        } catch (error) {
+            const transferPopover = railState.mtr.routePlanner.transferStopPopover;
+            if (controller.signal.aborted || transferPopover.requestId !== requestId) return;
+            transferPopover.status = "error";
+            transferPopover.errorMessage = error instanceof Error ? error.message : "暫時未能讀取換乘班次。";
+            transferPopover.services = [];
+        } finally {
+            const transferPopover = railState.mtr.routePlanner.transferStopPopover;
+            if (transferPopover.requestId !== requestId) return;
+            transferPopover.activeController = null;
+            renderCurrentTab();
+            bindCurrentTabEvents();
+        }
+    }
+    function toggleRoutePlannerTransferStopPopover(transferTarget) {
+        if (!transferTarget?.viewId || !transferTarget.stationCode) {
+            closeRoutePlannerTransferStopPopover();
+            return;
+        }
+
+        if (isRoutePlannerTransferStopPopoverOpen(transferTarget.viewId, transferTarget.stationCode, transferTarget.legIndex)) {
+            closeRoutePlannerTransferStopPopover();
+            return;
+        }
+
+        closeRoutePlannerLegPopover();
+        abortRoutePlannerTransferStopRequest();
+
+        const transferPopover = railState.mtr.routePlanner.transferStopPopover;
+        const requestId = transferPopover.requestId + 1;
+        const controller = new AbortController();
+        transferPopover.viewId = transferTarget.viewId;
+        transferPopover.stationCode = transferTarget.stationCode;
+        transferPopover.stationNameZh = transferTarget.stationNameZh;
+        transferPopover.stationNameEn = transferTarget.stationNameEn;
+        transferPopover.legIndex = transferTarget.legIndex;
+        transferPopover.lineCode = transferTarget.lineCode;
+        transferPopover.lineNameZh = transferTarget.lineNameZh;
+        transferPopover.terminusCode = transferTarget.terminusCode;
+        transferPopover.terminusNameZh = transferTarget.terminusNameZh;
+        transferPopover.directionKey = "";
+        transferPopover.status = "loading";
+        transferPopover.errorMessage = "";
+        transferPopover.services = [];
+        transferPopover.requestId = requestId;
+        transferPopover.activeController = controller;
+
+        void requestRoutePlannerTransferStopSchedule(transferTarget, requestId, controller);
+    }
+    function buildRoutePlannerTransferStopPopoverMarkup(transferTarget) {
+        if (!transferTarget || !isRoutePlannerTransferStopPopoverOpen(transferTarget.viewId, transferTarget.stationCode, transferTarget.legIndex)) return "";
+
+        const transferPopover = railState.mtr.routePlanner.transferStopPopover;
+        const services = Array.isArray(transferPopover.services) ? transferPopover.services : [];
+        const serviceMarkup = services.slice(0, 2).map((service, index) => {
+            const orderLabel = index === 0 ? "下一班車" : `第${index + 1}班車`;
+            const timeText = service.clockTime ? `（預計 ${service.clockTime}${service.timeTypeLabel ? ` · ${service.timeTypeLabel}` : ""}）` : "";
+            return `<p class="rail-route-transfer-stop-service"><strong>${escapeHtml(orderLabel)}：</strong>${escapeHtml(service.minutesLabel || "時間未提供")}${escapeHtml(timeText)}</p>`;
+        }).join("");
+        const platformLabel = services.find((service) => service.platform)?.platform || "";
+
+        let bodyMarkup = "";
+        if (transferPopover.status === "loading") {
+            bodyMarkup = '<p class="rail-route-transfer-stop-copy">正在讀取這一程換乘的官方班次…</p>';
+        } else if (transferPopover.status === "success") {
+            bodyMarkup = `
+                <div class="rail-route-transfer-stop-service-list">
+                    ${serviceMarkup}
+                </div>
+                ${platformLabel ? `<p class="rail-route-transfer-stop-copy">${escapeHtml(`${platformLabel}號月台`)}</p>` : ""}`;
+        } else {
+            bodyMarkup = `<p class="rail-route-transfer-stop-copy">${escapeHtml(transferPopover.errorMessage || "官方暫時未有可顯示的換乘班次。")}</p>`;
+        }
+
+        return `
+            <div class="rail-route-transfer-stop-popover" data-route-transfer-popover role="dialog" aria-modal="false" aria-label="換乘班次">
+                <div class="rail-route-transfer-stop-head">
+                    <div class="rail-summary-main">
+                        <h5 class="rail-route-transfer-stop-title">${escapeHtml(transferTarget.stationNameZh)}</h5>
+                        <p class="rail-route-transfer-stop-subtitle">${escapeHtml(`${transferTarget.lineNameZh}　往 ${transferTarget.terminusNameZh}`)}</p>
+                    </div>
+                    <button type="button" class="rail-route-transfer-stop-close" data-route-transfer-close aria-label="關閉換乘班次">關閉</button>
+                </div>
+                ${bodyMarkup}
+            </div>`;
+    }
     function syncRoutePlannerStatusMessage() {
         const planner = railState.mtr.routePlanner;
         const originStation = getRoutePlannerStationEntry(planner.originStationCode);
@@ -1786,6 +2026,7 @@
     }
     function setRoutePlannerField(field) {
         closeRoutePlannerLegPopover();
+        closeRoutePlannerTransferStopPopover();
         railState.mtr.routePlanner.activeField = field === "origin" ? "origin" : "destination";
     }
     function setRoutePlannerView(viewId) {
@@ -1794,6 +2035,7 @@
         if (!matchingView) return;
         railState.mtr.routePlanner.activeViewId = matchingView.id;
         closeRoutePlannerLegPopover();
+        closeRoutePlannerTransferStopPopover();
         syncRoutePlannerStatusMessage();
     }
     function selectRoutePlannerStation(stationCode) {
@@ -1814,6 +2056,7 @@
     }
     function clearRoutePlannerDestination() {
         closeRoutePlannerLegPopover();
+        closeRoutePlannerTransferStopPopover();
         railState.mtr.routePlanner.destinationStationCode = "";
         railState.mtr.routePlanner.result = null;
         railState.mtr.routePlanner.activeViewId = "";
@@ -1835,6 +2078,7 @@
     function toggleRoutePlanner() {
         const planner = railState.mtr.routePlanner;
         closeRoutePlannerLegPopover();
+        closeRoutePlannerTransferStopPopover();
         planner.isOpen = !planner.isOpen;
         planner.lastMapFocusKey = "";
         planner.lastSchematicFocusKey = "";
@@ -2916,6 +3160,8 @@
     function buildRoutePlannerOptionCardMarkup(view, activeViewId) {
         const result = view?.result;
         if (!result || (result.status !== "ready" && result.status !== "sameStation")) return "";
+        const hasOpenPopover = railState.mtr.routePlanner.legPopover.viewId === view.id
+            || railState.mtr.routePlanner.transferStopPopover.viewId === view.id;
         const transferStationNames = Array.isArray(result.transferStations)
             ? result.transferStations.map((station) => station.stationNameZh).filter(Boolean)
             : [];
@@ -2931,7 +3177,7 @@
 
         return `
             <article
-                class="rail-route-option-card ${view.id === activeViewId ? "is-active" : ""}"
+                class="rail-route-option-card ${view.id === activeViewId ? "is-active" : ""} ${hasOpenPopover ? "has-open-popover" : ""}"
                 role="button"
                 tabindex="0"
                 data-route-view="${escapeHtml(view.id)}"
@@ -2952,21 +3198,30 @@
         const transferStationSet = new Set(Array.isArray(routeResult.transferStations) ? routeResult.transferStations.map((station) => station.stationCode) : []);
         const stopPoints = [];
         const displaySegments = [];
-        const pushStopPoint = (stationCode) => {
+        const pushStopPoint = (stationCode, options = {}) => {
             const normalizedStationCode = String(stationCode || "").toUpperCase();
-            if (!normalizedStationCode || stopPoints[stopPoints.length - 1]?.stationCode === normalizedStationCode) return;
+            const transferLegIndex = Number.isInteger(options.transferLegIndex) ? options.transferLegIndex : -1;
+            const lastStopPoint = stopPoints[stopPoints.length - 1] || null;
+            if (!normalizedStationCode) return;
+            if (lastStopPoint?.stationCode === normalizedStationCode) {
+                if (transferLegIndex >= 0 && (!Number.isInteger(lastStopPoint.transferLegIndex) || lastStopPoint.transferLegIndex < 0)) {
+                    lastStopPoint.transferLegIndex = transferLegIndex;
+                }
+                return;
+            }
             stopPoints.push({
                 stationCode: normalizedStationCode,
                 stationNameZh: getRoutePlannerStationEntry(normalizedStationCode)?.nameZh || normalizedStationCode,
                 isTransfer: transferStationSet.has(normalizedStationCode),
                 isOrigin: normalizedStationCode === routeResult.originStationCode,
                 isDestination: normalizedStationCode === routeResult.destinationStationCode,
-                isWalkNode: Boolean(getVirtualRoutePlannerStation(normalizedStationCode)) || normalizedStationCode === "HSR"
+                isWalkNode: Boolean(getVirtualRoutePlannerStation(normalizedStationCode)) || normalizedStationCode === "HSR",
+                transferLegIndex
             });
         };
 
         pushStopPoint(routeResult.originStationCode);
-        for (const leg of Array.isArray(routeResult.legs) ? routeResult.legs : []) {
+        for (const [legIndex, leg] of (Array.isArray(routeResult.legs) ? routeResult.legs : []).entries()) {
             if (leg.kind === "walk") {
                 for (const stationCode of leg.stations.slice(1)) {
                     pushStopPoint(stationCode);
@@ -2978,7 +3233,13 @@
                 }
                 continue;
             }
-            pushStopPoint(leg.stations[leg.stations.length - 1]);
+            const terminalStationCode = String(leg.stations[leg.stations.length - 1] || "").toUpperCase();
+            const nextLeg = routeResult.legs[legIndex + 1];
+            const nextLegStartsHere = String(nextLeg?.stations?.[0] || "").toUpperCase() === terminalStationCode;
+            const transferLegIndex = nextLeg && nextLeg.kind !== "walk" && nextLegStartsHere && transferStationSet.has(terminalStationCode)
+                ? legIndex + 1
+                : -1;
+            pushStopPoint(terminalStationCode, { transferLegIndex });
             displaySegments.push({
                 lineCode: leg.lineCode,
                 grow: Math.max(leg.stopCount, 1),
@@ -2989,6 +3250,10 @@
 
         const stripMarkup = stopPoints.map((stopPoint, index) => {
             const segmentEntry = displaySegments[index] || null;
+            const transferTarget = Number.isInteger(stopPoint.transferLegIndex) && stopPoint.transferLegIndex >= 0
+                ? getRoutePlannerTransferStopTarget(viewId, stopPoint.stationCode, stopPoint.transferLegIndex)
+                : null;
+            const isTransferTrigger = Boolean(transferTarget);
             const segmentWidth = segmentEntry
                 ? segmentEntry.kind === "walk"
                     ? 52
@@ -3001,10 +3266,24 @@
                 <div class="rail-route-option-step ${segmentEntry ? "" : "is-terminal"}">
                     <div class="rail-route-option-stop ${stopPoint.isTransfer ? "is-transfer" : ""} ${stopPoint.isOrigin ? "is-origin" : ""} ${stopPoint.isDestination ? "is-destination" : ""} ${stopPoint.isWalkNode ? "is-walk" : ""}">
                         <span class="rail-route-option-stop-name">${escapeHtml(stopPoint.stationNameZh)}</span>
-                        <span class="rail-route-option-stop-rail">
-                            <span class="rail-route-option-stop-dot" aria-hidden="true"></span>
+                        <div class="rail-route-option-stop-rail">
+                            <span class="rail-route-option-stop-dot-wrap ${isTransferTrigger ? "is-transfer-target" : ""}">
+                                ${isTransferTrigger ? `
+                                    <button
+                                        type="button"
+                                        class="rail-route-option-stop-dot rail-route-option-stop-dot-button"
+                                        data-route-transfer-trigger
+                                        data-route-transfer-view="${escapeHtml(viewId)}"
+                                        data-route-transfer-station="${escapeHtml(stopPoint.stationCode)}"
+                                        data-route-transfer-leg-index="${escapeHtml(String(transferTarget.legIndex))}"
+                                        aria-expanded="${isRoutePlannerTransferStopPopoverOpen(viewId, stopPoint.stationCode, transferTarget.legIndex) ? "true" : "false"}"
+                                        aria-label="查看 ${escapeHtml(stopPoint.stationNameZh)} 的換乘班次"
+                                    ></button>
+                                    ${buildRoutePlannerTransferStopPopoverMarkup(transferTarget)}
+                                ` : '<span class="rail-route-option-stop-dot" aria-hidden="true"></span>'}
+                            </span>
                             ${segmentMarkup}
-                        </span>
+                        </div>
                     </div>
                 </div>
             `;
@@ -4217,6 +4496,29 @@
         }
         if (mtrRoutePlannerPanel instanceof HTMLElement) {
             mtrRoutePlannerPanel.addEventListener("click", (event) => {
+                const transferCloseButton = event.target instanceof Element ? event.target.closest("[data-route-transfer-close]") : null;
+                if (transferCloseButton instanceof Element) {
+                    closeRoutePlannerTransferStopPopover();
+                    renderCurrentTab();
+                    bindCurrentTabEvents();
+                    return;
+                }
+
+                const transferTrigger = event.target instanceof Element ? event.target.closest("[data-route-transfer-trigger]") : null;
+                if (transferTrigger instanceof Element) {
+                    const viewId = transferTrigger.getAttribute("data-route-transfer-view") || "";
+                    const stationCode = transferTrigger.getAttribute("data-route-transfer-station") || "";
+                    const legIndex = Number.parseInt(transferTrigger.getAttribute("data-route-transfer-leg-index") || "", 10);
+                    const transferTarget = getRoutePlannerTransferStopTarget(viewId, stationCode, Number.isInteger(legIndex) ? legIndex : -1);
+                    toggleRoutePlannerTransferStopPopover(transferTarget);
+                    renderCurrentTab();
+                    bindCurrentTabEvents();
+                    return;
+                }
+
+                const transferPopoverSurface = event.target instanceof Element ? event.target.closest("[data-route-transfer-popover]") : null;
+                if (transferPopoverSurface instanceof Element) return;
+
                 const legCloseButton = event.target instanceof Element ? event.target.closest("[data-route-leg-close]") : null;
                 if (legCloseButton instanceof Element) {
                     closeRoutePlannerLegPopover();
@@ -4267,7 +4569,15 @@
                 }
 
                 if (railState.mtr.routePlanner.legPopover.viewId) {
+                    closeRoutePlannerTransferStopPopover();
                     closeRoutePlannerLegPopover();
+                    renderCurrentTab();
+                    bindCurrentTabEvents();
+                    return;
+                }
+
+                if (railState.mtr.routePlanner.transferStopPopover.viewId) {
+                    closeRoutePlannerTransferStopPopover();
                     renderCurrentTab();
                     bindCurrentTabEvents();
                 }
@@ -4375,8 +4685,9 @@
     });
     document.addEventListener("click", (event) => {
         if (!(event.target instanceof Element)) return;
-        if (!railState.mtr.routePlanner.legPopover.viewId) return;
+        if (!railState.mtr.routePlanner.legPopover.viewId && !railState.mtr.routePlanner.transferStopPopover.viewId) return;
         if (event.target.closest("#mtrRoutePlannerPanel")) return;
+        closeRoutePlannerTransferStopPopover();
         closeRoutePlannerLegPopover();
         renderCurrentTab();
         bindCurrentTabEvents();
@@ -4389,7 +4700,8 @@
             bindCurrentTabEvents();
             return;
         }
-        if (!railState.mtr.routePlanner.legPopover.viewId) return;
+        if (!railState.mtr.routePlanner.legPopover.viewId && !railState.mtr.routePlanner.transferStopPopover.viewId) return;
+        closeRoutePlannerTransferStopPopover();
         closeRoutePlannerLegPopover();
         renderCurrentTab();
         bindCurrentTabEvents();
@@ -4399,6 +4711,7 @@
             const nextTab = button.getAttribute("data-tab-trigger") || "";
             if (!nextTab || railState.currentTab === nextTab) return;
             closeNextTrainModal();
+            closeRoutePlannerTransferStopPopover();
             closeRoutePlannerLegPopover();
             railState.currentTab = nextTab;
             setStatus(nextTab === "lightRail" ? "已切換到輕鐵頁殼，這一輪只載入靜態路線與站點資料。" : "已切換到港鐵頁殼，可使用最近站摘要與手動即時查詢。", "info");
