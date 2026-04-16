@@ -80,8 +80,8 @@ const LABEL_OVERRIDES = {
     HKU: middle(-34),
     SYP: middle(-34),
     SHW: middle(-34),
-    CEN: { anchor: "middle", dx: 0, dy: -40 },
-    ADM: { anchor: "start", dx: 22, dy: -36 },
+    CEN: { anchor: "middle", dx: 0, dy: 40 },
+    ADM: { anchor: "start", dx: 26, dy: -42 },
     WAC: middle(-34),
     CAB: middle(-34),
     TIH: middle(-34),
@@ -94,15 +94,15 @@ const LABEL_OVERRIDES = {
     HFC: right(22),
     CHW: right(24),
 
-    TST: { anchor: "end", dx: -26, dy: -18 },
-    JOR: { anchor: "end", dx: -24, dy: -6 },
-    YMT: { anchor: "end", dx: -24, dy: -6 },
-    MOK: { anchor: "end", dx: -24, dy: -8 },
-    PRE: { anchor: "end", dx: -24, dy: -8 },
-    SSP: middle(-28),
-    CSW: middle(-28),
-    LCK: middle(-28),
-    SKM: left(-10),
+    TST: { anchor: "end", dx: -32, dy: -18 },
+    JOR: { anchor: "end", dx: -28, dy: -8 },
+    YMT: { anchor: "end", dx: -30, dy: -10 },
+    MOK: { anchor: "end", dx: -30, dy: -12 },
+    PRE: { anchor: "end", dx: -30, dy: -12 },
+    SSP: middle(-38),
+    CSW: middle(-38),
+    LCK: middle(-38),
+    SKM: middle(-40),
     LOF: middle(32),
     WTS: middle(-32),
     KOT: middle(-34),
@@ -113,27 +113,27 @@ const LABEL_OVERRIDES = {
     KWH: middle(-30),
     KWF: middle(-30),
     LAK: left(-14),
-    MEF: left(-14),
+    MEF: { anchor: "start", dx: 28, dy: 30 },
     NAC: { anchor: "end", dx: -20, dy: 36 },
-    OLY: { anchor: "end", dx: -22, dy: 34 },
-    KOW: { anchor: "end", dx: -22, dy: -36 },
-    HOK: { anchor: "end", dx: -22, dy: -34 },
+    OLY: { anchor: "end", dx: -28, dy: 40 },
+    KOW: { anchor: "end", dx: -30, dy: -24 },
+    HOK: { anchor: "middle", dx: -52, dy: -24 },
     TWW: middle(-30),
     KSR: middle(-30),
     YUL: middle(-30),
     LOP: middle(-30),
     TIS: middle(-30),
-    SIH: right(26),
+    SIH: { anchor: "end", dx: -38, dy: -10 },
     TUM: right(24),
-    AUS: { anchor: "end", dx: -28, dy: 40 },
-    ETS: { anchor: "start", dx: 22, dy: 6 },
+    AUS: { anchor: "end", dx: -36, dy: -8 },
+    ETS: { anchor: "start", dx: 28, dy: 16 },
 
-    HUH: { anchor: "start", dx: 20, dy: 24 },
-    HOM: { anchor: "start", dx: 20, dy: 34 },
+    HUH: { anchor: "start", dx: 24, dy: 30 },
+    HOM: middle(-44),
     TKW: right(30),
     SUW: right(30),
     KAT: right(30),
-    DIH: right(-22),
+    DIH: { anchor: "end", dx: -38, dy: 34 },
     HIK: left(-18),
     TAW: right(-24),
     CKT: middle(30),
@@ -144,15 +144,15 @@ const LABEL_OVERRIDES = {
     HEO: middle(-30),
     MOS: middle(-30),
     WKS: middle(-30),
-    EXC: { anchor: "start", dx: 22, dy: -20 },
+    EXC: middle(-44),
 
     SHT: right(-20),
     FOT: right(-20),
-    UNI: right(-20),
-    TAP: right(-20),
-    TWO: right(-20),
-    FAN: right(-20),
-    SHS: right(-20),
+    UNI: middle(-40),
+    TAP: middle(-40),
+    TWO: middle(-40),
+    FAN: middle(-40),
+    SHS: middle(-40),
 
     TUC: left(26),
     SUN: left(28),
@@ -167,8 +167,8 @@ const LABEL_OVERRIDES = {
     NTK: middle(32),
     KOB: middle(32),
     CHH: middle(32),
-    TIK: right(30),
-    TKO: right(28),
+    TIK: middle(38),
+    TKO: middle(-44),
     HAH: right(28),
     POA: right(28),
     LHP: right(-22),
@@ -277,11 +277,11 @@ function middle(dy) {
 }
 
 function right(dy = -8) {
-    return { anchor: "start", dx: 18, dy };
+    return { anchor: "start", dx: 22, dy };
 }
 
 function left(dy = -8) {
-    return { anchor: "end", dx: -18, dy };
+    return { anchor: "end", dx: -22, dy };
 }
 
 function roundCoordinate(value) {
@@ -817,6 +817,12 @@ function buildStationsFromOfficialMap(stationIndex, officialMap) {
         };
     }
 
+    if (stations.HOK) {
+        stations.HOK.nameZh = "香港西九龍站";
+        stations.HOK.nameEn = "HK West Kowloon";
+        if (stations.HOK.label) stations.HOK.label.text = "香港西九龍站";
+    }
+
     return {
         stations,
         viewBox: {
@@ -961,6 +967,13 @@ function buildWalkLinksAndLandmarks(stations) {
             dy: 0
         }
     };
+
+    highSpeedRailLandmark.nameZh = "香港西九龍";
+    highSpeedRailLandmark.nameEn = "Hong Kong West Kowloon";
+    highSpeedRailLandmark.label.text = "香港西九龍";
+    highSpeedRailLandmark.nameZh = "高鐵";
+    highSpeedRailLandmark.nameEn = "High Speed Rail";
+    highSpeedRailLandmark.label.text = "高鐵";
 
     const walkLinks = [
         {

@@ -1,5 +1,5 @@
 window.__MTR_SCHEMATIC_LAYOUT__ = {
-  "generatedAt": "2026-04-16T04:26:38.894Z",
+  "generatedAt": "2026-04-16T09:37:15.415Z",
   "source": "official-rail-index.json + official-mtr-map.js + official-mtr-map.css",
   "version": 6,
   "viewBox": {
@@ -3868,8 +3868,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "金鐘",
         "anchor": "start",
-        "dx": 22,
-        "dy": -36
+        "dx": 26,
+        "dy": -42
       }
     },
     "AIR": {
@@ -3893,7 +3893,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "機場",
         "anchor": "end",
-        "dx": -18,
+        "dx": -22,
         "dy": 26
       }
     },
@@ -3918,8 +3918,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "柯士甸",
         "anchor": "end",
-        "dx": -28,
-        "dy": 40
+        "dx": -36,
+        "dy": -8
       }
     },
     "AWE": {
@@ -3943,7 +3943,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "博覽館",
         "anchor": "end",
-        "dx": -18,
+        "dx": -22,
         "dy": -12
       }
     },
@@ -3999,7 +3999,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "中環",
         "anchor": "middle",
         "dx": 0,
-        "dy": -40
+        "dy": 40
       }
     },
     "CHH": {
@@ -4048,7 +4048,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "柴灣",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": 24
       }
     },
@@ -4124,7 +4124,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "長沙灣",
         "anchor": "middle",
         "dx": 0,
-        "dy": -28
+        "dy": -38
       }
     },
     "DIH": {
@@ -4152,9 +4152,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "鑽石山",
-        "anchor": "start",
-        "dx": 18,
-        "dy": -22
+        "anchor": "end",
+        "dx": -38,
+        "dy": 34
       }
     },
     "DIS": {
@@ -4178,7 +4178,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "迪士尼",
         "anchor": "end",
-        "dx": -18,
+        "dx": -22,
         "dy": 26
       }
     },
@@ -4203,8 +4203,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "尖東",
         "anchor": "start",
-        "dx": 22,
-        "dy": 6
+        "dx": 28,
+        "dy": 16
       }
     },
     "EXC": {
@@ -4227,9 +4227,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "會展",
-        "anchor": "start",
-        "dx": 22,
-        "dy": -20
+        "anchor": "middle",
+        "dx": 0,
+        "dy": -44
       }
     },
     "FAN": {
@@ -4252,9 +4252,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "粉嶺",
-        "anchor": "start",
-        "dx": 18,
-        "dy": -20
+        "anchor": "middle",
+        "dx": 0,
+        "dy": -40
       }
     },
     "FOH": {
@@ -4303,7 +4303,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "火炭",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": -20
       }
     },
@@ -4328,7 +4328,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "坑口",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": 28
       }
     },
@@ -4378,7 +4378,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "杏花邨",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": 22
       }
     },
@@ -4403,7 +4403,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "顯徑",
         "anchor": "end",
-        "dx": -18,
+        "dx": -22,
         "dy": -18
       }
     },
@@ -4434,8 +4434,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
     },
     "HOK": {
       "stationCode": "HOK",
-      "nameZh": "香港",
-      "nameEn": "Hong Kong",
+      "nameZh": "香港西九龍站",
+      "nameEn": "HK West Kowloon",
       "x": 891.4,
       "y": 955.1,
       "markerX": 891.4,
@@ -4456,10 +4456,10 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         }
       },
       "label": {
-        "text": "香港",
-        "anchor": "end",
-        "dx": -22,
-        "dy": -34
+        "text": "香港西九龍站",
+        "anchor": "middle",
+        "dx": -52,
+        "dy": -24
       }
     },
     "HOM": {
@@ -4487,9 +4487,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "何文田",
-        "anchor": "start",
-        "dx": 20,
-        "dy": 34
+        "anchor": "middle",
+        "dx": 0,
+        "dy": -44
       }
     },
     "HUH": {
@@ -4518,8 +4518,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "紅磡",
         "anchor": "start",
-        "dx": 20,
-        "dy": 24
+        "dx": 24,
+        "dy": 30
       }
     },
     "JOR": {
@@ -4543,8 +4543,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "佐敦",
         "anchor": "end",
-        "dx": -24,
-        "dy": -6
+        "dx": -28,
+        "dy": -8
       }
     },
     "KAT": {
@@ -4568,7 +4568,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "啟德",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": 30
       }
     },
@@ -4678,8 +4678,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "九龍",
         "anchor": "end",
-        "dx": -22,
-        "dy": -36
+        "dx": -30,
+        "dy": -24
       }
     },
     "KSR": {
@@ -4808,7 +4808,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "茘景",
         "anchor": "end",
-        "dx": -18,
+        "dx": -22,
         "dy": -14
       }
     },
@@ -4859,7 +4859,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "茘枝角",
         "anchor": "middle",
         "dx": 0,
-        "dy": -28
+        "dy": -38
       }
     },
     "LET": {
@@ -4908,7 +4908,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "康城",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": -22
       }
     },
@@ -4933,7 +4933,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "落馬洲",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": -8
       }
     },
@@ -5008,7 +5008,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "羅湖",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": -8
       }
     },
@@ -5037,9 +5037,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "美孚",
-        "anchor": "end",
-        "dx": -18,
-        "dy": -14
+        "anchor": "start",
+        "dx": 28,
+        "dy": 30
       }
     },
     "MKK": {
@@ -5063,7 +5063,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "旺角東",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": 28
       }
     },
@@ -5093,8 +5093,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "旺角",
         "anchor": "end",
-        "dx": -24,
-        "dy": -8
+        "dx": -30,
+        "dy": -12
       }
     },
     "MOS": {
@@ -5228,7 +5228,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "海洋公園",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": 28
       }
     },
@@ -5253,8 +5253,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "奧運",
         "anchor": "end",
-        "dx": -22,
-        "dy": 34
+        "dx": -28,
+        "dy": 40
       }
     },
     "POA": {
@@ -5278,7 +5278,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "寶琳",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": 28
       }
     },
@@ -5308,8 +5308,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "太子",
         "anchor": "end",
-        "dx": -24,
-        "dy": -8
+        "dx": -30,
+        "dy": -12
       }
     },
     "QUB": {
@@ -5387,9 +5387,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "上水",
-        "anchor": "start",
-        "dx": 18,
-        "dy": -20
+        "anchor": "middle",
+        "dx": 0,
+        "dy": -40
       }
     },
     "SHT": {
@@ -5413,7 +5413,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "沙田",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": -20
       }
     },
@@ -5462,9 +5462,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "兆康",
-        "anchor": "start",
-        "dx": 18,
-        "dy": 26
+        "anchor": "end",
+        "dx": -38,
+        "dy": -10
       }
     },
     "SKM": {
@@ -5487,9 +5487,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "石硤尾",
-        "anchor": "end",
-        "dx": -18,
-        "dy": -10
+        "anchor": "middle",
+        "dx": 0,
+        "dy": -40
       }
     },
     "SKW": {
@@ -5513,7 +5513,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "筲箕灣",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": -2
       }
     },
@@ -5564,7 +5564,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
         "text": "深水埗",
         "anchor": "middle",
         "dx": 0,
-        "dy": -28
+        "dy": -38
       }
     },
     "STW": {
@@ -5618,7 +5618,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "欣澳",
         "anchor": "end",
-        "dx": -18,
+        "dx": -22,
         "dy": 28
       }
     },
@@ -5643,7 +5643,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "宋皇臺",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": 30
       }
     },
@@ -5742,9 +5742,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "大埔墟",
-        "anchor": "start",
-        "dx": 18,
-        "dy": -20
+        "anchor": "middle",
+        "dx": 0,
+        "dy": -40
       }
     },
     "TAW": {
@@ -5773,7 +5773,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "大圍",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": -24
       }
     },
@@ -5827,9 +5827,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "調景嶺",
-        "anchor": "start",
-        "dx": 18,
-        "dy": 30
+        "anchor": "middle",
+        "dx": 0,
+        "dy": 38
       }
     },
     "TIS": {
@@ -5877,9 +5877,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "將軍澳",
-        "anchor": "start",
-        "dx": 18,
-        "dy": 28
+        "anchor": "middle",
+        "dx": 0,
+        "dy": -44
       }
     },
     "TKW": {
@@ -5903,7 +5903,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "土瓜灣",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": 30
       }
     },
@@ -5953,7 +5953,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "尖沙咀",
         "anchor": "end",
-        "dx": -26,
+        "dx": -32,
         "dy": -18
       }
     },
@@ -6008,7 +6008,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "青衣",
         "anchor": "end",
-        "dx": -18,
+        "dx": -22,
         "dy": 30
       }
     },
@@ -6033,7 +6033,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "東涌",
         "anchor": "end",
-        "dx": -18,
+        "dx": -22,
         "dy": 26
       }
     },
@@ -6058,7 +6058,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "屯門",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": 24
       }
     },
@@ -6107,9 +6107,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "太和",
-        "anchor": "start",
-        "dx": 18,
-        "dy": -20
+        "anchor": "middle",
+        "dx": 0,
+        "dy": -40
       }
     },
     "TWW": {
@@ -6157,9 +6157,9 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       },
       "label": {
         "text": "大學",
-        "anchor": "start",
-        "dx": 18,
-        "dy": -20
+        "anchor": "middle",
+        "dx": 0,
+        "dy": -40
       }
     },
     "WAC": {
@@ -6233,7 +6233,7 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "黃埔",
         "anchor": "start",
-        "dx": 18,
+        "dx": 22,
         "dy": -8
       }
     },
@@ -6343,8 +6343,8 @@ window.__MTR_SCHEMATIC_LAYOUT__ = {
       "label": {
         "text": "油麻地",
         "anchor": "end",
-        "dx": -24,
-        "dy": -6
+        "dx": -30,
+        "dy": -10
       }
     },
     "YUL": {

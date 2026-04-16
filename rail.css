@@ -1256,17 +1256,48 @@ body::after {
 }
 
 .rail-schematic-station-label {
-    fill: var(--rail-ink);
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    paint-order: stroke;
-    stroke: rgba(249, 251, 254, 0.94);
-    stroke-width: 7px;
-    stroke-linejoin: round;
-    dominant-baseline: central;
+    color: var(--rail-ink);
     pointer-events: none;
-    transition: opacity 0.18s ease, fill 0.18s ease;
+    transition: opacity 0.18s ease, color 0.18s ease;
+}
+
+.rail-schematic-station-name-zh,
+.rail-schematic-station-name-en {
+    fill: currentColor;
+    font-family: "Noto Sans TC", "Noto Sans", sans-serif;
+    paint-order: stroke;
+    stroke: rgba(249, 251, 254, 0.96);
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    dominant-baseline: central;
+    text-rendering: geometricPrecision;
+}
+
+.rail-schematic-station-name-zh {
+    font-size: 15.6px;
+    font-weight: 700;
+    letter-spacing: 0.015em;
+    stroke-width: 6.8px;
+}
+
+.rail-schematic-station-name-en {
+    font-size: 9.9px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    opacity: 0.9;
+    stroke-width: 5.3px;
+}
+
+.rail-schematic-station[data-station-code="HOK"] .rail-schematic-station-name-zh {
+    font-size: 13.1px;
+    letter-spacing: 0.01em;
+    stroke-width: 5.8px;
+}
+
+.rail-schematic-station[data-station-code="HOK"] .rail-schematic-station-name-en {
+    font-size: 8.3px;
+    letter-spacing: 0.015em;
+    stroke-width: 4.5px;
 }
 
 .rail-schematic-station:hover .rail-schematic-station-halo,
@@ -1312,7 +1343,7 @@ body::after {
 }
 
 .rail-schematic-station.is-origin .rail-schematic-station-label {
-    fill: #a83835;
+    color: #a83835;
 }
 
 .rail-schematic-station.is-destination {
@@ -1326,7 +1357,7 @@ body::after {
 }
 
 .rail-schematic-station.is-destination .rail-schematic-station-label {
-    fill: #25579d;
+    color: #25579d;
 }
 
 .rail-schematic-station.is-dimmed .rail-schematic-station-dot,
@@ -2644,9 +2675,24 @@ body::after {
         border-radius: 18px;
     }
 
-    .rail-schematic-station-label {
-        font-size: 15px;
-        stroke-width: 6px;
+    .rail-schematic-station-name-zh {
+        font-size: 13.3px;
+        stroke-width: 5.8px;
+    }
+
+    .rail-schematic-station-name-en {
+        font-size: 8.7px;
+        stroke-width: 4.5px;
+    }
+
+    .rail-schematic-station[data-station-code="HOK"] .rail-schematic-station-name-zh {
+        font-size: 11.7px;
+        stroke-width: 5.1px;
+    }
+
+    .rail-schematic-station[data-station-code="HOK"] .rail-schematic-station-name-en {
+        font-size: 7.6px;
+        stroke-width: 4px;
     }
 
     .rail-official-map-viewport {

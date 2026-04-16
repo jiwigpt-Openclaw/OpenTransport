@@ -65,6 +65,18 @@
             weight: 2.6
         }
     ];
+    MTR_VIRTUAL_ROUTE_POINTS.HSR.nameZh = "香港西九龍";
+    MTR_VIRTUAL_ROUTE_POINTS.HSR.nameEn = "Hong Kong West Kowloon";
+    const walkLinkToWestKowloon = MTR_BASE_WALK_LINKS.find((walkLink) => walkLink.walkId === "AUS|HSR");
+    const walkLinkFromWestKowloon = MTR_BASE_WALK_LINKS.find((walkLink) => walkLink.walkId === "HSR|KOW");
+    const walkRouteViaWestKowloon = MTR_SPECIAL_WALK_ROUTES.find((walkRoute) => walkRoute.walkId === "AUS|KOW");
+    if (walkLinkToWestKowloon) walkLinkToWestKowloon.labelZh = "步行前往香港西九龍";
+    if (walkLinkFromWestKowloon) walkLinkFromWestKowloon.labelZh = "步行前往九龍站";
+    if (walkRouteViaWestKowloon) walkRouteViaWestKowloon.labelZh = "經香港西九龍步行連接";
+    MTR_VIRTUAL_ROUTE_POINTS.HSR.nameZh = "高鐵";
+    MTR_VIRTUAL_ROUTE_POINTS.HSR.nameEn = "High Speed Rail";
+    if (walkLinkToWestKowloon) walkLinkToWestKowloon.labelZh = "步行前往高鐵";
+    if (walkRouteViaWestKowloon) walkRouteViaWestKowloon.labelZh = "經高鐵步行連接";
     const officialMtrMap = window.__OFFICIAL_MTR_MAP__ || null;
     const customMtrSchematicLayout = window.__MTR_SCHEMATIC_LAYOUT__ || null;
     const statusElement = document.getElementById("railStatus");
@@ -2046,6 +2058,65 @@
                 `).join("")}
             </g>`;
     }
+    function buildSchematicStationLabelMarkup(station) {
+        const labelX = station.x + station.label.dx;
+        const labelY = station.y + station.label.dy;
+        const englishName = String(station.nameEn || "").trim();
+        const hasEnglishName = englishName.length > 0;
+
+        return `
+            <g
+                class="rail-schematic-station-label"
+                transform="translate(${escapeHtml(String(labelX))} ${escapeHtml(String(labelY))})"
+                text-anchor="${escapeHtml(station.label.anchor)}"
+                aria-hidden="true"
+            >
+                <text
+                    class="rail-schematic-station-name-zh"
+                    x="0"
+                    y="${hasEnglishName ? "-6" : "1"}"
+                >${escapeHtml(station.nameZh || station.label.text || station.stationCode)}</text>
+                ${hasEnglishName ? `
+                    <text
+                        class="rail-schematic-station-name-en"
+                        x="0"
+                        y="10"
+                    >${escapeHtml(englishName)}</text>
+                ` : ""}
+            </g>`;
+    }
+    function buildSchematicLandmarkMarkup(landmark) {
+        const labelText = String(landmark.label?.text || landmark.nameZh || landmark.stationCode || "").trim();
+        const labelLength = Math.max(2, Array.from(labelText).length);
+        const badgeWidth = Math.max(68, 28 + labelLength * 14);
+        const badgeHeight = 32;
+        const badgeRadius = badgeHeight / 2;
+
+        return `
+            <circle
+                class="rail-schematic-landmark-hit"
+                cx="${escapeHtml(String(landmark.x))}"
+                cy="${escapeHtml(String(landmark.y))}"
+                r="24"
+            />
+            <g class="rail-schematic-landmark-visual" aria-hidden="true">
+                <rect
+                    class="rail-schematic-landmark-badge"
+                    x="${escapeHtml(String(landmark.x - badgeWidth / 2))}"
+                    y="${escapeHtml(String(landmark.y - badgeHeight / 2))}"
+                    width="${escapeHtml(String(badgeWidth))}"
+                    height="${escapeHtml(String(badgeHeight))}"
+                    rx="${escapeHtml(String(badgeRadius))}"
+                    ry="${escapeHtml(String(badgeRadius))}"
+                />
+                <text
+                    class="rail-schematic-landmark-text"
+                    x="${escapeHtml(String(landmark.x))}"
+                    y="${escapeHtml(String(landmark.y))}"
+                    text-anchor="middle"
+                >${escapeHtml(labelText)}</text>
+            </g>`;
+    }
     function buildCustomSchematicMarkup() {
         const schematicRuntime = railState.mtr.routing.customSchematic;
         if (!schematicRuntime) {
@@ -2139,29 +2210,7 @@
                                             tabindex="0"
                                             aria-label="選擇 ${escapeHtml(landmark.nameZh)} 作為${planner.activeField === "origin" ? "起點" : "終點"}"
                                         >
-                                            <circle
-                                                class="rail-schematic-landmark-hit"
-                                                cx="${escapeHtml(String(landmark.x))}"
-                                                cy="${escapeHtml(String(landmark.y))}"
-                                                r="24"
-                                            />
-                                            <g class="rail-schematic-landmark-visual" aria-hidden="true">
-                                                <rect
-                                                    class="rail-schematic-landmark-badge"
-                                                    x="${escapeHtml(String(landmark.x - 34))}"
-                                                    y="${escapeHtml(String(landmark.y - 16))}"
-                                                    width="68"
-                                                    height="32"
-                                                    rx="16"
-                                                    ry="16"
-                                                />
-                                                <text
-                                                    class="rail-schematic-landmark-text"
-                                                    x="${escapeHtml(String(landmark.x))}"
-                                                    y="${escapeHtml(String(landmark.y))}"
-                                                    text-anchor="middle"
-                                                >${escapeHtml(landmark.label.text)}</text>
-                                            </g>
+                                            ${buildSchematicLandmarkMarkup(landmark)}
                                         </g>
                                     `).join("")}
                                 </g>
@@ -2176,12 +2225,7 @@
                                             aria-label="選擇 ${escapeHtml(station.nameZh)} 作為${planner.activeField === "origin" ? "起點" : "終點"}"
                                         >
                                             ${buildSchematicStationVisualMarkup(station)}
-                                            <text
-                                                class="rail-schematic-station-label"
-                                                x="${escapeHtml(String(station.x + station.label.dx))}"
-                                                y="${escapeHtml(String(station.y + station.label.dy))}"
-                                                text-anchor="${escapeHtml(station.label.anchor)}"
-                                            >${escapeHtml(station.label.text)}</text>
+                                            ${buildSchematicStationLabelMarkup(station)}
                                         </g>
                                     `).join("")}
                                 </g>
