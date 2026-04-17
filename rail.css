@@ -560,6 +560,337 @@ body::after {
     font-weight: 700;
 }
 
+.rail-lrt-panel,
+.rail-lrt-result-card {
+    --rail-lrt-accent: #9a5d2f;
+    --rail-lrt-accent-soft: rgba(154, 93, 47, 0.14);
+    --rail-lrt-border: rgba(186, 137, 98, 0.24);
+}
+
+.rail-lrt-panel {
+    display: grid;
+    gap: 12px;
+}
+
+.rail-lrt-panel > .rail-panel-title {
+    order: 0;
+    margin-bottom: 0;
+}
+
+.rail-lrt-panel > .rail-lrt-nearest-card {
+    order: 1;
+    margin-bottom: 0;
+}
+
+.rail-lrt-panel > .rail-selector-grid {
+    order: 2;
+}
+
+.rail-lrt-panel > .rail-lrt-result-card,
+.rail-lrt-panel > .rail-empty-card,
+.rail-lrt-panel > .rail-loading-card,
+.rail-lrt-panel > .rail-inline-banner {
+    order: 3;
+}
+
+.rail-lrt-result-card {
+    display: grid;
+    gap: 14px;
+}
+
+.rail-lrt-result-head {
+    display: grid;
+    gap: 12px;
+}
+
+.rail-lrt-section-kicker {
+    margin: 0;
+    color: var(--rail-lrt-accent);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.rail-lrt-chip-row {
+    margin-bottom: 0;
+}
+
+.rail-lrt-nearest-card {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 16px 18px;
+    border-color: var(--rail-lrt-border);
+    background:
+        radial-gradient(circle at 100% 0%, rgba(255, 233, 214, 0.82) 0%, rgba(255, 233, 214, 0) 38%),
+        linear-gradient(180deg, rgba(255, 252, 248, 0.96) 0%, rgba(248, 241, 235, 0.92) 100%);
+}
+
+.rail-lrt-nearest-head {
+    display: grid;
+    gap: 12px;
+}
+
+.rail-lrt-nearest-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.rail-lrt-nearest-button {
+    min-width: 0;
+}
+
+.rail-lrt-nearest-service-list {
+    display: grid;
+    gap: 8px;
+}
+
+.rail-lrt-nearest-service {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    padding: 10px 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    background: rgba(255, 255, 255, 0.74);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.rail-lrt-nearest-service-route {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    padding: 7px 10px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #9a5d2f 0%, #7f451b 100%);
+    color: #fff;
+    font-family: "Outfit", "Noto Sans TC", sans-serif;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    box-shadow: 0 8px 14px rgba(118, 70, 36, 0.14);
+}
+
+.rail-lrt-nearest-service-copy {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.rail-lrt-nearest-service-copy strong {
+    color: var(--rail-ink);
+    font-size: 0.94rem;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.rail-lrt-nearest-service-copy span {
+    color: var(--rail-muted);
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.rail-lrt-nearest-inline-note {
+    margin: 0;
+    color: var(--rail-muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.rail-lrt-refresh-button {
+    border-color: rgba(255, 243, 232, 0.92);
+    background: linear-gradient(180deg, rgba(255, 251, 247, 0.96) 0%, rgba(250, 242, 233, 0.88) 100%);
+    color: #844b20;
+}
+
+.rail-lrt-platform-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.rail-lrt-platform-card {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 22px;
+    border: 1px solid var(--rail-lrt-border);
+    background:
+        radial-gradient(circle at 100% 0%, rgba(255, 236, 220, 0.86) 0%, rgba(255, 236, 220, 0) 34%),
+        linear-gradient(180deg, rgba(255, 251, 247, 0.94) 0%, rgba(248, 242, 236, 0.9) 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 14px 26px rgba(87, 63, 43, 0.08);
+}
+
+.rail-lrt-platform-head {
+    display: grid;
+    gap: 10px;
+}
+
+.rail-lrt-platform-kicker {
+    margin: 0 0 4px;
+    color: var(--rail-lrt-accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.rail-lrt-platform-title {
+    margin: 0;
+    color: var(--rail-ink);
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.rail-lrt-platform-meta {
+    margin: 4px 0 0;
+    color: var(--rail-muted);
+    font-size: 0.88rem;
+}
+
+.rail-lrt-platform-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: start;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(120, 71, 37, 0.1);
+    color: #7b4a24;
+    font-size: 0.88rem;
+    font-weight: 800;
+}
+
+.rail-lrt-service-list {
+    display: grid;
+    gap: 10px;
+}
+
+.rail-lrt-service-card {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    background: rgba(255, 255, 255, 0.74);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.rail-lrt-service-card.is-focused-route {
+    border-color: rgba(154, 93, 47, 0.3);
+    background:
+        linear-gradient(180deg, rgba(255, 248, 242, 0.98) 0%, rgba(253, 242, 231, 0.92) 100%);
+    box-shadow:
+        inset 3px 0 0 rgba(154, 93, 47, 0.82),
+        0 12px 22px rgba(92, 61, 37, 0.08);
+}
+
+.rail-lrt-service-top {
+    display: grid;
+    gap: 10px;
+    align-items: start;
+}
+
+.rail-lrt-route-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: start;
+    min-width: 54px;
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #9a5d2f 0%, #7f451b 100%);
+    color: #fff;
+    font-family: "Outfit", "Noto Sans TC", sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    box-shadow: 0 10px 18px rgba(118, 70, 36, 0.18);
+}
+
+.rail-lrt-service-main {
+    display: grid;
+    gap: 4px;
+}
+
+.rail-lrt-service-title {
+    margin: 0;
+    color: var(--rail-ink);
+    font-size: 0.98rem;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.rail-lrt-service-meta {
+    margin: 0;
+    color: var(--rail-muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.rail-lrt-eta-badge {
+    display: inline-grid;
+    gap: 2px;
+    justify-self: start;
+    padding: 10px 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 246, 238, 0.9);
+    background: rgba(250, 244, 238, 0.9);
+}
+
+.rail-lrt-eta-label {
+    color: var(--rail-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rail-lrt-eta-value {
+    color: #6f3e19;
+    font-size: 0.98rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.rail-lrt-service-facts {
+    display: grid;
+    gap: 8px;
+}
+
+.rail-lrt-service-fact {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0;
+    color: var(--rail-muted);
+    font-size: 0.86rem;
+}
+
+.rail-lrt-service-fact span {
+    color: var(--rail-muted);
+}
+
+.rail-lrt-service-fact strong {
+    color: var(--rail-ink);
+    font-size: 0.9rem;
+}
+
+.rail-lrt-service-tags {
+    gap: 6px;
+}
+
+.rail-lrt-note-list {
+    margin-top: -2px;
+    font-size: 0.84rem;
+}
+
 .rail-nearest-line-grid {
     display: grid;
     gap: 10px;
@@ -2757,6 +3088,16 @@ body::after {
         align-items: center;
     }
 
+    .rail-lrt-result-head {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+    }
+
+    .rail-lrt-nearest-head {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+    }
+
     .rail-mtr-action-row {
         justify-self: end;
         justify-content: flex-end;
@@ -2775,9 +3116,17 @@ body::after {
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     }
 
+    .rail-lrt-platform-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
     .rail-nearest-direction-row {
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: start;
+    }
+
+    .rail-lrt-service-top {
+        grid-template-columns: auto minmax(0, 1fr) auto;
     }
 
     .rail-official-map-viewport {
@@ -2849,6 +3198,43 @@ body::after {
     .rail-loading-card {
         grid-template-columns: 1fr;
         justify-items: start;
+    }
+
+    .rail-lrt-platform-card {
+        padding: 12px;
+        border-radius: 18px;
+    }
+
+    .rail-lrt-service-card {
+        padding: 11px;
+    }
+
+    .rail-lrt-nearest-card {
+        padding: 12px;
+        border-radius: 18px;
+    }
+
+    .rail-lrt-service-top,
+    .rail-lrt-result-head {
+        grid-template-columns: 1fr;
+    }
+
+    .rail-lrt-nearest-head,
+    .rail-lrt-nearest-service {
+        grid-template-columns: 1fr;
+    }
+
+    .rail-lrt-eta-badge,
+    .rail-lrt-refresh-button {
+        justify-self: start;
+    }
+
+    .rail-lrt-nearest-actions {
+        width: 100%;
+    }
+
+    .rail-lrt-nearest-button {
+        width: auto;
     }
 
     .rail-route-panel,

@@ -1,5 +1,6 @@
 (() => {
     const MTR_SCHEDULE_ENDPOINT = "https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php";
+    const LIGHT_RAIL_SCHEDULE_ENDPOINT = "https://rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule";
     const MTR_DIRECTION_CONFIG = [{ apiKey: "UP", label: "上行" }, { apiKey: "DOWN", label: "下行" }];
     const MTR_LINE_STYLE_MAP = {
         AEL: { color: "#008A8B" },
@@ -79,6 +80,7 @@
     if (walkRouteViaWestKowloon) walkRouteViaWestKowloon.labelZh = "經高鐵步行連接";
     const officialMtrMap = window.__OFFICIAL_MTR_MAP__ || null;
     const customMtrSchematicLayout = window.__MTR_SCHEMATIC_LAYOUT__ || null;
+    const lightRailStopLocationData = window.__LIGHT_RAIL_STOP_LOCATIONS__ || null;
     const statusElement = document.getElementById("railStatus");
     const contentElement = document.getElementById("railContent");
     const tabButtons = Array.from(document.querySelectorAll("[data-tab-trigger]"));
@@ -171,7 +173,29 @@
                 customSchematic: null
             }
         },
-        lightRail: { routeCode: "", stopId: "", routes: [], stopIndex: {} },
+        lightRail: {
+            routeCode: "",
+            stopId: "",
+            routes: [],
+            stopIndex: {},
+            nearest: {
+                status: "idle",
+                hasAttempted: false,
+                errorMessage: "",
+                userLocation: null,
+                nearestStop: null,
+                schedule: null,
+                requestId: 0,
+                activeController: null
+            },
+            realtime: {
+                status: "idle",
+                errorMessage: "",
+                schedule: null,
+                requestId: 0,
+                activeController: null
+            }
+        },
         ui: { isReady: false, statusKind: "info", statusMessage: "正在準備官方靜態索引..." }
     };
     railState.ui.nextTrainModal = {
@@ -883,6 +907,320 @@
             }
         }
         return [...stopMap.values()].sort((left, right) => left.nameZh.localeCompare(right.nameZh, "zh-HK"));
+    }
+    function getSelectedLightRailRoute() {
+        return railState.lightRail.routes.find((route) => route.routeCode === railState.lightRail.routeCode) || null;
+    }
+    function getSelectedLightRailStop() {
+        return railState.lightRail.stopIndex[railState.lightRail.stopId] || null;
+    }
+    function getLightRailStopLocation(stopId) {
+        return lightRailStopLocationData?.stopLocations?.[String(stopId || "")] || null;
+    }
+    function enrichLightRailStopIndexWithLocations(stopIndex) {
+        const nextStopIndex = {};
+        for (const [stopId, stopEntry] of Object.entries(stopIndex || {})) {
+            const location = getLightRailStopLocation(stopId);
+            nextStopIndex[stopId] = location
+                ? {
+                    ...stopEntry,
+                    location: {
+                        latitude: Number(location.latitude),
+                        longitude: Number(location.longitude),
+                        source: "Official GTFS stop data + MTR Bus/Feeder Bus stop data"
+                    }
+                }
+                : { ...stopEntry };
+        }
+        return nextStopIndex;
+    }
+    function abortLightRailRealtimeRequest() {
+        if (railState.lightRail.realtime.activeController instanceof AbortController) railState.lightRail.realtime.activeController.abort();
+        railState.lightRail.realtime.activeController = null;
+    }
+    function abortLightRailNearestRequest() {
+        if (railState.lightRail.nearest.activeController instanceof AbortController) railState.lightRail.nearest.activeController.abort();
+        railState.lightRail.nearest.activeController = null;
+    }
+    function resetLightRailRealtimeState() {
+        abortLightRailRealtimeRequest();
+        railState.lightRail.realtime.status = "idle";
+        railState.lightRail.realtime.errorMessage = "";
+        railState.lightRail.realtime.schedule = null;
+    }
+    function parseLightRailMinutes(...values) {
+        for (const value of values) {
+            const text = String(value || "").trim();
+            if (!text) continue;
+            const match = text.match(/(\d+)/);
+            if (match) return Number.parseInt(match[1], 10);
+            if (/(arriving|departing|即將抵達|正在離開)/i.test(text)) return 0;
+        }
+        return null;
+    }
+    function resolveLightRailCountdownState(service) {
+        const timeZh = String(service?.time_ch || "").trim();
+        const timeEn = String(service?.time_en || "").trim();
+        const isDeparture = String(service?.arrival_departure || "").toUpperCase() === "D";
+        const isStopped = Number.parseInt(String(service?.stop || "0"), 10) === 1;
+        if (isStopped) return "停站中";
+        if (timeZh === "正在離開" || /departing/i.test(timeEn)) return "正在離開";
+        if (timeZh === "即將抵達" || /arriving/i.test(timeEn)) return "即將抵達";
+        if (timeZh === "-" || timeEn === "-") return isDeparture ? "即將開出" : "即將進站";
+        if (parseLightRailMinutes(timeZh, timeEn) !== null) return "倒數中";
+        return "時間未提供";
+    }
+    function compareLightRailServices(left, right) {
+        const leftMinutes = Number.isFinite(left?.minutes) ? left.minutes : Number.POSITIVE_INFINITY;
+        const rightMinutes = Number.isFinite(right?.minutes) ? right.minutes : Number.POSITIVE_INFINITY;
+        if (leftMinutes !== rightMinutes) return leftMinutes - rightMinutes;
+        const leftRoute = String(left?.routeNo || "");
+        const rightRoute = String(right?.routeNo || "");
+        return leftRoute.localeCompare(rightRoute, "en", { numeric: true });
+    }
+    function normalizeLightRailService(service, platformId) {
+        const remarks = [
+            service?.additionalInfo1,
+            service?.routeRemarkChi2,
+            service?.routeRemarkEng2
+        ]
+            .map((value) => String(value || "").trim())
+            .filter(Boolean)
+            .filter((value, index, array) => array.indexOf(value) === index);
+        const routeNo = String(service?.route_no || "").trim();
+        const timeTextZh = String(service?.time_ch || "").trim();
+        const timeTextEn = String(service?.time_en || "").trim();
+        const minutes = parseLightRailMinutes(timeTextZh, timeTextEn);
+        const trainLength = Number.parseInt(String(service?.train_length || ""), 10);
+        const arrivalDeparture = String(service?.arrival_departure || "").toUpperCase() === "D" ? "departure" : "arrival";
+
+        return {
+            id: [platformId, routeNo, service?.dest_ch || service?.dest_en || "", timeTextZh, timeTextEn].join("-"),
+            platformId: String(platformId || ""),
+            routeNo,
+            destinationNameZh: String(service?.dest_ch || service?.dest_en || "未提供目的地").trim(),
+            destinationNameEn: String(service?.dest_en || "").trim(),
+            arrivalDeparture,
+            arrivalDepartureLabel: arrivalDeparture === "departure" ? "開出" : "到站",
+            timeTextZh: timeTextZh || timeTextEn || "時間未提供",
+            timeTextEn,
+            minutes,
+            statusLabel: resolveLightRailCountdownState(service),
+            trainLength: Number.isFinite(trainLength) ? trainLength : null,
+            trainLengthLabel: Number.isFinite(trainLength) ? `${trainLength} 卡列車` : "",
+            isSpecial: Number.parseInt(String(service?.special || "0"), 10) === 1,
+            isStopped: Number.parseInt(String(service?.stop || "0"), 10) === 1,
+            remarks
+        };
+    }
+    function normalizeLightRailScheduleResponse(payload, stopEntry) {
+        const platforms = (Array.isArray(payload?.platform_list) ? payload.platform_list : [])
+            .map((platformEntry) => {
+                const platformId = String(platformEntry?.platform_id || "").trim();
+                const services = (Array.isArray(platformEntry?.route_list) ? platformEntry.route_list : [])
+                    .filter((service) => service && typeof service === "object")
+                    .map((service) => normalizeLightRailService(service, platformId))
+                    .sort(compareLightRailServices);
+                return {
+                    platformId,
+                    services,
+                    nextService: services[0] || null
+                };
+            })
+            .filter((platform) => platform.platformId && platform.services.length > 0)
+            .sort((left, right) => Number.parseInt(left.platformId, 10) - Number.parseInt(right.platformId, 10));
+
+        return {
+            stopId: String(stopEntry?.stopId || ""),
+            stopCode: String(stopEntry?.stopCode || ""),
+            stopNameZh: String(stopEntry?.nameZh || stopEntry?.stopId || ""),
+            stopNameEn: String(stopEntry?.nameEn || ""),
+            systemTime: String(payload?.system_time || "").trim(),
+            systemTimeLabel: formatClockTime(payload?.system_time || ""),
+            statusCode: Number.parseInt(String(payload?.status || "0"), 10) || 0,
+            isNormal: Number.parseInt(String(payload?.status || "0"), 10) === 1,
+            platforms,
+            hasAnyData: platforms.length > 0
+        };
+    }
+    async function fetchLightRailSchedule(stopEntry, signal) {
+        const query = new URLSearchParams({ station_id: String(stopEntry.stopId || "") });
+        const response = await fetch(`${LIGHT_RAIL_SCHEDULE_ENDPOINT}?${query.toString()}`, { method: "GET", headers: { Accept: "application/json" }, signal });
+        if (!response.ok) throw new Error(`輕鐵即時資料服務回應失敗（HTTP ${response.status}）。`);
+        const payload = await response.json();
+        const normalizedSchedule = normalizeLightRailScheduleResponse(payload, stopEntry);
+        if (!normalizedSchedule.isNormal && !normalizedSchedule.hasAnyData) {
+            throw new Error("官方暫時未能提供此輕鐵站的即時班次。");
+        }
+        return normalizedSchedule;
+    }
+    async function requestLightRailSchedule() {
+        const selectedStop = getSelectedLightRailStop();
+        if (!selectedStop) {
+            resetLightRailRealtimeState();
+            renderCurrentTab();
+            bindCurrentTabEvents();
+            return;
+        }
+
+        abortLightRailRealtimeRequest();
+        const requestId = railState.lightRail.realtime.requestId + 1;
+        const controller = new AbortController();
+        railState.lightRail.realtime.requestId = requestId;
+        railState.lightRail.realtime.activeController = controller;
+        railState.lightRail.realtime.status = "loading";
+        railState.lightRail.realtime.errorMessage = "";
+        railState.lightRail.realtime.schedule = null;
+        setStatus(`正在讀取輕鐵 <strong>${escapeHtml(selectedStop.nameZh)}</strong> 的即時班次…`, "info");
+        renderCurrentTab();
+        bindCurrentTabEvents();
+
+        try {
+            const normalizedSchedule = await fetchLightRailSchedule(selectedStop, controller.signal);
+            if (railState.lightRail.realtime.requestId !== requestId) return;
+            railState.lightRail.realtime.schedule = normalizedSchedule;
+            railState.lightRail.realtime.status = normalizedSchedule.hasAnyData ? "success" : "empty";
+            railState.lightRail.realtime.errorMessage = "";
+            if (railState.lightRail.nearest.nearestStop?.stopId === normalizedSchedule.stopId) {
+                railState.lightRail.nearest.schedule = normalizedSchedule;
+                railState.lightRail.nearest.status = normalizedSchedule.hasAnyData ? "ready" : "empty";
+            }
+            setStatus(
+                normalizedSchedule.hasAnyData
+                    ? `已更新輕鐵 <strong>${escapeHtml(normalizedSchedule.stopNameZh)}</strong> 的即時班次。`
+                    : `官方暫時未有 <strong>${escapeHtml(normalizedSchedule.stopNameZh)}</strong> 的可顯示班次。`,
+                normalizedSchedule.hasAnyData ? "info" : "warning"
+            );
+        } catch (error) {
+            if (controller.signal.aborted || railState.lightRail.realtime.requestId !== requestId) return;
+            railState.lightRail.realtime.status = "error";
+            railState.lightRail.realtime.errorMessage = error instanceof Error ? error.message : "暫時未能讀取輕鐵即時班次。";
+            railState.lightRail.realtime.schedule = null;
+            setStatus(railState.lightRail.realtime.errorMessage, "error");
+        } finally {
+            if (railState.lightRail.realtime.requestId !== requestId) return;
+            railState.lightRail.realtime.activeController = null;
+            renderCurrentTab();
+            bindCurrentTabEvents();
+        }
+    }
+    function findNearestLightRailStop(position) {
+        return Object.values(railState.lightRail.stopIndex)
+            .filter((stop) => Number.isFinite(stop.location?.latitude) && Number.isFinite(stop.location?.longitude))
+            .map((stop) => ({
+                ...stop,
+                distanceMeters: haversineDistanceMeters(position.latitude, position.longitude, stop.location.latitude, stop.location.longitude)
+            }))
+            .sort((left, right) => left.distanceMeters - right.distanceMeters)[0] || null;
+    }
+    function getLightRailNearestPreviewServices(schedule, selectedRoute) {
+        const services = (Array.isArray(schedule?.platforms) ? schedule.platforms : [])
+            .flatMap((platform) => Array.isArray(platform.services) ? platform.services : [])
+            .filter(Boolean);
+        if (services.length === 0) return [];
+        const selectedRouteCode = selectedRoute?.routeCode || "";
+        const focusedServices = selectedRouteCode ? services.filter((service) => service.routeNo === selectedRouteCode) : [];
+        return (focusedServices.length > 0 ? focusedServices : services)
+            .slice()
+            .sort(compareLightRailServices)
+            .slice(0, 3);
+    }
+    async function requestNearestLightRailSummary(force = false) {
+        if (railState.currentTab !== "lightRail") return;
+        if (!force && railState.lightRail.nearest.hasAttempted) return;
+
+        abortLightRailNearestRequest();
+        railState.lightRail.nearest.requestId += 1;
+        const requestId = railState.lightRail.nearest.requestId;
+        const controller = new AbortController();
+        railState.lightRail.nearest.activeController = controller;
+        railState.lightRail.nearest.hasAttempted = true;
+        railState.lightRail.nearest.status = "locating";
+        railState.lightRail.nearest.errorMessage = "";
+        railState.lightRail.nearest.userLocation = null;
+        railState.lightRail.nearest.nearestStop = null;
+        railState.lightRail.nearest.schedule = null;
+        setStatus("正在定位最近輕鐵站…", "info");
+        renderCurrentTab();
+        bindCurrentTabEvents();
+
+        try {
+            const position = await locateUserPosition();
+            if (railState.lightRail.nearest.requestId !== requestId) return;
+
+            railState.lightRail.nearest.userLocation = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+            };
+
+            const nearestStop = findNearestLightRailStop(railState.lightRail.nearest.userLocation);
+            if (!nearestStop) {
+                railState.lightRail.nearest.status = "notFound";
+                railState.lightRail.nearest.errorMessage = "暫時未能從現有輕鐵站點資料計算最近站。";
+                setStatus(railState.lightRail.nearest.errorMessage, "warning");
+                renderCurrentTab();
+                bindCurrentTabEvents();
+                return;
+            }
+
+            railState.lightRail.nearest.nearestStop = nearestStop;
+            railState.lightRail.nearest.status = "loading";
+            setStatus(`已找到最近輕鐵站 <strong>${escapeHtml(nearestStop.nameZh)}</strong>，距離約 ${escapeHtml(formatDistance(nearestStop.distanceMeters))}。正在整理即時班次…`, "info");
+            renderCurrentTab();
+            bindCurrentTabEvents();
+
+            const schedule = await fetchLightRailSchedule(nearestStop, controller.signal);
+            if (railState.lightRail.nearest.requestId !== requestId) return;
+            railState.lightRail.nearest.schedule = schedule;
+            railState.lightRail.nearest.status = schedule.hasAnyData ? "ready" : "empty";
+            setStatus(
+                schedule.hasAnyData
+                    ? `最近輕鐵站 <strong>${escapeHtml(nearestStop.nameZh)}</strong> 的即時班次已準備好。`
+                    : `已找到最近輕鐵站 <strong>${escapeHtml(nearestStop.nameZh)}</strong>，但官方暫時未有可顯示的班次。`,
+                schedule.hasAnyData ? "info" : "warning"
+            );
+        } catch (error) {
+            if (controller.signal.aborted || railState.lightRail.nearest.requestId !== requestId) return;
+            const code = error && typeof error === "object" && "code" in error ? error.code : null;
+            if (code === 1) {
+                railState.lightRail.nearest.status = "permissionDenied";
+                railState.lightRail.nearest.errorMessage = "你未允許定位權限，可以按重新定位再試一次。";
+            } else if (code === 2) {
+                railState.lightRail.nearest.status = "locationError";
+                railState.lightRail.nearest.errorMessage = "目前無法判斷你的位置，請確認裝置定位服務已開啟。";
+            } else if (code === 3) {
+                railState.lightRail.nearest.status = "locationError";
+                railState.lightRail.nearest.errorMessage = "定位逾時，請稍後再試一次。";
+            } else {
+                railState.lightRail.nearest.status = "locationError";
+                railState.lightRail.nearest.errorMessage = error instanceof Error ? error.message : "暫時未能完成最近輕鐵站定位。";
+            }
+            railState.lightRail.nearest.schedule = null;
+            setStatus(railState.lightRail.nearest.errorMessage, "warning");
+        } finally {
+            if (railState.lightRail.nearest.requestId !== requestId) return;
+            railState.lightRail.nearest.activeController = null;
+            renderCurrentTab();
+            bindCurrentTabEvents();
+        }
+    }
+    function applyNearestLightRailStop() {
+        const nearestStop = railState.lightRail.nearest.nearestStop;
+        if (!nearestStop?.stopId) return;
+
+        const routeStillMatches = !railState.lightRail.routeCode || nearestStop.routes?.some((route) => route.routeCode === railState.lightRail.routeCode);
+        if (!routeStillMatches) railState.lightRail.routeCode = "";
+
+        railState.lightRail.stopId = nearestStop.stopId;
+        setStatus(
+            routeStillMatches
+                ? `已帶入最近輕鐵站 <strong>${escapeHtml(nearestStop.nameZh)}</strong>。`
+                : `已帶入最近輕鐵站 <strong>${escapeHtml(nearestStop.nameZh)}</strong>，並清除不相容的路線篩選。`,
+            "info"
+        );
+        renderCurrentTab();
+        bindCurrentTabEvents();
+        void requestLightRailSchedule();
     }
     function abortManualMtrRequest() {
         if (railState.mtr.manual.activeController instanceof AbortController) railState.mtr.manual.activeController.abort();
@@ -4448,12 +4786,245 @@
                 </div>
             </section>`;
     }
-    function buildLightRailMarkup() {
+    function buildLightRailMarkupLegacy() {
         const stopOptions = getLightRailStopOptions();
         const selectedRoute = railState.lightRail.routes.find((route) => route.routeCode === railState.lightRail.routeCode) || null;
         const selectedStop = railState.lightRail.stopIndex[railState.lightRail.stopId] || null;
         const summaryMarkup = selectedStop ? `<section class="rail-summary-card"><div class="rail-chip-row"><span class="rail-chip">輕鐵</span>${selectedRoute ? `<span class="rail-chip">路線 ${escapeHtml(selectedRoute.routeCode)}</span>` : ""}</div><div class="rail-summary-main"><h3 class="rail-summary-title">${escapeHtml(selectedStop.nameZh)}</h3><p class="rail-summary-text">已完成輕鐵路線與站點索引。下一步會在這裡接入按站點查詢的即時到站資料。</p></div></section>` : `<section class="rail-empty-card"><h3 class="rail-empty-title">輕鐵 tab 已就緒</h3><p class="rail-empty-text">可以先用路線篩選站點。這一輪先維持靜態索引，不接即時輕鐵資料。</p></section>`;
         return `<section class="rail-panel"><h2 class="rail-panel-title">輕鐵靜態索引</h2><div class="rail-selector-grid"><label class="rail-field"><span class="rail-field-label">路線</span><select id="lightRailRouteSelect" class="rail-select"><option value="">全部輕鐵路線</option>${railState.lightRail.routes.map((route) => `<option value="${escapeHtml(route.routeCode)}" ${route.routeCode === railState.lightRail.routeCode ? "selected" : ""}>路線 ${escapeHtml(route.routeCode)}</option>`).join("")}</select><span class="rail-field-hint">資料來自官方 <code>light_rail_routes_and_stops.csv</code>。</span></label><label class="rail-field"><span class="rail-field-label">站點</span><select id="lightRailStopSelect" class="rail-select"><option value="">選擇輕鐵站點</option>${stopOptions.map((stop) => `<option value="${escapeHtml(stop.stopId)}" ${stop.stopId === railState.lightRail.stopId ? "selected" : ""}>${escapeHtml(stop.nameZh)} (${escapeHtml(stop.stopCode)})</option>`).join("")}</select><span class="rail-field-hint">輕鐵即時到站會在下一輪以 <code>station_id</code> 串接官方 API。</span></label></div></section>${summaryMarkup}`;
+    }
+    function buildLightRailNearestServiceMarkup(service) {
+        return `
+            <article class="rail-lrt-nearest-service">
+                <span class="rail-lrt-nearest-service-route">${escapeHtml(service.routeNo || "--")}</span>
+                <div class="rail-lrt-nearest-service-copy">
+                    <strong>往 ${escapeHtml(service.destinationNameZh)}</strong>
+                    <span>${escapeHtml(service.arrivalDepartureLabel)} · ${escapeHtml(service.timeTextZh)}${service.platformId ? ` · ${escapeHtml(service.platformId)}號月台` : ""}</span>
+                </div>
+            </article>`;
+    }
+    function buildLightRailNearestCard(selectedRoute) {
+        const nearestState = railState.lightRail.nearest;
+        const hasCoordinateData = Object.values(railState.lightRail.stopIndex).some((stop) => Number.isFinite(stop.location?.latitude) && Number.isFinite(stop.location?.longitude));
+        const retryDisabled = nearestState.status === "locating" || nearestState.status === "loading";
+        const nearestStop = nearestState.nearestStop || null;
+        const isCurrentStop = Boolean(nearestStop?.stopId) && nearestStop.stopId === railState.lightRail.stopId;
+        const applyDisabled = !nearestStop?.stopId || isCurrentStop;
+        const actionMarkup = `
+            <div class="rail-lrt-nearest-actions">
+                <button type="button" id="lightRailNearestRetryButton" class="rail-secondary-button rail-lrt-nearest-button" ${retryDisabled || !hasCoordinateData ? "disabled" : ""}>${retryDisabled ? "定位中…" : "重新定位"}</button>
+                <button type="button" id="lightRailNearestApplyButton" class="rail-secondary-button rail-accent-button rail-lrt-nearest-button" ${applyDisabled ? "disabled" : ""}>${isCurrentStop ? "目前已是此站" : "帶入此站"}</button>
+            </div>`;
+
+        if (!hasCoordinateData) {
+            return `
+                <section class="rail-summary-card rail-lrt-nearest-card">
+                    <div class="rail-lrt-nearest-head">
+                        <div class="rail-summary-main">
+                            <p class="rail-lrt-section-kicker">最近輕鐵站</p>
+                            <h3 class="rail-summary-title">定位資料未就緒</h3>
+                            <p class="rail-summary-text">目前輕鐵站點缺少可用座標，暫時未能計算最近站。</p>
+                        </div>
+                        ${actionMarkup}
+                    </div>
+                </section>`;
+        }
+
+        if (nearestState.status === "locating") {
+            return `
+                <section class="rail-summary-card rail-lrt-nearest-card">
+                    <div class="rail-lrt-nearest-head">
+                        <div class="rail-summary-main">
+                            <p class="rail-lrt-section-kicker">最近輕鐵站</p>
+                            <h3 class="rail-summary-title">正在定位</h3>
+                            <p class="rail-summary-text">正在嘗試找出你附近的輕鐵站與即將到站班次。</p>
+                        </div>
+                        ${actionMarkup}
+                    </div>
+                </section>`;
+        }
+
+        if (nearestState.status === "permissionDenied" || nearestState.status === "locationError" || nearestState.status === "notFound") {
+            return `
+                <section class="rail-summary-card rail-lrt-nearest-card">
+                    <div class="rail-lrt-nearest-head">
+                        <div class="rail-summary-main">
+                            <p class="rail-lrt-section-kicker">最近輕鐵站</p>
+                            <h3 class="rail-summary-title">最近站未就緒</h3>
+                            <p class="rail-summary-text">${escapeHtml(nearestState.errorMessage || "暫時未能完成最近站定位。")}</p>
+                        </div>
+                        ${actionMarkup}
+                    </div>
+                </section>`;
+        }
+
+        if (!nearestStop) {
+            return `
+                <section class="rail-summary-card rail-lrt-nearest-card">
+                    <div class="rail-lrt-nearest-head">
+                        <div class="rail-summary-main">
+                            <p class="rail-lrt-section-kicker">最近輕鐵站</p>
+                            <h3 class="rail-summary-title">可嘗試定位最近站</h3>
+                            <p class="rail-summary-text">按重新定位後，會找出最近的輕鐵站並提供一鍵帶入選站。</p>
+                        </div>
+                        ${actionMarkup}
+                    </div>
+                </section>`;
+        }
+
+        const previewServices = getLightRailNearestPreviewServices(nearestState.schedule, selectedRoute);
+        const nearestChips = [
+            `<span class="rail-chip">${escapeHtml(nearestStop.nameZh)}</span>`,
+            `<span class="rail-chip">${escapeHtml(formatDistance(nearestStop.distanceMeters))}</span>`,
+            nearestStop.stopCode ? `<span class="rail-chip">站點 ${escapeHtml(nearestStop.stopCode)}</span>` : "",
+            selectedRoute?.routeCode ? `<span class="rail-chip">路線 ${escapeHtml(selectedRoute.routeCode)}</span>` : "",
+            nearestState.schedule?.systemTimeLabel ? `<span class="rail-chip">更新 ${escapeHtml(nearestState.schedule.systemTimeLabel)}</span>` : ""
+        ].filter(Boolean).join("");
+        const serviceMarkup = previewServices.length > 0
+            ? `<div class="rail-lrt-nearest-service-list">${previewServices.map((service) => buildLightRailNearestServiceMarkup(service)).join("")}</div>`
+            : `<p class="rail-lrt-nearest-inline-note">${nearestState.status === "loading" ? "正在讀取這個站的即時班次…" : "官方暫時未有這個最近站的可顯示班次。"}${selectedRoute?.routeCode ? " 如已選路線，摘要會優先顯示該路線班次。" : ""}</p>`;
+
+        return `
+            <section class="rail-summary-card rail-lrt-nearest-card">
+                <div class="rail-lrt-nearest-head">
+                    <div class="rail-summary-main">
+                        <p class="rail-lrt-section-kicker">最近輕鐵站</p>
+                        <h3 class="rail-summary-title">${escapeHtml(nearestStop.nameZh)}</h3>
+                        <p class="rail-summary-text">距離約 ${escapeHtml(formatDistance(nearestStop.distanceMeters))}。${selectedRoute?.routeCode ? "如果該站有你已選路線，摘要會優先顯示相關班次。" : "可直接帶入成目前查詢站點。"}</p>
+                    </div>
+                    ${actionMarkup}
+                </div>
+                ${nearestChips ? `<div class="rail-chip-row rail-lrt-chip-row">${nearestChips}</div>` : ""}
+                ${serviceMarkup}
+            </section>`;
+    }
+    function buildLightRailResultHeader(selectedRoute, selectedStop, schedule) {
+        const refreshButton = selectedStop
+            ? `<button type="button" id="lightRailRefreshButton" class="rail-secondary-button rail-lrt-refresh-button" ${railState.lightRail.realtime.status === "loading" ? "disabled" : ""}>${railState.lightRail.realtime.status === "loading" ? "更新中…" : "重新整理班次"}</button>`
+            : "";
+        const summaryChips = [
+            '<span class="rail-chip">輕鐵</span>',
+            selectedRoute ? `<span class="rail-chip">路線 ${escapeHtml(selectedRoute.routeCode)}</span>` : "",
+            selectedStop ? `<span class="rail-chip">${escapeHtml(selectedStop.nameZh)}</span>` : "",
+            selectedStop?.stopCode ? `<span class="rail-chip">站碼 ${escapeHtml(selectedStop.stopCode)}</span>` : "",
+            schedule?.systemTimeLabel ? `<span class="rail-chip">資料時間 ${escapeHtml(schedule.systemTimeLabel)}</span>` : "",
+            schedule && !schedule.isNormal ? '<span class="rail-chip rail-chip-alert">官方提示</span>' : ""
+        ].filter(Boolean).join("");
+
+        return `
+            <div class="rail-lrt-result-head">
+                <div class="rail-summary-main">
+                    <p class="rail-lrt-section-kicker">輕鐵即時班次</p>
+                    <h3 class="rail-summary-title">${selectedStop ? `${escapeHtml(selectedStop.nameZh)} 站` : "選擇輕鐵站點"}</h3>
+                    <p class="rail-summary-text">${selectedRoute ? `目前用路線 ${escapeHtml(selectedRoute.routeCode)} 協助篩站；結果仍會保留這個站的全部月台班次。` : "先選站，再查看該站各月台的即將到站 / 開出班次。"}</p>
+                </div>
+                ${refreshButton}
+            </div>
+            ${summaryChips ? `<div class="rail-chip-row rail-lrt-chip-row">${summaryChips}</div>` : ""}`;
+    }
+    function buildLightRailServiceCard(service, selectedRoute) {
+        const tagsMarkup = [
+            service.trainLengthLabel ? `<span class="rail-meta-pill">${escapeHtml(service.trainLengthLabel)}</span>` : "",
+            service.isSpecial ? '<span class="rail-meta-pill">特別班次</span>' : ""
+        ].filter(Boolean).join("");
+        const noteMarkup = service.remarks.length > 0
+            ? `<ul class="rail-note-list rail-lrt-note-list">${service.remarks.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>`
+            : "";
+        const isFocusedRoute = selectedRoute?.routeCode && service.routeNo === selectedRoute.routeCode;
+
+        return `
+            <article class="rail-lrt-service-card ${isFocusedRoute ? "is-focused-route" : ""}">
+                <div class="rail-lrt-service-top">
+                    <span class="rail-lrt-route-badge">${escapeHtml(service.routeNo || "--")}</span>
+                    <div class="rail-lrt-service-main">
+                        <h5 class="rail-lrt-service-title">往 ${escapeHtml(service.destinationNameZh)}</h5>
+                        <p class="rail-lrt-service-meta">${escapeHtml(service.arrivalDepartureLabel)}時間 · ${escapeHtml(service.timeTextZh)}</p>
+                    </div>
+                    <div class="rail-lrt-eta-badge">
+                        <span class="rail-lrt-eta-label">${escapeHtml(service.arrivalDepartureLabel)}</span>
+                        <strong class="rail-lrt-eta-value">${escapeHtml(service.timeTextZh)}</strong>
+                    </div>
+                </div>
+                <div class="rail-lrt-service-facts">
+                    <p class="rail-lrt-service-fact"><span>路線</span><strong>${escapeHtml(service.routeNo || "--")}</strong></p>
+                    <p class="rail-lrt-service-fact"><span>班次狀態</span><strong>${escapeHtml(service.statusLabel)}</strong></p>
+                </div>
+                ${tagsMarkup ? `<div class="rail-service-tags rail-lrt-service-tags">${tagsMarkup}</div>` : ""}
+                ${noteMarkup}
+            </article>`;
+    }
+    function buildLightRailPlatformCard(platform, selectedRoute) {
+        const nextService = platform.nextService || null;
+        return `
+            <section class="rail-lrt-platform-card">
+                <div class="rail-lrt-platform-head">
+                    <div>
+                        <p class="rail-lrt-platform-kicker">Platform ${escapeHtml(platform.platformId)}</p>
+                        <h4 class="rail-lrt-platform-title">${escapeHtml(platform.platformId)} 號月台</h4>
+                        <p class="rail-lrt-platform-meta">共 ${escapeHtml(String(platform.services.length))} 班可顯示班次</p>
+                    </div>
+                    ${nextService ? `<span class="rail-lrt-platform-count">${escapeHtml(nextService.timeTextZh)}</span>` : ""}
+                </div>
+                <div class="rail-lrt-service-list">
+                    ${platform.services.map((service) => buildLightRailServiceCard(service, selectedRoute)).join("")}
+                </div>
+            </section>`;
+    }
+    function buildLightRailResultMarkup(selectedRoute, selectedStop) {
+        const realtimeState = railState.lightRail.realtime;
+        const headerMarkup = buildLightRailResultHeader(selectedRoute, selectedStop, realtimeState.schedule);
+
+        let bodyMarkup = "";
+        if (!selectedStop) {
+            bodyMarkup = `<section class="rail-empty-card"><h3 class="rail-empty-title">先選擇一個輕鐵站點</h3><p class="rail-empty-text">站點選好後，這裡會按月台列出路線號、目的地、到站 / 開出時間，以及班次狀態。</p></section>`;
+        } else if (realtimeState.status === "loading") {
+            bodyMarkup = `<section class="rail-loading-card" aria-live="polite"><span class="rail-loading-dot" aria-hidden="true"></span><div class="rail-loading-copy"><h3 class="rail-empty-title">正在讀取 ${escapeHtml(selectedStop.nameZh)} 站班次</h3><p class="rail-empty-text">會依官方回傳的月台資料整理為較易閱讀的輕鐵班次卡片。</p></div></section>`;
+        } else if (realtimeState.status === "error") {
+            bodyMarkup = `<section class="rail-empty-card rail-empty-card-error"><h3 class="rail-empty-title">暫時未能讀取輕鐵班次</h3><p class="rail-empty-text">${escapeHtml(realtimeState.errorMessage || "官方輕鐵即時資料暫時不可用。")}</p></section>`;
+        } else if (realtimeState.status === "empty" || !realtimeState.schedule) {
+            bodyMarkup = `<section class="rail-empty-card"><h3 class="rail-empty-title">暫時未有可顯示班次</h3><p class="rail-empty-text">官方暫時未回傳 ${escapeHtml(selectedStop.nameZh)} 站的月台班次，稍後可以再重新整理一次。</p></section>`;
+        } else {
+            const schedule = realtimeState.schedule;
+            const alertMarkup = !schedule.isNormal
+                ? '<section class="rail-inline-banner"><strong>官方提示：</strong>系統目前回傳非一般狀態，請同時留意車站現場資訊。</section>'
+                : "";
+            bodyMarkup = `
+                ${alertMarkup}
+                <section class="rail-lrt-platform-grid">
+                    ${schedule.platforms.map((platform) => buildLightRailPlatformCard(platform, selectedRoute)).join("")}
+                </section>`;
+        }
+
+        return `<section class="rail-summary-card rail-lrt-result-card">${headerMarkup}${bodyMarkup}</section>`;
+    }
+    function buildLightRailMarkup() {
+        const stopOptions = getLightRailStopOptions();
+        const selectedRoute = getSelectedLightRailRoute();
+        const selectedStop = getSelectedLightRailStop();
+        return `
+            <section class="rail-panel rail-lrt-panel">
+                ${buildLightRailNearestCard(selectedRoute)}
+                <h2 class="rail-panel-title">輕鐵站點與即時班次</h2>
+                <div class="rail-selector-grid">
+                    <label class="rail-field">
+                        <span class="rail-field-label">路線</span>
+                        <select id="lightRailRouteSelect" class="rail-select">
+                            <option value="">全部輕鐵路線</option>
+                            ${railState.lightRail.routes.map((route) => `<option value="${escapeHtml(route.routeCode)}" ${route.routeCode === railState.lightRail.routeCode ? "selected" : ""}>路線 ${escapeHtml(route.routeCode)}</option>`).join("")}
+                        </select>
+                        <span class="rail-field-hint">先用路線縮小站點範圍，再挑選站點查即時班次。</span>
+                    </label>
+                    <label class="rail-field">
+                        <span class="rail-field-label">站點</span>
+                        <select id="lightRailStopSelect" class="rail-select">
+                            <option value="">選擇輕鐵站點</option>
+                            ${stopOptions.map((stop) => `<option value="${escapeHtml(stop.stopId)}" ${stop.stopId === railState.lightRail.stopId ? "selected" : ""}>${escapeHtml(stop.nameZh)} (${escapeHtml(stop.stopCode)})</option>`).join("")}
+                        </select>
+                        <span class="rail-field-hint">即時資料使用官方 <code>station_id</code> API，結果會依月台分組顯示。</span>
+                    </label>
+                </div>
+                ${buildLightRailResultMarkup(selectedRoute, selectedStop)}
+            </section>`;
     }
     function renderCurrentTab() {
         syncTabButtons();
@@ -4471,7 +5042,12 @@
         const mtrRoutePlannerClearButton = document.getElementById("mtrRoutePlannerClearButton");
         const lightRailRouteSelect = document.getElementById("lightRailRouteSelect");
         const lightRailStopSelect = document.getElementById("lightRailStopSelect");
+        const lightRailRefreshButton = document.getElementById("lightRailRefreshButton");
+        const lightRailNearestRetryButton = document.getElementById("lightRailNearestRetryButton");
+        const lightRailNearestApplyButton = document.getElementById("lightRailNearestApplyButton");
         if (mtrNearestRetryButton instanceof HTMLButtonElement) mtrNearestRetryButton.addEventListener("click", () => requestNearestMtrSummary(true));
+        if (lightRailNearestRetryButton instanceof HTMLButtonElement) lightRailNearestRetryButton.addEventListener("click", () => { void requestNearestLightRailSummary(true); });
+        if (lightRailNearestApplyButton instanceof HTMLButtonElement) lightRailNearestApplyButton.addEventListener("click", () => { applyNearestLightRailStop(); });
         if (mtrRoutePlannerToggle instanceof HTMLButtonElement) {
             mtrRoutePlannerToggle.addEventListener("click", () => {
                 toggleRoutePlanner();
@@ -4607,6 +5183,12 @@
             lightRailRouteSelect.addEventListener("change", () => {
                 railState.lightRail.routeCode = lightRailRouteSelect.value;
                 railState.lightRail.stopId = "";
+                resetLightRailRealtimeState();
+                setStatus("已更新輕鐵路線篩選，請再選擇站點讀取即時班次。", "info");
+                renderCurrentTab();
+                bindCurrentTabEvents();
+                return;
+                setStatus("已更新輕鐵路線篩選，請再選擇站點讀取即時班次。", "info");
                 setStatus("已更新輕鐵路線篩選，這一輪只更新靜態選擇器。", "info");
                 renderCurrentTab();
                 bindCurrentTabEvents();
@@ -4615,12 +5197,27 @@
         if (lightRailStopSelect instanceof HTMLSelectElement) {
             lightRailStopSelect.addEventListener("change", () => {
                 railState.lightRail.stopId = lightRailStopSelect.value;
+                if (!railState.lightRail.stopId) {
+                    resetLightRailRealtimeState();
+                    setStatus("已清除輕鐵站點選擇。", "info");
+                    renderCurrentTab();
+                    bindCurrentTabEvents();
+                    return;
+                }
+                void requestLightRailSchedule();
+                return;
                 setStatus(railState.lightRail.stopId ? "輕鐵靜態索引已定位到指定站點，下一階段會接即時到站。" : "已清除輕鐵站點選擇。", "info");
                 renderCurrentTab();
                 bindCurrentTabEvents();
             });
         }
+        if (lightRailRefreshButton instanceof HTMLButtonElement) {
+            lightRailRefreshButton.addEventListener("click", () => {
+                void requestLightRailSchedule();
+            });
+        }
 
+        maybeStartNearestLightRailSummary();
         bindOfficialMapInteractions();
         bindCustomSchematicInteractions();
         requestAnimationFrame(() => {
@@ -4630,6 +5227,9 @@
     }
     function maybeStartNearestMtrSummary() {
         if (railState.currentTab === "mtr" && !railState.mtr.nearest.hasAttempted) requestNearestMtrSummary(false);
+    }
+    function maybeStartNearestLightRailSummary() {
+        if (railState.currentTab === "lightRail" && !railState.lightRail.nearest.hasAttempted) void requestNearestLightRailSummary(false);
     }
     function initializeIndex() {
         if (!railIndex?.heavyRail || !railIndex?.lightRail) {
@@ -4645,7 +5245,7 @@
         railState.mtr.routing.officialMap = buildMtrOfficialMapRuntime(officialMtrMap);
         railState.mtr.routing.customSchematic = buildMtrSchematicRuntime(customMtrSchematicLayout);
         railState.lightRail.routes = Array.isArray(railIndex.lightRail.routes) ? railIndex.lightRail.routes : [];
-        railState.lightRail.stopIndex = railIndex.lightRail.stopIndex || {};
+        railState.lightRail.stopIndex = enrichLightRailStopIndexWithLocations(railIndex.lightRail.stopIndex || {});
         railState.ui.isReady = true;
         setStatus(`已載入官方靜態索引：港鐵 <strong>${railIndex.heavyRail.lineCount}</strong> 條綫 / <strong>${railIndex.heavyRail.stationCount}</strong> 個車站，輕鐵 <strong>${railIndex.lightRail.routeCount}</strong> 條路線 / <strong>${railIndex.lightRail.stopCount}</strong> 個站點。`, "info");
         renderCurrentTab();
@@ -4714,6 +5314,12 @@
             closeRoutePlannerTransferStopPopover();
             closeRoutePlannerLegPopover();
             railState.currentTab = nextTab;
+            if (nextTab === "lightRail") {
+                setStatus("已切換到輕鐵 tab，可按站點查看官方即時班次。", "info");
+                renderCurrentTab();
+                bindCurrentTabEvents();
+                return;
+            }
             setStatus(nextTab === "lightRail" ? "已切換到輕鐵頁殼，這一輪只載入靜態路線與站點資料。" : "已切換到港鐵頁殼，可使用最近站摘要與手動即時查詢。", "info");
             renderCurrentTab();
             bindCurrentTabEvents();
