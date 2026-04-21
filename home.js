@@ -51,7 +51,7 @@
             title: "行的入口",
             items: [
                 { id: "bus", label: "巴士", icon: secondaryIcons.bus, interactive: true, href: "bus.html" },
-                { id: "mtr", label: "地鐵", icon: secondaryIcons.mtr, interactive: false },
+                { id: "mtr", label: "地鐵", icon: secondaryIcons.mtr, interactive: true, href: "rail.html" },
                 { id: "flight", label: "飛機", icon: secondaryIcons.flight, interactive: false },
                 { id: "ferry", label: "渡輪", icon: secondaryIcons.ferry, interactive: false },
                 { id: "other", label: "其他", icon: secondaryIcons.other, interactive: false }
