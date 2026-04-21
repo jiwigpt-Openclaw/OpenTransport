@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="香港巴士到站查詢網站，支援 KMB、CTB、NLB、GMB，並提供 GPS、常用路線與站點資訊功能。">
+    <meta name="keywords" content="香港巴士, KMB, CTB, NLB, GMB, 到站時間, ETA, 巴士查詢">
+    <meta name="theme-color" content="#f2f7fc">
+    <title>bozisoda.com | 巴士查詢</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        if (window.location.protocol !== "file:") {
+            const manifestLink = document.createElement("link");
+            manifestLink.rel = "manifest";
+            manifestLink.href = "bus-manifest.json?v=20260413-2";
+            document.head.appendChild(manifestLink);
+        }
+    </script>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3098/3098090.png" type="image/png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="香港巴士到站">
+
+    <link rel="stylesheet" href="style.css?v=20260413-4">
+</head>
+<body>
+    <div class="container">
+        <div class="page-topbar">
+            <a class="page-home-link" href="index.html">← 返回 bozisoda.com 衣食住行入口</a>
+        </div>
+        <header class="header">
+            <h1>巴士查詢</h1>
+            <p class="subtitle">bozisoda.com / 行 / 巴士</p>
+        </header>
+
+        <section class="quick-routes" aria-label="常用路線">
+            <div class="quick-routes-header">
+                <p class="quick-routes-title">常用路線</p>
+                <p id="favoriteRoutesNotice" class="quick-routes-feedback" aria-live="polite"></p>
+            </div>
+            <div id="favoriteRoutesList" class="quick-routes-list"></div>
+        </section>
+
+        <div class="search-box">
+            <div class="input-group">
+                <input
+                    type="text"
+                    id="routeInput"
+                    placeholder="輸入路線號，例如 1A、24、104"
+                    value="1A"
+                    onkeyup="if (event.key === 'Enter') searchETA()"
+                >
+            </div>
+            <button onclick="searchETA()" id="searchBtn">查詢</button>
+        </div>
+
+        <div id="status" class="status"></div>
+        <div id="result" class="result"></div>
+    </div>
+
+    <div class="share-app-wrap">
+        <button onclick="shareApp()" class="share-app-btn">
+            分享網站
+        </button>
+    </div>
+
+    <button
+        type="button"
+        id="scrollToTopBtn"
+        class="scroll-top-btn"
+        aria-label="回到頁面頂部並重新輸入巴士路線"
+        aria-hidden="true"
+    >
+        <span class="scroll-top-btn-icon" aria-hidden="true">↑</span>
+        <span class="scroll-top-btn-text">回到頂部</span>
+    </button>
+
+    <footer class="footer">
+        <p>香港巴士到站查詢</p>
+        <p>版本: <span id="app-version"></span></p>
+    </footer>
+
+    <div
+        id="stopInfoModal"
+        class="stop-info-modal"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stopInfoModalTitle"
+        onclick="handleStopInfoModalBackdrop(event)"
+    >
+        <div class="stop-info-modal-dialog">
+            <div class="stop-info-modal-header">
+                <div class="stop-info-modal-heading">
+                    <h2 id="stopInfoModalTitle">此站及附近停靠車號</h2>
+                    <p id="stopInfoModalSubtitle" class="stop-info-modal-subtitle" hidden></p>
+                </div>
+                <button type="button" class="stop-info-modal-close" aria-label="關閉站點資訊" onclick="closeStopInfoModal()">×</button>
+            </div>
+            <div id="stopInfoModalBody" class="stop-info-modal-body">
+                <p class="stop-info-modal-empty">正在整理此站及附近停靠的車號...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="official-bus-stop-index.js?v=20260401-1605" data-official-stop-index="true"></script>
+    <script src="script.js?v=20260401-1605"></script>
+    <script src="stable-overrides.js?v=20260401-1605"></script>
+    <script src="pwa-register.js?v=20260413-1"></script>
+    <script>
+        document.getElementById("app-version").textContent = "2026-04-13 16:40";
+
+        function shareApp() {
+            if (navigator.share) {
+                navigator.share({
+                    title: "香港巴士到站查詢",
+                    text: "支援 KMB、CTB、NLB、GMB 的香港巴士到站查詢。",
+                    url: window.location.href
+                });
+                return;
+            }
+
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert("已把網站連結複製到剪貼板。");
+            });
+        }
+
+        (() => {
+            const scrollTopBtn = document.getElementById("scrollToTopBtn");
+            const routeInput = document.getElementById("routeInput");
+            const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+            if (!scrollTopBtn) {
+                return;
+            }
+
+            function updateScrollTopButtonVisibility() {
+                const isVisible = window.scrollY > 280;
+                scrollTopBtn.classList.toggle("is-visible", isVisible);
+                scrollTopBtn.setAttribute("aria-hidden", String(!isVisible));
+                scrollTopBtn.tabIndex = isVisible ? 0 : -1;
+            }
+
+            function focusRouteInput() {
+                if (!routeInput) {
+                    return;
+                }
+
+                try {
+                    routeInput.focus({ preventScroll: true });
+                } catch (error) {
+                    routeInput.focus();
+                }
+
+                if (typeof routeInput.select === "function") {
+                    routeInput.select();
+                }
+            }
+
+            scrollTopBtn.addEventListener("click", () => {
+                window.scrollTo({
+                    top: 0,
+                    behavior: prefersReducedMotion.matches ? "auto" : "smooth"
+                });
+
+                window.setTimeout(focusRouteInput, prefersReducedMotion.matches ? 0 : 360);
+            });
+
+            window.addEventListener("scroll", updateScrollTopButtonVisibility, { passive: true });
+            updateScrollTopButtonVisibility();
+        })();
+    </script>
+</body>
+</html>

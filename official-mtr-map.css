@@ -1,0 +1,108 @@
+/* Extracted from official MTR mobile map assets for route rendering */
+.rail-official-map-line.tung-chung .rail-official-map-route{background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='2400' height='559' viewBox='0 0 2400 559' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M520.5 556H450.696C438.473 556 428.25 546.07 428.25 533.819V430.044V326.27C428.25 311 414.67 299.25 401.333 299.25H366.75C359.235 299.25 352.432 302.053 347.508 306.988L288.015 366.604C286.523 368.099 285.762 370.05 285.73 372.008V372.975C285.699 374.932 284.938 376.884 283.446 378.379L185.5 476.543' stroke='%23F7943E' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1720.5 556H1650.7C1638.47 556 1628.25 546.07 1628.25 533.819V430.046V326.273C1628.25 311 1616 299.25 1603.33 299.25H1566.75C1559.24 299.25 1552.43 302.053 1547.51 306.988L1488.01 366.604C1486.52 368.099 1485.76 370.05 1485.73 372.008V372.975C1485.7 374.932 1484.94 376.884 1483.45 378.379L1385.5 476.543' stroke='%23858585' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3c/svg%3e ");}
+.rail-official-map-line.airport .rail-official-map-route{background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='2400' height='564' viewBox='0 0 2400 564' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M520.096 561H450.397C435.391 561 423.21 548.335 423.21 533.329L423.207 326.599C423.207 314.393 413.314 304.5 401.105 304.5H366.574C360.47 304.5 354.945 306.974 350.947 310.972L292.024 369.895C290.588 371.332 288.731 372.089 286.852 372.17H285.471C283.592 372.251 281.735 373.011 280.299 374.445L203.038 451.705C193.297 461.446 177.505 461.446 167.762 451.705L167.805 451.746C158.065 442.005 158.065 426.213 167.805 416.473L194.207 390.071' stroke='%2300888A' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1721.1 561H1651.4C1636.39 561 1624.21 548.335 1624.21 533.329L1624.21 326.599C1624.21 314.393 1614.31 304.5 1602.11 304.5H1567.57C1561.47 304.5 1555.95 306.974 1551.95 310.972L1493.02 369.895C1491.59 371.332 1489.73 372.089 1487.85 372.17H1486.47C1484.59 372.251 1482.74 373.011 1481.3 374.445L1404.04 451.705C1394.3 461.446 1378.51 461.446 1368.76 451.705L1368.81 451.746C1359.06 442.005 1359.06 426.213 1368.81 416.473L1395.21 390.071' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3c/svg%3e ");}
+.rail-official-map-line.disney .rail-official-map-route{background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='2400' height='444' viewBox='0 0 2400 444' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M266.5 401.545L277.931 390.114C283.417 384.629 292.315 384.629 297.804 390.114C300.525 392.835 301.898 396.398 301.919 399.963V443.842' stroke='%23F173AC' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1466.5 401.545L1477.93 390.114C1483.42 384.629 1492.31 384.629 1497.8 390.114C1500.52 392.835 1501.9 396.398 1501.92 399.963V443.842' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3c/svg%3e ");}
+.rail-official-map-line.east-rail .rail-official-map-route{background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='2400' height='755' viewBox='0 0 2400 755' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M723 126.27H727.554C735.11 126.27 741.234 132.394 741.234 139.95V146.274C741.234 153.646 735.401 159.657 728.098 159.945L723 159.955' stroke='%2353B7E8' stroke-width='5' stroke-miterlimit='10' stroke-dasharray='5 3'/%3e%3cpath d='M722 456.71L720 283.535C720 225.692 721 167.849 721 110C721 94.8904 707.24 83 692.13 83H415.72' stroke='%2353B7E8' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M375 107H457.083C464.639 107 470.763 102.05 470.763 94.4938V89.4458' stroke='%2353B7E8' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M722 450V458C722 461.5 716.68 467.8 714 470.471L621 574.04C616.011 579.032 610.229 583 603.17 583H579.56' stroke='%2353B7E8' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1923 126.27H1927.55C1935.11 126.27 1941.23 132.394 1941.23 139.95V146.274C1941.23 153.646 1935.4 159.657 1928.1 159.945L1923 159.955' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3cpath d='M1922 456.71L1920 283.535L1921 109C1921 93.8904 1907.24 83 1892.13 83H1615.72' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3cpath d='M1575 107H1657.08C1664.64 107 1670.76 102.05 1670.76 94.4938V89.4458' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3cpath d='M1922 450V458C1922 461.5 1916.68 467.8 1914 470.471L1821 574.04C1816.01 579.032 1810.23 583 1803.17 583H1779.56' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3c/svg%3e ");}
+.rail-official-map-line.hong-kong-island .rail-official-map-route{background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='2400' height='726' viewBox='0 0 2400 726' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M276.5 577.5L1077.27 578C1084.27 578 1091.27 579.671 1096.61 585.013L1148.71 637.1C1153.66 642.051 1156 648.892 1156 656.448V725.919' stroke='%23007DC5' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1476.5 577.5L2277.27 578C2284.27 578 2291.27 579.671 2296.61 585.013L2348.71 637.1C2353.66 642.051 2356 648.892 2356 656.448V725.919' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3c/svg%3e ");}
+.rail-official-map-line.kwun-tong .rail-official-map-route{background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='2400' height='755' viewBox='0 0 2400 755' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M793.63 455.71L778.49 442C773.539 437.049 766.696 431.55 759.14 431.55H712.251H650.36C635.251 431.55 623 422.301 623 407.189V321.36C623 306.251 635.251 294 650.36 294H952.3C967.41 294 979.66 306.251 979.66 321.36V422.186C979.66 437.295 993.914 448.5 1009.02 448.5H1069.08' stroke='%2300AB4E' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1993.63 455.71L1978.49 441.56C1973.54 436.609 1966.7 431.55 1959.14 431.55H1912.25H1850.36C1835.25 431.55 1823 422.301 1823 407.189V321.36C1823 306.251 1835.25 294 1850.36 294H2152.3C2167.41 294 2179.66 306.251 2179.66 321.36V422.186C2179.66 437.295 2193.91 448.5 2209.02 448.5H2269.08' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3c/svg%3e ");}
+.rail-official-map-line.tseung-kwan-o .rail-official-map-route{background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='2400' height='576' viewBox='0 0 2400 576' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M1156 334V426C1156 439 1144.51 454 1128 454H1005.94C991.128 454 979.118 465.06 979.118 479.876V546.075C979.118 560.89 967.107 572.904 952.289 572.904H892' stroke='%237E499D' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1126.28 459H1129.4C1144.51 459 1156 470.327 1156 485.437V497.766' stroke='%237E499D' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M2356 334V425C2356 439 2343 454 2328 454H2205.94C2191.13 454 2179.12 465.06 2179.12 479.876V546.075C2179.12 560.89 2167.11 572.904 2152.29 572.904H2092' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3cpath d='M2326.28 459H2329.4C2344.51 459 2356 470.327 2356 485.437V497.766' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3c/svg%3e ");}
+.rail-official-map-line.tsuen-wan .rail-official-map-route{background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='2400' height='575' viewBox='0 0 2400 575' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M154 294H591.09C606.202 294 618 305.251 618 320.36V546.237C618 561.303 606.237 572.5 591.171 572.5H520.293' stroke='%23ED1C24' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1354 294H1791.09C1806.2 294 1818 305.251 1818 320.36V546.237C1818 561.303 1806.24 572.5 1791.17 572.5H1720.29' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3c/svg%3e ");}
+.rail-official-map-line.south-island .rail-official-map-route{background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='2400' height='755' viewBox='0 0 2400 755' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M578.52 588H584.85C599.96 588 610.21 592.25 610.21 606.36V629.884C610.21 644.993 597.96 652.24 582.85 652.24L502.8 652.25C496.676 652.25 491.123 654.727 487.11 658.74L457.336 688.52C453.32 692.533 447.775 696 441.651 696H347' stroke='%23C1CD23' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1778.52 588H1784.85C1799.96 588 1810.21 592.25 1810.21 606.36V629.884C1810.21 644.993 1797.96 652.24 1782.85 652.24L1702.8 652.25C1696.68 652.25 1691.12 654.727 1687.11 658.74L1657.34 688.52C1653.32 692.533 1647.78 696 1641.65 696H1547' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3c/svg%3e ");}
+.rail-official-map-line.tuen-ma .rail-official-map-route{background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='2400' height='755' viewBox='0 0 2400 755' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M638.128 507.116L616.541 484.438' stroke='%2300234F' stroke-width='2' stroke-dasharray='3 2'/%3e%3cpath d='M83 216.082V92.52C83 80.9572 91.3772 70 102.94 70C114.503 70 125 80.9572 125 92.52V222.274C125 237.387 136.14 248 151.25 248H403.909C419.022 248 434 261.873 434 276.983L433.27 349.243C433.27 356.8 434.331 363.64 439.282 368.591L567.78 497.09C573.122 502.432 582.127 503.5 589.127 503.5H626.28H665.87C673.426 503.5 678.266 502.041 683.22 497.09L696.8 482' stroke='%23923011' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M749.208 436H744.06C740.281 436 733.997 441.466 731.52 443.94L696.8 482' stroke='%23923011' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1158.39 83.1665H838.834C823.721 83.1665 811.473 95.4174 811.473 110.527V185.302C811.473 200.415 799.222 214.66 784.113 214.66H738.346C731.707 214.66 724.929 215.903 724.929 226.499V233.33' stroke='%23923011' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M892 300V270.336C892 255.224 894.75 242.976 879.64 242.976H739.35C732.71 242.976 724.93 242.736 724.93 232.14L724.93 225.31' stroke='%23923011' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M746.21 436H791.17C798.723 436 806.049 437.871 811 432.92L877 367C887.34 356.662 893.01 354.1 893.01 342.1L892 300.396' stroke='%23923011' stroke-width='5' stroke-miterlimit='10'/%3e%3cpath d='M1283 216.082V92.52C1283 80.9572 1291.38 70 1302.94 70C1314.5 70 1325 80.9572 1325 92.52V222.274C1325 237.387 1336.14 248 1351.25 248H1603.91C1619.02 248 1634 261.873 1634 276.983L1633.27 349.243C1633.27 356.8 1634.33 363.64 1639.28 368.591L1767.78 497.09C1773.12 502.432 1782.13 503.5 1789.13 503.5H1826.28H1865.87C1873.43 503.5 1878.27 502.041 1883.22 497.09L1896.8 482' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3cpath d='M1949.21 436H1944.06C1940.28 436 1934 441.466 1931.52 443.94L1896.8 482' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3cpath d='M2358.39 83.1665H2038.83C2023.72 83.1665 2011.47 95.4174 2011.47 110.527V185.302C2011.47 200.415 1999.22 214.66 1984.11 214.66H1938.35C1931.71 214.66 1924.93 215.903 1924.93 226.499V233.33' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3cpath d='M2092 300V270.336C2090.99 255.224 2094.75 242.976 2079.64 242.976H1939.35C1932.71 242.976 1924.93 242.736 1924.93 232.14L1924.93 225.31' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3cpath d='M1946.21 436H1991.17C1998.72 436 2006.05 437.871 2011 432.92L2077 367C2087.34 356.662 2093.01 354.1 2093.01 342.1L2092 300.396' stroke='%237F7F7F' stroke-width='3' stroke-miterlimit='10' stroke-dasharray='3 2'/%3e%3c/svg%3e ");}
+
+:root{
+  --rail-official-color-apl:#008a8b;
+  --rail-official-color-isl:#007dc5;
+  --rail-official-color-isls:#bdcf00;
+  --rail-official-color-eal:#12b9ed;
+  --rail-official-color-ktl:#00af40;
+  --rail-official-color-tcl:#ff8f1b;
+  --rail-official-color-tkol:#8743a2;
+  --rail-official-color-tml:#9e2600;
+  --rail-official-color-twl:#ec1d24;
+}
+
+.rail-official-map-route::before,
+.rail-official-map-route::after{
+  background-color:transparent;
+  background-repeat:no-repeat;
+  content:"";
+  display:block;
+  opacity:.56;
+  overflow:hidden;
+  width:0;
+  height:0;
+  position:absolute;
+  left:0;
+  top:0;
+  pointer-events:none;
+}
+
+.rail-official-map-lines-active .rail-official-map-route::before,
+.rail-official-map-lines-active .rail-official-map-route::after{
+  opacity:1;
+}
+
+.rail-official-map-line.tung-chung .rail-official-map-route::before,
+.rail-official-map-line.tung-chung .rail-official-map-route::after{background-color:var(--rail-official-color-tcl);}
+.rail-official-map-line.airport .rail-official-map-route::before,
+.rail-official-map-line.airport .rail-official-map-route::after{background-color:var(--rail-official-color-apl);}
+.rail-official-map-line.east-rail .rail-official-map-route::before,
+.rail-official-map-line.east-rail .rail-official-map-route::after{background-color:var(--rail-official-color-eal);}
+.rail-official-map-line.hong-kong-island .rail-official-map-route::before,
+.rail-official-map-line.hong-kong-island .rail-official-map-route::after{background-color:var(--rail-official-color-isl);}
+.rail-official-map-line.kwun-tong .rail-official-map-route::before,
+.rail-official-map-line.kwun-tong .rail-official-map-route::after{background-color:var(--rail-official-color-ktl);}
+.rail-official-map-line.tseung-kwan-o .rail-official-map-route::before,
+.rail-official-map-line.tseung-kwan-o .rail-official-map-route::after{background-color:var(--rail-official-color-tkol);}
+.rail-official-map-line.tsuen-wan .rail-official-map-route::before,
+.rail-official-map-line.tsuen-wan .rail-official-map-route::after{background-color:var(--rail-official-color-twl);}
+.rail-official-map-line.south-island .rail-official-map-route::before,
+.rail-official-map-line.south-island .rail-official-map-route::after{background-color:var(--rail-official-color-isls);}
+.rail-official-map-line.tuen-ma .rail-official-map-route::before,
+.rail-official-map-line.tuen-ma .rail-official-map-route::after{background-color:var(--rail-official-color-tml);}
+
+.rail-official-map-line.tsuen-wan .rail-official-map-route.r0::after{width:60px;height:1px;top:16px;}
+.rail-official-map-line.hong-kong-island .rail-official-map-route.r4::before{width:60px;height:1px;top:7px;}
+.rail-official-map-line.hong-kong-island .rail-official-map-route.r5::after{width:35px;height:1px;top:12px;}
+.rail-official-map-line.east-rail .rail-official-map-route.r0::after{width:35px;height:1px;top:25px;}
+.rail-official-map-line.south-island .rail-official-map-route.r0::before{width:10px;height:1px;top:1px;}
+.rail-official-map-line.tseung-kwan-o .rail-official-map-route.r0::after{width:60px;height:1px;top:13px;}
+.rail-official-map-line.hong-kong-island .rail-official-map-route.r10::before{width:60px;height:1px;top:7px;}
+.rail-official-map-line.kwun-tong .rail-official-map-route.r13::after{width:60px;height:1px;top:11px;}
+.rail-official-map-line.tseung-kwan-o .rail-official-map-route.r2::before{width:60px;height:1px;top:5px;}
+.rail-official-map-line.tung-chung .rail-official-map-route.r0::after{width:75px;height:1px;top:84px;left:35px;}
+.rail-official-map-line.airport .rail-official-map-route.r0::before{width:75px;height:1px;top:89px;left:30px;}
+.rail-official-map-line.tsuen-wan .rail-official-map-route.r11::after{width:15px;height:1px;top:11px;left:35px;}
+.rail-official-map-line.tsuen-wan .rail-official-map-route.r10::after{width:20px;height:1px;top:11px;left:0;}
+.rail-official-map-line.tung-chung .rail-official-map-route.r3::before{width:20px;height:1px;top:4px;left:0;}
+.rail-official-map-line.tung-chung .rail-official-map-route.r3::after{
+  background-color:transparent;
+  background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='43' height='53' viewBox='0 0 43 53' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M42.5 53V25.5986C42.5 12 31.5 1.04999 18.1054 1.04999L0 1.05' stroke='%23F7943E' stroke-miterlimit='10'/%3e%3c/svg%3e ");
+  background-position:0 9px;
+  width:100%;
+  height:100%;
+}
+.rail-official-map-line.tung-chung .rail-official-map-route.r4::after{
+  background-color:transparent;
+  background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='66' height='40' viewBox='0 0 66 40' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M66 1.04999L49.5741 1.05C41 1.05 35.5 4 30 9.9719L1 39.5' stroke='%23F7943E' stroke-miterlimit='10'/%3e%3c/svg%3e ");
+  background-position:0 9px;
+  width:100%;
+  height:100%;
+}
+.rail-official-map-line.airport .rail-official-map-route.r1::before{
+  background-color:transparent;
+  background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='109' height='53' viewBox='0 0 109 53' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M108.5 53V25.5986C108.5 12 97.5 1.04999 84.1054 1.04999L49.5741 1.05C41 1.05 35.5 4 30 9.9719L1 39.5' stroke='%2300888A' stroke-miterlimit='10'/%3e%3c/svg%3e ");
+  background-position:-4px 8px;
+  width:100%;
+  height:100%;
+}
+.rail-official-map-line.airport .rail-official-map-route.r2::before{
+  background-color:#fff;
+  opacity:1;
+  transform:rotate3d(0,0,1,45deg);
+  top:32%;
+  left:9%;
+  width:10%;
+  height:50%;
+}

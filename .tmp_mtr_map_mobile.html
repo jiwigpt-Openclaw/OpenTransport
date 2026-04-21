@@ -1,0 +1,102 @@
+﻿<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<title>MTR Map</title>
+<meta http-equiv="X-UA-Compatible" content="IE=EmulateIE8">
+<META http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<META NAME="Generator" CONTENT="EditPlus">
+<META NAME="Author" CONTENT="">
+<META NAME="Keywords" CONTENT="">
+<META NAME="Description" CONTENT="">
+<meta http-equiv="Pragma" content="NO-CACHE">
+<meta http-equiv="CACHE-CONTROL" content="NO-CACHE">
+<meta HTTP-EQUIV="EXPIRES" content="0">
+<!--<meta name="viewport" content="width=device-width,user-scalable=yes">-->
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,shrink-to-fit=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+<link rel="stylesheet" href="./css/master_grid.css" />
+<link rel="stylesheet" href="./css/common.css" />
+<link rel="stylesheet" href="#" id="responsive_css"/>
+<link rel="stylesheet" href="./css/dpids.css?t=1489137697"/>
+<link rel="stylesheet" href="./css/desktop_dpids.css?t=1489137697" id="section_css"/>
+<link rel="stylesheet" href="./css/style_altTransport_m.css" id="stylesheet" type="text/css" media="all">
+<link href="./css/map_layout_withSILKTE.css?t=1720404708" rel="stylesheet" type="text/css" media="all" />
+<link rel="stylesheet" href="./plugin/zoom/zoom.css">
+
+<script src="./js/jquery-3.5.1.min.js"></script>
+<script src="./js/jquery-migrate-1.4.1.js"></script>
+<script src="./js/frame_responsive.js"></script>
+<script src="./js/responsive.js"></script>
+<script src="./js/selectivizr.js?t=1489137697"></script>
+<script src="./js/common.js"></script>
+<script type="text/javascript" src="js/func.js"></script>
+<script type="text/javascript" src="js/map_overview.js"></script>
+<script type="text/javascript" src="js/map_core_withSILKTE.js?t=1720404708"></script>
+<script src="./plugin/zoom/zoom.js"></script>
+<script src="./plugin/zoom/hammer.min.js"></script>
+<script>
+    function onClick_Back(page)
+    {
+    var url = document.referrer;
+    var filename = url.substring(url.lastIndexOf('/')+1);
+    if (filename == page)
+    {
+    window.location=page;
+    }
+    else
+    {
+    history.go(-1);
+    }
+    }
+	
+	$(function() {
+		initMapOverview();
+	});
+</script>
+</HEAD>
+
+<BODY style="background-color:#ddd">
+
+	<!--<div style="background-color:#EC4783;height:40px;min-width:1200px;width:100%;left:0px;top:0px;">-->
+		<!--<div style="position:fixed;left:0px;top:0px;"><a href="javascript:history.go(-1);" title="Back"><img src="./image/arrow.gif" border="0" width="40px"/></a></div>-->
+		<!--<div style="float:right;padding-left:0px;padding-top:0px;"><a href="javascript:history.go(-1);" title="Home"><img src="./image/home.gif" border="0" width="40px"/></a></div>-->
+	<!--</div>-->
+	<div id="innerNav" style="display:none;">
+		<div class="innerNav_inner">
+			<button title="Service Status" class="ButtonLink" onclick="window.location='service_status_m.html'"><img src="./image/icon-nav-05_WT.png" border="0" alt=""></button>
+			<button title="Back" class="ButtonLink" onclick="javascript:onClick_Back('service_status_m.html');"><img src="./image/icon-nav-arrow.png" border="0" alt=""></button>
+
+			<!--		pad must keep to alignment		-->
+			<a class="pad" href="service_status_m.html"></a>
+			<!--		pad must keep to alignment		-->
+		</div>
+	</div>
+	<div id="innerNav_pad">
+		<div class="innerNav_inner">
+			<a class="pad" href="service_status_m.html"></a>
+		</div>
+	</div>
+	<div>
+		<div class="main fixed">	
+			<div id="wrapper">  	
+				<div id="phMapStatic" style="display:none;">
+					<img id="mtr_map_static" src="" width="100%" alt="MTR System Map" />
+					
+				</div>
+				<div id="phMapAnimate" style="display:none;">
+					<div id="map" style="display:block; background-color:white; width:1400px; height:800px;"></div>
+
+					<div class="container">
+						<div class="incident-map-container">
+							<div class="lines-wrapper"></div><!--/.lines-wrapper-->
+							<div class="stations-text"></div><!--/.stations-->
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</BODY>
+</html>

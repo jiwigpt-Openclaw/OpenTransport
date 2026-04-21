@@ -1,12 +1,12 @@
 {
-  "name": "bozisoda.com 衣食住行",
-  "short_name": "bozisoda",
-  "description": "bozisoda.com 的衣食住行入口頁，現已開放 OpenTransport 巴士查詢。",
-  "start_url": "./",
+  "name": "香港巴士到站查詢",
+  "short_name": "巴士查詢",
+  "description": "支援 KMB、CTB、NLB、GMB 的香港巴士到站查詢網站。",
+  "start_url": "./bus.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f7f0e4",
-  "theme_color": "#f3ecdf",
+  "background_color": "#f2f7fc",
+  "theme_color": "#f2f7fc",
   "orientation": "portrait-primary",
   "icons": [
     {
