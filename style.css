@@ -1188,6 +1188,89 @@ body.has-modal-open {
     box-shadow: 0 18px 28px rgba(128, 145, 166, 0.16);
 }
 
+.scroll-top-btn {
+    position: fixed;
+    right: calc(16px + env(safe-area-inset-right));
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    z-index: 1200;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 12px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.84);
+    border-radius: 999px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(229, 237, 247, 0.78)),
+        rgba(255, 255, 255, 0.62);
+    color: var(--bus-accent-strong);
+    font-size: 0.92em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 18px 32px rgba(75, 96, 126, 0.2);
+    backdrop-filter: blur(18px);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+    pointer-events: none;
+    transition:
+        opacity 0.22s ease,
+        transform 0.22s ease,
+        box-shadow 0.22s ease,
+        background 0.22s ease,
+        color 0.22s ease;
+}
+
+.scroll-top-btn.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.scroll-top-btn:hover {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(234, 242, 252, 0.88)),
+        rgba(255, 255, 255, 0.72);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.96),
+        0 22px 38px rgba(75, 96, 126, 0.24);
+    transform: translateY(-2px);
+}
+
+.scroll-top-btn.is-visible:hover {
+    transform: translateY(-2px);
+}
+
+.scroll-top-btn:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 10px 18px rgba(75, 96, 126, 0.18);
+}
+
+.scroll-top-btn:focus-visible {
+    outline: 2px solid rgba(98, 130, 170, 0.34);
+    outline-offset: 4px;
+}
+
+.scroll-top-btn-icon {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(36, 65, 95, 0.1);
+    font-size: 1.05em;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.scroll-top-btn-text {
+    white-space: nowrap;
+}
+
 .footer {
     max-width: 900px;
     margin: 18px auto 0;
@@ -1428,6 +1511,20 @@ body.has-modal-open {
     .share-app-wrap,
     .footer {
         margin-top: 14px;
+    }
+
+    .scroll-top-btn {
+        right: calc(12px + env(safe-area-inset-right));
+        bottom: calc(14px + env(safe-area-inset-bottom));
+        gap: 8px;
+        padding: 11px 14px;
+        font-size: 0.88em;
+    }
+
+    .scroll-top-btn-icon {
+        width: 26px;
+        height: 26px;
+        font-size: 1em;
     }
 
     .footer {

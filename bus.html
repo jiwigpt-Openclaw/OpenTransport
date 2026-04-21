@@ -67,6 +67,17 @@
         </button>
     </div>
 
+    <button
+        type="button"
+        id="scrollToTopBtn"
+        class="scroll-top-btn"
+        aria-label="回到頁面頂部並重新輸入巴士路線"
+        aria-hidden="true"
+    >
+        <span class="scroll-top-btn-icon" aria-hidden="true">↑</span>
+        <span class="scroll-top-btn-text">回到頂部</span>
+    </button>
+
     <footer class="footer">
         <p>香港巴士到站查詢</p>
         <p>版本: <span id="app-version"></span></p>
@@ -116,6 +127,51 @@
                 alert("已把網站連結複製到剪貼板。");
             });
         }
+
+        (() => {
+            const scrollTopBtn = document.getElementById("scrollToTopBtn");
+            const routeInput = document.getElementById("routeInput");
+            const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+            if (!scrollTopBtn) {
+                return;
+            }
+
+            function updateScrollTopButtonVisibility() {
+                const isVisible = window.scrollY > 280;
+                scrollTopBtn.classList.toggle("is-visible", isVisible);
+                scrollTopBtn.setAttribute("aria-hidden", String(!isVisible));
+                scrollTopBtn.tabIndex = isVisible ? 0 : -1;
+            }
+
+            function focusRouteInput() {
+                if (!routeInput) {
+                    return;
+                }
+
+                try {
+                    routeInput.focus({ preventScroll: true });
+                } catch (error) {
+                    routeInput.focus();
+                }
+
+                if (typeof routeInput.select === "function") {
+                    routeInput.select();
+                }
+            }
+
+            scrollTopBtn.addEventListener("click", () => {
+                window.scrollTo({
+                    top: 0,
+                    behavior: prefersReducedMotion.matches ? "auto" : "smooth"
+                });
+
+                window.setTimeout(focusRouteInput, prefersReducedMotion.matches ? 0 : 360);
+            });
+
+            window.addEventListener("scroll", updateScrollTopButtonVisibility, { passive: true });
+            updateScrollTopButtonVisibility();
+        })();
     </script>
 </body>
 </html>
