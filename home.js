@@ -49,12 +49,13 @@
     const secondaryBubbleConfig = {
         travel: {
             title: "行的入口",
+            subtitle: "已開放功能可直接進入",
             items: [
-                { id: "bus", label: "巴士", icon: secondaryIcons.bus, interactive: true, href: "bus.html" },
-                { id: "mtr", label: "地鐵", icon: secondaryIcons.mtr, interactive: true, href: "rail.html" },
-                { id: "flight", label: "飛機", icon: secondaryIcons.flight, interactive: false },
-                { id: "ferry", label: "渡輪", icon: secondaryIcons.ferry, interactive: false },
-                { id: "other", label: "其他", icon: secondaryIcons.other, interactive: false }
+                { id: "bus", label: "巴士", meta: "即時到站", icon: secondaryIcons.bus, interactive: true, href: "bus.html" },
+                { id: "mtr", label: "地鐵", meta: "Rail beta", icon: secondaryIcons.mtr, interactive: true, href: "rail.html" },
+                { id: "flight", label: "飛機", meta: "稍後開放", icon: secondaryIcons.flight, interactive: false },
+                { id: "ferry", label: "渡輪", meta: "稍後開放", icon: secondaryIcons.ferry, interactive: false },
+                { id: "other", label: "其他", meta: "整理中", icon: secondaryIcons.other, interactive: false }
             ]
         }
     };
@@ -95,11 +96,17 @@
             return;
         }
 
+        const interactiveItems = secondaryConfig.items.filter((item) => item.interactive);
+        const pendingItems = secondaryConfig.items.filter((item) => !item.interactive);
+
         secondaryStage.innerHTML = `
             <div class="secondary-shell">
-                <p class="secondary-title">${secondaryConfig.title}</p>
+                <div class="secondary-header">
+                    <p class="secondary-title">${secondaryConfig.title}</p>
+                    <p class="secondary-subtitle">${secondaryConfig.subtitle || ""}</p>
+                </div>
                 <div class="secondary-cluster">
-                    ${secondaryConfig.items.map((item) => `
+                    ${interactiveItems.map((item) => `
                         <button
                             type="button"
                             class="secondary-bubble-card ${item.interactive ? "is-actionable" : ""}"
@@ -111,10 +118,21 @@
                             <span class="secondary-bubble-orb" aria-hidden="true">
                                 <span class="secondary-bubble-icon">${item.icon}</span>
                             </span>
-                            <span class="secondary-bubble-label">${item.label}</span>
+                            <span class="secondary-bubble-copy">
+                                <span class="secondary-bubble-label">${item.label}</span>
+                                <span class="secondary-bubble-meta">${item.meta || ""}</span>
+                            </span>
                         </button>
                     `).join("")}
                 </div>
+                ${pendingItems.length ? `
+                    <div class="secondary-pending" aria-label="稍後開放">
+                        <span class="secondary-pending-label">稍後開放</span>
+                        ${pendingItems.map((item) => `
+                            <span class="secondary-pending-chip">${item.label}</span>
+                        `).join("")}
+                    </div>
+                ` : ""}
             </div>
         `;
 
