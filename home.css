@@ -176,12 +176,16 @@ button {
 
 .bubble-field {
     position: relative;
-    min-height: 398px;
+    min-height: 0;
+    padding: 18px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
     border-radius: 30px;
     border: 1px solid rgba(255, 255, 255, 0.52);
     background:
-        radial-gradient(circle at 48% 42%, rgba(255, 255, 255, 0.28), transparent 45%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.12));
+        radial-gradient(circle at 48% 42%, rgba(255, 255, 255, 0.22), transparent 48%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.12));
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.74),
         inset 0 -16px 34px rgba(215, 228, 241, 0.18);
@@ -197,51 +201,57 @@ button {
 }
 
 .bubble-field::before {
-    inset: 16% auto auto 6%;
-    width: 42%;
+    inset: 10% auto auto 8%;
+    width: 34%;
     aspect-ratio: 1;
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    opacity: 0.5;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    opacity: 0.42;
 }
 
 .bubble-field::after {
-    right: 10%;
-    bottom: 10%;
-    width: 30%;
+    right: 8%;
+    bottom: 8%;
+    width: 24%;
     aspect-ratio: 1;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.32), transparent 68%);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.28), transparent 68%);
     filter: blur(10px);
-    opacity: 0.74;
+    opacity: 0.68;
 }
 
 .bubble-card {
-    --bubble-size: 146px;
-    --orbit-x: 0px;
-    --orbit-y: 0px;
     --bubble-scale: 1;
-    --float-distance: -7px;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: var(--bubble-size);
+    --bubble-tint: linear-gradient(145deg, rgba(255, 255, 255, 0.44), rgba(255, 255, 255, 0.18));
+    --bubble-tint-active: linear-gradient(145deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.26));
+    --category-ink: var(--ink);
+    position: relative;
+    width: 100%;
+    min-height: 168px;
     display: grid;
     justify-items: center;
-    gap: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: #2f435d;
+    align-content: center;
+    gap: 12px;
+    padding: 16px 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.74);
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at 24% 18%, rgba(255, 255, 255, 0.82), transparent 34%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.3)),
+        var(--bubble-tint);
+    color: var(--category-ink);
     cursor: pointer;
-    transform: translate(calc(-50% + var(--orbit-x)), calc(-50% + var(--orbit-y))) scale(var(--bubble-scale));
+    box-shadow: 0 18px 32px rgba(133, 149, 172, 0.14);
+    transform: scale(var(--bubble-scale));
     transition:
         transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 220ms ease,
+        background 220ms ease,
         opacity 220ms ease,
         filter 220ms ease;
 }
 
 .bubble-orb {
     position: relative;
-    width: 100%;
+    width: clamp(72px, 9vw, 92px);
     aspect-ratio: 1;
     display: grid;
     place-items: center;
@@ -317,15 +327,15 @@ button {
 }
 
 .bubble-nameplate {
-    margin-top: -14px;
-    padding: 8px 16px;
+    margin-top: 0;
+    padding: 7px 14px;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.82);
     background: rgba(255, 255, 255, 0.72);
     color: var(--ink);
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     font-weight: 700;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.1em;
     box-shadow: 0 12px 24px rgba(137, 151, 172, 0.14);
     backdrop-filter: blur(12px);
     transition:
@@ -337,7 +347,8 @@ button {
 
 .bubble-card:hover,
 .bubble-card:focus-visible {
-    --bubble-scale: 1.04;
+    --bubble-scale: 1.02;
+    box-shadow: 0 22px 34px rgba(124, 149, 176, 0.18);
 }
 
 .bubble-card:focus-visible {
@@ -352,8 +363,12 @@ button {
 }
 
 .bubble-card.is-selected {
-    --bubble-scale: 1.08;
+    --bubble-scale: 1.03;
     z-index: 2;
+    background:
+        radial-gradient(circle at 24% 18%, rgba(255, 255, 255, 0.88), transparent 34%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.36)),
+        var(--bubble-tint-active);
 }
 
 .bubble-card.is-selected .bubble-orb {
@@ -374,14 +389,14 @@ button {
 }
 
 .bubble-card.is-selected .bubble-nameplate {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     background: rgba(255, 255, 255, 0.88);
 }
 
 .bubble-card.is-dimmed {
-    --bubble-scale: 0.82;
-    opacity: 0.32;
-    filter: saturate(0.7);
+    --bubble-scale: 0.98;
+    opacity: 0.5;
+    filter: saturate(0.84);
 }
 
 .bubble-card.is-dimmed .bubble-nameplate {
@@ -389,39 +404,35 @@ button {
 }
 
 .bubble-clothing {
-    --bubble-size: 142px;
-    --orbit-x: -84px;
-    --orbit-y: -102px;
+    --bubble-tint: linear-gradient(145deg, rgba(248, 230, 236, 0.56), rgba(255, 255, 255, 0.24));
+    --bubble-tint-active: linear-gradient(145deg, rgba(248, 230, 236, 0.72), rgba(255, 255, 255, 0.3));
     --float-duration: 6.2s;
     --float-delay: -0.8s;
-    color: #986a7c;
+    --category-ink: #986a7c;
 }
 
 .bubble-food {
-    --bubble-size: 156px;
-    --orbit-x: 82px;
-    --orbit-y: -112px;
+    --bubble-tint: linear-gradient(145deg, rgba(255, 244, 224, 0.62), rgba(255, 255, 255, 0.24));
+    --bubble-tint-active: linear-gradient(145deg, rgba(255, 244, 224, 0.76), rgba(255, 255, 255, 0.3));
     --float-duration: 6.8s;
     --float-delay: -2.2s;
-    color: #aa7b40;
+    --category-ink: #aa7b40;
 }
 
 .bubble-home {
-    --bubble-size: 150px;
-    --orbit-x: -92px;
-    --orbit-y: 86px;
+    --bubble-tint: linear-gradient(145deg, rgba(231, 242, 255, 0.62), rgba(255, 255, 255, 0.24));
+    --bubble-tint-active: linear-gradient(145deg, rgba(231, 242, 255, 0.78), rgba(255, 255, 255, 0.3));
     --float-duration: 7.1s;
     --float-delay: -1.6s;
-    color: #5e86aa;
+    --category-ink: #5e86aa;
 }
 
 .bubble-travel {
-    --bubble-size: 170px;
-    --orbit-x: 90px;
-    --orbit-y: 74px;
+    --bubble-tint: linear-gradient(145deg, rgba(227, 249, 242, 0.68), rgba(255, 255, 255, 0.24));
+    --bubble-tint-active: linear-gradient(145deg, rgba(227, 249, 242, 0.82), rgba(255, 255, 255, 0.32));
     --float-duration: 6.4s;
     --float-delay: -2.8s;
-    color: #518b85;
+    --category-ink: #518b85;
 }
 
 .bubble-clothing .bubble-orb {
@@ -468,33 +479,53 @@ button {
 }
 
 .secondary-shell {
-    border-radius: 28px;
-    padding: 20px 16px 18px;
-    text-align: center;
+    border-radius: 24px;
+    padding: 16px 14px 14px;
+    text-align: left;
+}
+
+.secondary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 12px;
 }
 
 .secondary-title {
-    margin: 0 0 16px;
+    margin: 0;
     color: var(--muted);
     font-size: 0.82rem;
     font-weight: 700;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
+}
+
+.secondary-subtitle {
+    margin: 0;
+    color: #6d7c90;
+    font-size: 0.76rem;
+    font-weight: 600;
 }
 
 .secondary-cluster {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
 }
 
 .secondary-bubble-card {
     display: grid;
-    justify-items: center;
-    gap: 9px;
-    padding: 0;
-    border: 0;
-    background: transparent;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    justify-items: start;
+    gap: 10px 12px;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 22px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.34)),
+        rgba(255, 255, 255, 0.26);
     color: inherit;
     cursor: default;
     transition:
@@ -524,7 +555,7 @@ button {
 }
 
 .secondary-bubble-orb {
-    width: 82px;
+    width: 62px;
     aspect-ratio: 1;
     display: grid;
     place-items: center;
@@ -556,10 +587,53 @@ button {
 }
 
 .secondary-bubble-label {
+    display: block;
     font-size: 0.92rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     color: #3b4d66;
+}
+
+.secondary-bubble-copy {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.secondary-bubble-meta {
+    display: block;
+    color: #6f8096;
+    font-size: 0.74rem;
+    font-weight: 600;
+}
+
+.secondary-pending {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.secondary-pending-label {
+    color: #7a8798;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.secondary-pending-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.52);
+    color: #66788f;
+    font-size: 0.76rem;
+    font-weight: 700;
 }
 
 .launch-panel {
@@ -636,32 +710,8 @@ button {
     }
 
     .bubble-field {
-        min-height: 500px;
         border-radius: 34px;
-    }
-
-    .bubble-clothing {
-        --bubble-size: 182px;
-        --orbit-x: -126px;
-        --orbit-y: -134px;
-    }
-
-    .bubble-food {
-        --bubble-size: 204px;
-        --orbit-x: 138px;
-        --orbit-y: -132px;
-    }
-
-    .bubble-home {
-        --bubble-size: 192px;
-        --orbit-x: -142px;
-        --orbit-y: 118px;
-    }
-
-    .bubble-travel {
-        --bubble-size: 220px;
-        --orbit-x: 146px;
-        --orbit-y: 112px;
+        padding: 22px;
     }
 
     .secondary-shell {
@@ -669,50 +719,229 @@ button {
     }
 
     .secondary-cluster {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 14px;
     }
 
     .secondary-bubble-orb {
-        width: 88px;
+        width: 68px;
     }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 720px) {
+    .home-shell {
+        padding: 12px 10px 18px;
+        gap: 10px;
+    }
+
+    .landing-panel {
+        border-radius: 26px;
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .hero {
+        gap: 6px;
+    }
+
+    .hero-site {
+        padding: 6px 10px;
+        font-size: 0.68rem;
+        letter-spacing: 0.12em;
+    }
+
     .hero-title {
-        font-size: clamp(2.7rem, 16vw, 4rem);
+        font-size: clamp(1.95rem, 9.6vw, 2.7rem);
+        letter-spacing: -0.05em;
+    }
+
+    .hero-subtitle {
+        font-size: 0.82rem;
+    }
+
+    .hero-status {
+        padding: 7px 10px;
+        font-size: 0.74rem;
     }
 
     .bubble-field {
-        min-height: 368px;
+        min-height: 252px;
+        border-radius: 24px;
     }
 
-    .bubble-clothing {
-        --bubble-size: 132px;
-        --orbit-x: -76px;
-        --orbit-y: -98px;
+    .bubble-card {
+        --float-distance: -5px;
+        min-height: 122px;
+        padding: 12px 8px 10px;
+        gap: 8px;
     }
 
-    .bubble-food {
-        --bubble-size: 144px;
-        --orbit-x: 74px;
-        --orbit-y: -96px;
+    .bubble-orb {
+        width: 62px;
     }
 
-    .bubble-home {
-        --bubble-size: 140px;
-        --orbit-x: -80px;
-        --orbit-y: 76px;
+    .bubble-nameplate {
+        margin-top: -8px;
+        padding: 6px 11px;
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
     }
 
-    .bubble-travel {
-        --bubble-size: 156px;
-        --orbit-x: 78px;
-        --orbit-y: 70px;
+    .secondary-stage.is-visible {
+        max-height: 170px;
+    }
+
+    .secondary-shell {
+        border-radius: 20px;
+        padding: 10px;
+    }
+
+    .secondary-title {
+        margin-bottom: 8px;
+        font-size: 0.68rem;
+        letter-spacing: 0.12em;
     }
 
     .secondary-cluster {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .secondary-bubble-orb {
+        width: 56px;
+    }
+
+    .secondary-bubble-icon {
+        width: 22px;
+        height: 22px;
+    }
+
+    .secondary-bubble-label {
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+    }
+
+    .secondary-bubble-meta {
+        font-size: 0.68rem;
+    }
+
+    .launch-panel {
+        display: none;
+    }
+
+    .launch-label,
+    .launch-link {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 520px) {
+    .home-shell {
+        min-height: 100svh;
+        padding: 10px 8px 14px;
+        gap: 8px;
+    }
+
+    .landing-panel {
+        padding: 10px;
+        gap: 8px;
+    }
+
+    .hero {
+        gap: 5px;
+    }
+
+    .hero-site {
+        padding: 5px 8px;
+        font-size: 0.62rem;
+    }
+
+    .hero-title {
+        font-size: clamp(1.7rem, 8.5vw, 2.2rem);
+        letter-spacing: -0.04em;
+    }
+
+    .hero-subtitle {
+        font-size: 0.78rem;
+    }
+
+    .hero-status {
+        padding: 6px 9px;
+        font-size: 0.68rem;
+    }
+
+    .bubble-field {
+        min-height: 216px;
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .bubble-card {
+        min-height: 98px;
+        padding: 10px 6px 8px;
+        gap: 6px;
+    }
+
+    .bubble-orb {
+        width: 52px;
+    }
+
+    .bubble-core {
+        width: 58%;
+    }
+
+    .bubble-icon {
+        width: 54%;
+    }
+
+    .bubble-nameplate {
+        margin-top: -6px;
+        padding: 5px 8px;
+        font-size: 0.7rem;
+        letter-spacing: 0.05em;
+    }
+
+    .secondary-stage.is-visible {
+        max-height: 126px;
+    }
+
+    .secondary-shell {
+        padding: 8px;
+    }
+
+    .secondary-cluster {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px 8px;
+    }
+
+    .secondary-bubble-orb {
+        width: 54px;
+    }
+
+    .secondary-bubble-icon {
+        width: 22px;
+        height: 22px;
+    }
+
+    .secondary-bubble-label {
+        font-size: 0.7rem;
+    }
+
+    .secondary-bubble-meta {
+        font-size: 0.64rem;
+    }
+
+    .secondary-bubble-card[data-interactive="false"] {
+        display: none;
+    }
+
+    .secondary-pending {
+        display: none;
+    }
+
+    .launch-panel {
+        padding: 9px 10px;
+        gap: 7px;
     }
 
     .launch-panel {
