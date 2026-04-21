@@ -35,68 +35,8 @@
             </header>
 
             <section class="bubble-stage" aria-label="主分類入口">
-                <div class="bubble-field">
-                    <button type="button" class="bubble-card bubble-clothing" data-category="clothing" aria-pressed="false">
-                        <span class="bubble-orb" aria-hidden="true">
-                            <span class="bubble-core">
-                                <svg class="bubble-icon" viewBox="0 0 64 64" aria-hidden="true">
-                                    <path d="M28 16.5c0-2.8 1.8-5 4-5s4 2.2 4 5"></path>
-                                    <path d="M24 20c2 3 4.8 4.5 8 4.5s6-1.5 8-4.5l8 6.5-5.7 8.1-4.3-3.2V49H25.9V31.4l-4.2 3.2-5.7-8.1L24 20Z"></path>
-                                </svg>
-                            </span>
-                        </span>
-                        <span class="bubble-nameplate">衣</span>
-                    </button>
-
-                    <button type="button" class="bubble-card bubble-food" data-category="food" aria-pressed="false">
-                        <span class="bubble-orb" aria-hidden="true">
-                            <span class="bubble-core">
-                                <svg class="bubble-icon" viewBox="0 0 64 64" aria-hidden="true">
-                                    <path d="M18 34h28"></path>
-                                    <path d="M20 34c1.4 8 6.6 12.5 12 12.5S42.6 42 44 34"></path>
-                                    <path d="M24 18c-2 3-2 6.1 0 9.2"></path>
-                                    <path d="M32 16c-2 3.2-2 6.4 0 9.6"></path>
-                                    <path d="M40 18c-2 3-2 6.1 0 9.2"></path>
-                                </svg>
-                            </span>
-                        </span>
-                        <span class="bubble-nameplate">食</span>
-                    </button>
-
-                    <button type="button" class="bubble-card bubble-home" data-category="home" aria-pressed="false">
-                        <span class="bubble-orb" aria-hidden="true">
-                            <span class="bubble-core">
-                                <svg class="bubble-icon" viewBox="0 0 64 64" aria-hidden="true">
-                                    <path d="M18 28.5 32 17l14 11.5V47a2 2 0 0 1-2 2H20a2 2 0 0 1-2-2V28.5Z"></path>
-                                    <path d="M27 49V35.5h10V49"></path>
-                                </svg>
-                            </span>
-                        </span>
-                        <span class="bubble-nameplate">住</span>
-                    </button>
-
-                    <button type="button" class="bubble-card bubble-travel" data-category="travel" aria-pressed="false">
-                        <span class="bubble-orb" aria-hidden="true">
-                            <span class="bubble-core">
-                                <svg class="bubble-icon" viewBox="0 0 64 64" aria-hidden="true">
-                                    <circle cx="20" cy="44" r="3.5"></circle>
-                                    <circle cx="45" cy="20" r="3.5"></circle>
-                                    <path d="M20 40v-8c0-6.6 5.4-12 12-12h9"></path>
-                                    <path d="M28 36h12a4 4 0 0 0 0-8H28a4 4 0 0 0 0 8Z"></path>
-                                </svg>
-                            </span>
-                        </span>
-                        <span class="bubble-nameplate">行</span>
-                    </button>
-                </div>
+                <div id="bubbleField" class="bubble-field" aria-live="polite"></div>
             </section>
-
-            <section
-                id="secondaryBubbleStage"
-                class="secondary-stage"
-                aria-label="二級入口"
-                aria-hidden="true"
-            ></section>
         </section>
 
         <section class="launch-panel" aria-label="已開放功能">
